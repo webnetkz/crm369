@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'account_created_message' => 'An administrator created your account in the portal.',
+    'account_created_title' => 'Account created',
+    'all_marked_as_read' => 'All notifications marked as read.',
+    'empty' => 'You have no notifications yet.',
+    'marked_as_read' => 'Notification marked as read.',
+    'mark_all_as_read' => 'Mark all as read',
+    'mark_as_read' => 'Mark as read',
+    'open_profile' => 'Open profile',
+    'open_page' => 'Open notifications page',
+    'open_security' => 'Open security',
+    'open_target' => 'Open',
+    'panel_description' => 'Recent system updates and actions related to your account.',
+    'panel_title' => 'Notifications',
+    'status_all' => 'All',
+    'status_read' => 'Read',
+    'status_unread' => 'Unread',
+    'default_title' => 'Notification',
+    'group_updated_message' => 'Your user group is now: :group.',
+    'group_updated_title' => 'Group updated',
+    'password_reset_message' => 'An administrator changed your password. Use the new password provided to you.',
+    'password_reset_title' => 'Password changed',
+    'task_due_soon_message' => 'The task ":title" is due in less than 24 hours.',
+    'task_due_soon_title' => 'Task due soon',
+];

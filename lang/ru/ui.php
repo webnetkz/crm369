@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'common' => require __DIR__.'/ui/common.php',
+    'auth' => require __DIR__.'/ui/auth.php',
+    'settings' => require __DIR__.'/ui/settings.php',
+    'admin' => require __DIR__.'/ui/admin.php',
+    'portal' => require __DIR__.'/ui/portal.php',
+    'menu' => require __DIR__.'/ui/menu.php',
+    'knowledge' => require __DIR__.'/ui/knowledge.php',
+    'funnels' => require __DIR__.'/ui/funnels.php',
+    'forms' => require __DIR__.'/ui/forms.php',
+    'files' => require __DIR__.'/ui/files.php',
+    'news' => require __DIR__.'/ui/news.php',
+    'projects' => require __DIR__.'/ui/projects.php',
+    'chat' => require __DIR__.'/ui/chat.php',
+    'notifications' => require __DIR__.'/ui/notifications.php',
+    'profile' => require __DIR__.'/ui/profile.php',
+    'integrations' => require __DIR__.'/ui/integrations.php',
+    'webhooks' => require __DIR__.'/ui/webhooks.php',
+    'api' => require __DIR__.'/ui/api.php',
+    'security' => require __DIR__.'/ui/security.php',
+    'passkeys' => require __DIR__.'/ui/passkeys.php',
+    'two_factor' => require __DIR__.'/ui/two_factor.php',
+];

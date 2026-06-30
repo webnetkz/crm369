@@ -1,0 +1,1238 @@
+<script setup lang="ts">
+import { Head, Link, router, setLayoutProps, useForm } from '@inertiajs/vue3';
+import {
+    BriefcaseBusiness,
+    CalendarClock,
+    ClipboardList,
+    FolderKanban,
+    GitBranchPlus,
+    Layers3,
+    PencilLine,
+    Plus,
+    Save,
+    Shield,
+    Trash2,
+    UserRound,
+    UsersRound,
+} from '@lucide/vue';
+import { computed, ref, watch, watchEffect } from 'vue';
+import {
+    destroy as destroyProject,
+    destroyWorkspaceTask,
+    index,
+    show,
+    showWorkspaceTask,
+    store,
+    storeWorkspaceTask,
+    update,
+    updateWorkspaceTask,
+} from '@/actions/App/Http/Controllers/ProjectController';
+import InputError from '@/components/InputError.vue';
+import ProjectTaskConversationPanel from '@/components/ProjectTaskConversationPanel.vue';
+import ProjectTaskTreeItem from '@/components/ProjectTaskTreeItem.vue';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { useLanguage } from '@/composables/useLanguage';
+import type {
+    ProjectActiveProject,
+    ProjectActiveTask,
+    ProjectListItem,
+    ProjectOption,
+    ProjectTaskGroup,
+    ProjectTaskListItem,
+    ProjectTaskOption,
+    ProjectUserSummary,
+} from '@/types/ui';
+
+type ParentTaskOption = {
+    id: number;
+    label: string;
+};
+
+type Props = {
+    projects: ProjectListItem[];
+    taskGroups: ProjectTaskGroup[];
+    activeProject: ProjectActiveProject | null;
+    activeTask: ProjectActiveTask | null;
+    availableUsers: ProjectUserSummary[];
+    availableProjects: ProjectOption[];
+    can: {
+        createProject: boolean;
+        createTask: boolean;
+        manageProject: boolean;
+        manageTask: boolean;
+        workOnActiveProject: boolean;
+    };
+    taskOptions: {
+        statuses: ProjectTaskOption[];
+        importances: ProjectTaskOption[];
+        complexity: number[];
+    };
+    workspaceSummary: {
+        standalone_tasks_count: number;
+        standalone_open_tasks_count: number;
+        standalone_completed_tasks_count: number;
+    };
+};
+
+const props = defineProps<Props>();
+const { language, t } = useLanguage();
+
+const projectEditorMode = ref<'idle' | 'create' | 'edit'>('idle');
+const taskEditorMode = ref<'idle' | 'create' | 'edit'>('idle');
+
+const projectForm = useForm({
+    name: '',
+    slug: '',
+    description: '',
+    is_archived: false,
+    member_user_ids: [] as number[],
+});
+
+const taskForm = useForm({
+    project_id: '' as number | string,
+    parent_task_id: '' as number | string,
+    title: '',
+    description: '',
+    status: 'todo',
+    importance: 'normal',
+    complexity: 5,
+    due_at: '',
+    sort_order: 0,
+    assignee_user_id: '' as number | string,
+    co_assignee_user_ids: [] as number[],
+});
+
+const activeProjectOwnerId = computed(() => props.activeProject?.owner?.id ?? null);
+
+watchEffect(() => {
+    const breadcrumbs = [
+        {
+            title: t.value.projects.title,
+            href: index(),
+        },
+    ];
+
+    if (props.activeProject) {
+        breadcrumbs.push({
+            title: props.activeProject.name,
+            href: show(props.activeProject.id),
+        });
+    }
+
+    if (props.activeTask) {
+        breadcrumbs.push({
+            title: props.activeTask.title,
+            href: showWorkspaceTask(props.activeTask.id),
+        });
+    }
+
+    setLayoutProps({ breadcrumbs });
+});
+
+const fullName = (user: ProjectUserSummary | null): string => {
+    if (!user) {
+        return t.value.common.not_specified;
+    }
+
+    return [user.name, user.last_name].filter(Boolean).join(' ');
+};
+
+const formatDateTime = (value: string | null): string => {
+    if (!value) {
+        return t.value.common.not_specified;
+    }
+
+    const locale = language.value === 'ru' ? 'ru-RU' : 'en-US';
+
+    return new Intl.DateTimeFormat(locale, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    }).format(new Date(value));
+};
+
+const toDateTimeLocalValue = (value: string | null): string => {
+    if (!value) {
+        return '';
+    }
+
+    const date = new Date(value);
+
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+        date.getDate(),
+    ).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(
+        date.getMinutes(),
+    ).padStart(2, '0')}`;
+};
+
+const normalizeDueAtForSubmission = (value: string): string | null => {
+    const normalizedValue = value.trim();
+
+    if (normalizedValue === '') {
+        return null;
+    }
+
+    return new Date(normalizedValue).toISOString();
+};
+
+const projectStatusClass = (project: ProjectListItem): string => {
+    return project.is_archived
+        ? 'bg-muted text-muted-foreground'
+        : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
+};
+
+const taskStatusClass = (status: string): string => {
+    return {
+        todo: 'bg-slate-500/10 text-slate-700 dark:text-slate-300',
+        in_progress: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
+        review: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+        done: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    }[status] ?? 'bg-muted text-muted-foreground';
+};
+
+const importanceClass = (importance: string): string => {
+    return {
+        low: 'bg-muted text-muted-foreground',
+        normal: 'bg-primary/10 text-primary',
+        high: 'bg-orange-500/10 text-orange-700 dark:text-orange-300',
+        critical: 'bg-rose-500/10 text-rose-700 dark:text-rose-300',
+    }[importance] ?? 'bg-muted text-muted-foreground';
+};
+
+const optionLabel = (options: ProjectTaskOption[], value: string): string => {
+    return options.find((option) => option.value === value)?.label ?? value;
+};
+
+const selectedTaskProjectId = computed<number | null>(() => {
+    return taskForm.project_id === '' ? null : Number(taskForm.project_id);
+});
+
+const taskSheetOpen = computed<boolean>(() => {
+    return taskEditorMode.value !== 'idle' || props.activeTask !== null;
+});
+
+const taskSheetBaseRoute = computed(() => {
+    return props.activeProject ? show(props.activeProject.id) : index();
+});
+
+const selectedProjectOption = computed<ProjectOption | null>(() => {
+    if (selectedTaskProjectId.value === null) {
+        return null;
+    }
+
+    return props.availableProjects.find((project) => project.id === selectedTaskProjectId.value) ?? null;
+});
+
+const taskMemberOptions = computed(() => {
+    return selectedProjectOption.value?.members ?? props.availableUsers;
+});
+
+const standaloneTaskGroup = computed(() => {
+    return props.taskGroups.find((group) => group.kind === 'standalone') ?? null;
+});
+
+const selectedParentTaskTree = computed<ProjectTaskListItem[]>(() => {
+    if (selectedTaskProjectId.value === null) {
+        return standaloneTaskGroup.value?.tasks ?? [];
+    }
+
+    return props.taskGroups.find((group) => group.project?.id === selectedTaskProjectId.value)?.tasks ?? [];
+});
+
+const flattenTaskTree = (tasks: ProjectTaskListItem[], level = 0): Array<ProjectTaskListItem & { level: number }> => {
+    return tasks.flatMap((task) => [
+        { ...task, level },
+        ...flattenTaskTree(task.subtasks, level + 1),
+    ]);
+};
+
+const findTaskInTree = (tasks: ProjectTaskListItem[], taskId: number): ProjectTaskListItem | null => {
+    for (const task of tasks) {
+        if (task.id === taskId) {
+            return task;
+        }
+
+        const nestedMatch = findTaskInTree(task.subtasks, taskId);
+
+        if (nestedMatch) {
+            return nestedMatch;
+        }
+    }
+
+    return null;
+};
+
+const collectDescendantIds = (task: ProjectTaskListItem): number[] => {
+    return task.subtasks.flatMap((subtask) => [subtask.id, ...collectDescendantIds(subtask)]);
+};
+
+const parentTaskOptions = computed<ParentTaskOption[]>(() => {
+    const excludedIds = new Set<number>();
+
+    if (taskEditorMode.value === 'edit' && props.activeTask) {
+        excludedIds.add(props.activeTask.id);
+
+        const currentTaskTree = findTaskInTree(selectedParentTaskTree.value, props.activeTask.id);
+
+        if (currentTaskTree) {
+            collectDescendantIds(currentTaskTree).forEach((taskId) => excludedIds.add(taskId));
+        }
+    }
+
+    return flattenTaskTree(selectedParentTaskTree.value)
+        .filter((task) => !excludedIds.has(task.id))
+        .map((task) => ({
+            id: task.id,
+            label: `${'— '.repeat(task.level)}${task.title}`,
+        }));
+});
+
+watch(parentTaskOptions, (options) => {
+    if (taskForm.parent_task_id === '') {
+        return;
+    }
+
+    const hasCurrentParent = options.some((option) => option.id === Number(taskForm.parent_task_id));
+
+    if (!hasCurrentParent) {
+        taskForm.parent_task_id = '';
+    }
+});
+
+const resetProjectForm = (): void => {
+    projectForm.reset();
+    projectForm.is_archived = false;
+    projectForm.member_user_ids = [];
+    projectForm.clearErrors();
+    projectEditorMode.value = 'idle';
+};
+
+const openCreateProject = (): void => {
+    resetProjectForm();
+    projectEditorMode.value = 'create';
+};
+
+const openEditProject = (): void => {
+    if (!props.activeProject) {
+        return;
+    }
+
+    projectForm.name = props.activeProject.name;
+    projectForm.slug = props.activeProject.slug;
+    projectForm.description = props.activeProject.description ?? '';
+    projectForm.is_archived = props.activeProject.is_archived;
+    projectForm.member_user_ids = props.activeProject.members.map((user) => user.id);
+    projectForm.clearErrors();
+    projectEditorMode.value = 'edit';
+};
+
+const toggleProjectMember = (userId: number, checked: boolean | 'indeterminate'): void => {
+    if (checked === true) {
+        projectForm.member_user_ids = [...new Set([...projectForm.member_user_ids, userId])];
+
+        return;
+    }
+
+    projectForm.member_user_ids = projectForm.member_user_ids.filter((value) => value !== userId);
+};
+
+const setProjectArchived = (checked: boolean | 'indeterminate'): void => {
+    projectForm.is_archived = checked === true;
+};
+
+const projectMemberHandler = (userId: number) => {
+    return (checked: boolean | 'indeterminate'): void => {
+        toggleProjectMember(userId, checked);
+    };
+};
+
+const submitProject = (): void => {
+    if (projectEditorMode.value === 'edit' && props.activeProject) {
+        projectForm.patch(update.url(props.activeProject.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                projectEditorMode.value = 'idle';
+            },
+        });
+
+        return;
+    }
+
+    projectForm.post(store.url(), {
+        preserveScroll: true,
+        onSuccess: resetProjectForm,
+    });
+};
+
+const deleteCurrentProject = (): void => {
+    if (!props.activeProject || !window.confirm(t.value.projects.delete_project_confirm)) {
+        return;
+    }
+
+    router.delete(destroyProject.url(props.activeProject.id), {
+        preserveScroll: true,
+    });
+};
+
+const resetTaskForm = (): void => {
+    taskForm.reset();
+    taskForm.project_id = props.activeProject?.id ?? '';
+    taskForm.parent_task_id = '';
+    taskForm.status = 'todo';
+    taskForm.importance = 'normal';
+    taskForm.complexity = 5;
+    taskForm.due_at = '';
+    taskForm.sort_order = 0;
+    taskForm.assignee_user_id = '';
+    taskForm.co_assignee_user_ids = [];
+    taskForm.clearErrors();
+    taskEditorMode.value = 'idle';
+};
+
+const openCreateTask = (projectId: number | null = props.activeProject?.id ?? null): void => {
+    resetTaskForm();
+    taskForm.project_id = projectId ?? '';
+    taskEditorMode.value = 'create';
+};
+
+const openCreateSubtask = (task: ProjectTaskListItem): void => {
+    openCreateTask(task.project_id);
+    taskForm.parent_task_id = task.id;
+};
+
+const openCreateSubtaskFromActiveTask = (): void => {
+    if (!props.activeTask) {
+        return;
+    }
+
+    openCreateTask(props.activeTask.project_id);
+    taskForm.parent_task_id = props.activeTask.id;
+};
+
+const openEditTask = (): void => {
+    if (!props.activeTask) {
+        return;
+    }
+
+    taskForm.project_id = props.activeTask.project_id ?? '';
+    taskForm.parent_task_id = props.activeTask.parent_task_id ?? '';
+    taskForm.title = props.activeTask.title;
+    taskForm.description = props.activeTask.description ?? '';
+    taskForm.status = props.activeTask.status;
+    taskForm.importance = props.activeTask.importance;
+    taskForm.complexity = props.activeTask.complexity;
+    taskForm.due_at = toDateTimeLocalValue(props.activeTask.due_at);
+    taskForm.sort_order = props.activeTask.sort_order;
+    taskForm.assignee_user_id = props.activeTask.assignee?.id ?? '';
+    taskForm.co_assignee_user_ids = props.activeTask.co_assignees.map((user) => user.id);
+    taskForm.clearErrors();
+    taskEditorMode.value = 'edit';
+};
+
+const toggleCoAssignee = (userId: number, checked: boolean | 'indeterminate'): void => {
+    if (checked === true) {
+        taskForm.co_assignee_user_ids = [...new Set([...taskForm.co_assignee_user_ids, userId])];
+
+        return;
+    }
+
+    taskForm.co_assignee_user_ids = taskForm.co_assignee_user_ids.filter((value) => value !== userId);
+};
+
+const taskCoAssigneeHandler = (userId: number) => {
+    return (checked: boolean | 'indeterminate'): void => {
+        toggleCoAssignee(userId, checked);
+    };
+};
+
+const submitTask = (): void => {
+    if (taskEditorMode.value === 'edit' && props.activeTask) {
+        taskForm
+            .transform((data) => ({
+                ...data,
+                due_at: normalizeDueAtForSubmission(data.due_at),
+            }))
+            .patch(updateWorkspaceTask.url(props.activeTask.id), {
+                preserveScroll: true,
+                onSuccess: () => {
+                    taskEditorMode.value = 'idle';
+                },
+            });
+
+        return;
+    }
+
+    taskForm
+        .transform((data) => ({
+            ...data,
+            due_at: normalizeDueAtForSubmission(data.due_at),
+        }))
+        .post(storeWorkspaceTask.url(), {
+            preserveScroll: true,
+            onSuccess: () => {
+                taskEditorMode.value = 'idle';
+            },
+        });
+};
+
+const deleteCurrentTask = (): void => {
+    if (!props.activeTask || !window.confirm(t.value.projects.delete_task_confirm)) {
+        return;
+    }
+
+    router.delete(destroyWorkspaceTask.url(props.activeTask.id), {
+        preserveScroll: true,
+    });
+};
+
+const closeTaskSheet = (): void => {
+    resetTaskForm();
+
+    if (!props.activeTask) {
+        return;
+    }
+
+    router.get(taskSheetBaseRoute.value.url, {}, {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+};
+
+const handleTaskSheetOpenChange = (open: boolean): void => {
+    if (open) {
+        return;
+    }
+
+    closeTaskSheet();
+};
+</script>
+
+<template>
+    <Head :title="t.projects.title" />
+
+    <div class="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <section class="space-y-4">
+            <div class="rounded-3xl border border-border bg-card p-5 shadow-sm">
+                <div class="space-y-4">
+                    <div>
+                        <h1 class="text-lg font-semibold">{{ t.projects.title }}</h1>
+                        <p class="text-sm text-muted-foreground">
+                            {{ t.projects.description }}
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" @click="openCreateTask()">
+                            <Plus class="size-4" />
+                            {{ t.projects.create_task }}
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" @click="openCreateProject">
+                            <FolderKanban class="size-4" />
+                            {{ t.projects.create_project }}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            <Link
+                :href="index()"
+                class="block rounded-3xl border px-4 py-4 transition hover:border-primary/40 hover:bg-background"
+                :class="!props.activeProject ? 'border-primary/50 bg-background' : 'border-border bg-card'"
+            >
+                <div class="flex items-start justify-between gap-3">
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2">
+                            <Layers3 class="size-4 text-muted-foreground" />
+                            <span class="font-medium">{{ t.projects.workspace_overview }}</span>
+                        </div>
+                        <p class="text-sm text-muted-foreground">
+                            {{ t.projects.workspace_overview_description }}
+                        </p>
+                    </div>
+
+                    <span class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground">
+                        {{ props.workspaceSummary.standalone_tasks_count }}
+                    </span>
+                </div>
+
+                <div class="mt-4 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                    <div>
+                        <div class="font-medium text-foreground">
+                            {{ props.workspaceSummary.standalone_tasks_count }}
+                        </div>
+                        <div>{{ t.projects.standalone_tasks }}</div>
+                    </div>
+                    <div>
+                        <div class="font-medium text-foreground">
+                            {{ props.workspaceSummary.standalone_open_tasks_count }}
+                        </div>
+                        <div>{{ t.projects.open_tasks }}</div>
+                    </div>
+                    <div>
+                        <div class="font-medium text-foreground">
+                            {{ props.workspaceSummary.standalone_completed_tasks_count }}
+                        </div>
+                        <div>{{ t.projects.done_tasks }}</div>
+                    </div>
+                </div>
+            </Link>
+
+            <div class="space-y-3">
+                <Link
+                    v-for="project in props.projects"
+                    :key="project.id"
+                    :href="show(project.id)"
+                    class="block rounded-3xl border px-4 py-4 transition hover:border-primary/40 hover:bg-background"
+                    :class="
+                        props.activeProject?.id === project.id
+                            ? 'border-primary/50 bg-background'
+                            : 'border-border bg-card'
+                    "
+                >
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0 space-y-2">
+                            <div class="flex items-center gap-2">
+                                <FolderKanban class="size-4 text-muted-foreground" />
+                                <span class="truncate font-medium">{{ project.name }}</span>
+                            </div>
+                            <p v-if="project.description" class="line-clamp-2 text-sm text-muted-foreground">
+                                {{ project.description }}
+                            </p>
+                        </div>
+
+                        <span class="rounded-full px-2 py-1 text-xs font-medium" :class="projectStatusClass(project)">
+                            {{ project.is_archived ? t.projects.archived : t.projects.active }}
+                        </span>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                        <div>
+                            <div class="font-medium text-foreground">{{ project.members_count }}</div>
+                            <div>{{ t.projects.members }}</div>
+                        </div>
+                        <div>
+                            <div class="font-medium text-foreground">{{ project.open_tasks_count }}</div>
+                            <div>{{ t.projects.open_tasks }}</div>
+                        </div>
+                        <div>
+                            <div class="font-medium text-foreground">{{ project.completed_tasks_count }}</div>
+                            <div>{{ t.projects.done_tasks }}</div>
+                        </div>
+                    </div>
+                </Link>
+            </div>
+
+            <div
+                v-if="projectEditorMode !== 'idle'"
+                class="rounded-3xl border border-border bg-card p-5 shadow-sm"
+            >
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <h2 class="text-base font-semibold">
+                        {{ projectEditorMode === 'create' ? t.projects.create_project : t.projects.edit_project }}
+                    </h2>
+
+                    <Button type="button" variant="ghost" size="sm" @click="resetProjectForm">
+                        {{ t.common.cancel }}
+                    </Button>
+                </div>
+
+                <form class="space-y-4" @submit.prevent="submitProject">
+                    <div class="space-y-2">
+                        <Label for="project-name">{{ t.projects.project_name }}</Label>
+                        <Input id="project-name" v-model="projectForm.name" />
+                        <InputError :message="projectForm.errors.name" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label for="project-slug">{{ t.projects.project_slug }}</Label>
+                        <Input id="project-slug" v-model="projectForm.slug" />
+                        <InputError :message="projectForm.errors.slug" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label for="project-description">{{ t.projects.description_label }}</Label>
+                        <textarea
+                            id="project-description"
+                            v-model="projectForm.description"
+                            rows="4"
+                            class="min-h-28 w-full rounded-2xl border border-input bg-background px-3 py-3 text-sm shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        ></textarea>
+                        <InputError :message="projectForm.errors.description" />
+                    </div>
+
+                    <label class="flex items-start gap-3 rounded-2xl border border-border bg-background/70 p-3">
+                        <Checkbox :checked="projectForm.is_archived" @update:checked="setProjectArchived" />
+                        <div>
+                            <div class="text-sm font-medium">{{ t.projects.archive_project }}</div>
+                            <p class="text-sm text-muted-foreground">{{ t.projects.archive_project_help }}</p>
+                        </div>
+                    </label>
+
+                    <div class="space-y-3">
+                        <div>
+                            <div class="text-sm font-medium">{{ t.projects.members }}</div>
+                            <p class="text-sm text-muted-foreground">{{ t.projects.project_members_help }}</p>
+                        </div>
+
+                        <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
+                            <label
+                                v-for="user in props.availableUsers"
+                                :key="user.id"
+                                class="flex items-start gap-3 rounded-2xl border border-border bg-background/70 p-3"
+                            >
+                                <Checkbox
+                                    :checked="projectForm.member_user_ids.includes(user.id)"
+                                    :disabled="projectEditorMode === 'edit' && activeProjectOwnerId === user.id"
+                                    @update:checked="projectMemberHandler(user.id)"
+                                />
+                                <div class="min-w-0 flex-1">
+                                    <div class="truncate text-sm font-medium">{{ fullName(user) }}</div>
+                                    <div class="truncate text-xs text-muted-foreground">{{ user.email }}</div>
+                                </div>
+                            </label>
+                        </div>
+                        <InputError :message="projectForm.errors.member_user_ids" />
+                    </div>
+
+                    <div class="flex justify-end">
+                        <Button type="submit" :disabled="projectForm.processing">
+                            <Save class="size-4" />
+                            {{ t.common.save }}
+                        </Button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="space-y-4">
+            <div v-if="props.activeProject" class="rounded-3xl border border-border bg-card p-5 shadow-sm">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2">
+                            <BriefcaseBusiness class="size-5 text-muted-foreground" />
+                            <h2 class="text-xl font-semibold">{{ props.activeProject.name }}</h2>
+                        </div>
+
+                        <p v-if="props.activeProject.description" class="max-w-2xl text-sm text-muted-foreground">
+                            {{ props.activeProject.description }}
+                        </p>
+
+                        <div class="flex flex-wrap gap-2">
+                            <span
+                                class="rounded-full px-2.5 py-1 text-xs font-medium"
+                                :class="
+                                    props.activeProject.is_archived
+                                        ? 'bg-muted text-muted-foreground'
+                                        : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                "
+                            >
+                                {{ props.activeProject.is_archived ? t.projects.archived : t.projects.active }}
+                            </span>
+                            <span class="rounded-full bg-background px-2.5 py-1 text-xs text-muted-foreground">
+                                {{ t.projects.owner }}: {{ fullName(props.activeProject.owner) }}
+                            </span>
+                            <span class="rounded-full bg-background px-2.5 py-1 text-xs text-muted-foreground">
+                                {{ t.projects.members }}: {{ props.activeProject.members.length }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        <Button
+                            v-if="props.can.workOnActiveProject"
+                            type="button"
+                            size="sm"
+                            @click="openCreateTask(props.activeProject.id)"
+                        >
+                            <Plus class="size-4" />
+                            {{ t.projects.create_task }}
+                        </Button>
+                        <Button
+                            v-if="props.can.manageProject"
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            @click="openEditProject"
+                        >
+                            <PencilLine class="size-4" />
+                            {{ t.projects.edit_project }}
+                        </Button>
+                        <Button
+                            v-if="props.can.manageProject"
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            @click="deleteCurrentProject"
+                        >
+                            <Trash2 class="size-4" />
+                            {{ t.projects.delete_project }}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            <div v-else class="rounded-3xl border border-border bg-card p-5 shadow-sm">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2">
+                            <Layers3 class="size-5 text-muted-foreground" />
+                            <h2 class="text-xl font-semibold">{{ t.projects.workspace_overview }}</h2>
+                        </div>
+
+                        <p class="max-w-2xl text-sm text-muted-foreground">
+                            {{ t.projects.workspace_overview_description }}
+                        </p>
+                    </div>
+
+                    <Button type="button" size="sm" @click="openCreateTask()">
+                        <Plus class="size-4" />
+                        {{ t.projects.create_task }}
+                    </Button>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div
+                    v-for="group in props.taskGroups"
+                    :key="group.key"
+                    class="rounded-3xl border border-border bg-card p-5 shadow-sm"
+                >
+                    <div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div class="space-y-3">
+                            <div class="flex items-center gap-2">
+                                <FolderKanban class="size-5 text-muted-foreground" />
+                                <template v-if="group.project">
+                                    <Link :href="show(group.project.id)" class="text-base font-semibold hover:underline">
+                                        {{ group.title }}
+                                    </Link>
+                                </template>
+                                <template v-else>
+                                    <h3 class="text-base font-semibold">{{ group.title }}</h3>
+                                </template>
+                            </div>
+
+                            <p v-if="group.description" class="text-sm text-muted-foreground">
+                                {{ group.description }}
+                            </p>
+
+                            <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                <span class="rounded-full bg-background px-2 py-1">
+                                    {{ t.projects.tasks }}: {{ group.tasks_count }}
+                                </span>
+                                <span class="rounded-full bg-background px-2 py-1">
+                                    {{ t.projects.open_tasks }}: {{ group.open_tasks_count }}
+                                </span>
+                                <span class="rounded-full bg-background px-2 py-1">
+                                    {{ t.projects.done_tasks }}: {{ group.completed_tasks_count }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            @click="openCreateTask(group.project?.id ?? null)"
+                        >
+                            <GitBranchPlus class="size-4" />
+                            {{ t.projects.create_task }}
+                        </Button>
+                    </div>
+
+                    <div
+                        v-if="group.tasks.length === 0"
+                        class="rounded-2xl border border-dashed border-border bg-background/70 p-6 text-sm text-muted-foreground"
+                    >
+                        {{
+                            group.project
+                                ? t.projects.no_tasks_description
+                                : t.projects.no_standalone_tasks_description
+                        }}
+                    </div>
+
+                    <div v-else class="space-y-3">
+                        <ProjectTaskTreeItem
+                            v-for="taskItem in group.tasks"
+                            :key="taskItem.id"
+                            :task="taskItem"
+                            :active-task-id="props.activeTask?.id ?? null"
+                            :task-options="props.taskOptions"
+                            :can-create-subtasks="props.can.createTask"
+                            @create-subtask="openCreateSubtask"
+                        />
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <Sheet :open="taskSheetOpen" @update:open="handleTaskSheetOpenChange">
+        <SheetContent side="right" class="w-full gap-0 p-0 sm:w-[80vw] sm:max-w-[80vw]">
+            <div v-if="taskEditorMode !== 'idle'" class="h-full min-h-0 overflow-y-auto bg-background">
+                <div class="mx-auto w-full max-w-4xl p-5 sm:p-8">
+                    <div class="rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-6">
+                        <div class="mb-4 flex items-center justify-between gap-3">
+                            <h2 class="text-base font-semibold">
+                                {{ taskEditorMode === 'create' ? t.projects.create_task : t.projects.edit_task }}
+                            </h2>
+
+                            <Button type="button" variant="ghost" size="sm" @click="resetTaskForm">
+                                {{ t.common.cancel }}
+                            </Button>
+                        </div>
+
+                        <form class="space-y-4" @submit.prevent="submitTask">
+                            <div class="space-y-2">
+                                <Label for="task-project">{{ t.projects.task_location }}</Label>
+                                <select
+                                    id="task-project"
+                                    v-model="taskForm.project_id"
+                                    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                >
+                                    <option value="">{{ t.projects.standalone_task }}</option>
+                                    <option
+                                        v-for="project in props.availableProjects"
+                                        :key="project.id"
+                                        :value="project.id"
+                                    >
+                                        {{ project.name }}
+                                    </option>
+                                </select>
+                                <InputError :message="taskForm.errors.project_id" />
+                            </div>
+
+                            <div class="space-y-2">
+                                <Label for="task-parent">{{ t.projects.parent_task }}</Label>
+                                <select
+                                    id="task-parent"
+                                    v-model="taskForm.parent_task_id"
+                                    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                >
+                                    <option value="">{{ t.projects.no_parent_task }}</option>
+                                    <option
+                                        v-for="taskOption in parentTaskOptions"
+                                        :key="taskOption.id"
+                                        :value="taskOption.id"
+                                    >
+                                        {{ taskOption.label }}
+                                    </option>
+                                </select>
+                                <InputError :message="taskForm.errors.parent_task_id" />
+                            </div>
+
+                            <div class="space-y-2">
+                                <Label for="task-title">{{ t.projects.task_title }}</Label>
+                                <Input id="task-title" v-model="taskForm.title" />
+                                <InputError :message="taskForm.errors.title" />
+                            </div>
+
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <div class="space-y-2">
+                                    <Label for="task-status">{{ t.projects.status }}</Label>
+                                    <select
+                                        id="task-status"
+                                        v-model="taskForm.status"
+                                        class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    >
+                                        <option
+                                            v-for="statusOption in props.taskOptions.statuses"
+                                            :key="statusOption.value"
+                                            :value="statusOption.value"
+                                        >
+                                            {{ statusOption.label }}
+                                        </option>
+                                    </select>
+                                    <InputError :message="taskForm.errors.status" />
+                                </div>
+
+                                <div class="space-y-2">
+                                    <Label for="task-importance">{{ t.projects.importance }}</Label>
+                                    <select
+                                        id="task-importance"
+                                        v-model="taskForm.importance"
+                                        class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    >
+                                        <option
+                                            v-for="importanceOption in props.taskOptions.importances"
+                                            :key="importanceOption.value"
+                                            :value="importanceOption.value"
+                                        >
+                                            {{ importanceOption.label }}
+                                        </option>
+                                    </select>
+                                    <InputError :message="taskForm.errors.importance" />
+                                </div>
+                            </div>
+
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <div class="space-y-2">
+                                    <Label for="task-due">{{ t.projects.due_date }}</Label>
+                                    <Input id="task-due" v-model="taskForm.due_at" type="datetime-local" step="60" />
+                                    <InputError :message="taskForm.errors.due_at" />
+                                </div>
+
+                                <div class="space-y-2">
+                                    <Label for="task-sort-order">{{ t.projects.sort_order }}</Label>
+                                    <Input
+                                        id="task-sort-order"
+                                        v-model.number="taskForm.sort_order"
+                                        type="number"
+                                        min="0"
+                                    />
+                                    <InputError :message="taskForm.errors.sort_order" />
+                                </div>
+                            </div>
+
+                            <div class="space-y-2">
+                                <div class="flex items-center justify-between gap-3">
+                                    <Label for="task-complexity">{{ t.projects.complexity }}</Label>
+                                    <span class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground">
+                                        {{ taskForm.complexity }}/10
+                                    </span>
+                                </div>
+                                <input
+                                    id="task-complexity"
+                                    v-model.number="taskForm.complexity"
+                                    type="range"
+                                    min="1"
+                                    max="10"
+                                    class="w-full accent-primary"
+                                />
+                                <InputError :message="taskForm.errors.complexity" />
+                            </div>
+
+                            <div class="space-y-2">
+                                <Label for="task-description">{{ t.projects.description_label }}</Label>
+                                <textarea
+                                    id="task-description"
+                                    v-model="taskForm.description"
+                                    rows="6"
+                                    class="min-h-32 w-full rounded-2xl border border-input bg-background px-3 py-3 text-sm shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                ></textarea>
+                                <InputError :message="taskForm.errors.description" />
+                            </div>
+
+                            <div class="space-y-2">
+                                <Label for="task-assignee">{{ t.projects.assignee }}</Label>
+                                <select
+                                    id="task-assignee"
+                                    v-model="taskForm.assignee_user_id"
+                                    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                >
+                                    <option value="">{{ t.projects.unassigned }}</option>
+                                    <option v-for="member in taskMemberOptions" :key="member.id" :value="member.id">
+                                        {{ fullName(member) }}
+                                    </option>
+                                </select>
+                                <InputError :message="taskForm.errors.assignee_user_id" />
+                            </div>
+
+                            <div class="space-y-3">
+                                <div>
+                                    <div class="text-sm font-medium">{{ t.projects.co_assignees }}</div>
+                                    <p class="text-sm text-muted-foreground">{{ t.projects.co_assignees_help }}</p>
+                                </div>
+
+                                <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
+                                    <label
+                                        v-for="member in taskMemberOptions"
+                                        :key="member.id"
+                                        class="flex items-start gap-3 rounded-2xl border border-border bg-background/70 p-3"
+                                    >
+                                        <Checkbox
+                                            :checked="taskForm.co_assignee_user_ids.includes(member.id)"
+                                            @update:checked="taskCoAssigneeHandler(member.id)"
+                                        />
+                                        <div class="min-w-0 flex-1">
+                                            <div class="truncate text-sm font-medium">{{ fullName(member) }}</div>
+                                            <div class="truncate text-xs text-muted-foreground">{{ member.email }}</div>
+                                        </div>
+                                    </label>
+                                </div>
+                                <InputError :message="taskForm.errors.co_assignee_user_ids" />
+                            </div>
+
+                            <div class="flex justify-end">
+                                <Button type="submit" :disabled="taskForm.processing">
+                                    <Save class="size-4" />
+                                    {{ t.common.save }}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                v-else-if="props.activeTask"
+                class="grid h-full min-h-0 bg-background xl:grid-cols-[minmax(0,1fr)_24rem] 2xl:grid-cols-[minmax(0,1fr)_28rem]"
+            >
+                <div class="min-h-0 overflow-y-auto p-5 sm:p-8">
+                    <div class="space-y-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <ClipboardList class="size-5 text-muted-foreground" />
+                                    <h2 class="text-lg font-semibold">{{ props.activeTask.title }}</h2>
+                                </div>
+
+                                <div class="flex flex-wrap gap-2 text-xs">
+                                    <span
+                                        class="rounded-full px-2 py-1 font-medium"
+                                        :class="taskStatusClass(props.activeTask.status)"
+                                    >
+                                        {{ optionLabel(props.taskOptions.statuses, props.activeTask.status) }}
+                                    </span>
+                                    <span
+                                        class="rounded-full px-2 py-1 font-medium"
+                                        :class="importanceClass(props.activeTask.importance)"
+                                    >
+                                        {{ optionLabel(props.taskOptions.importances, props.activeTask.importance) }}
+                                    </span>
+                                    <span class="rounded-full bg-background px-2 py-1 text-muted-foreground">
+                                        {{ t.projects.complexity }}: {{ props.activeTask.complexity }}/10
+                                    </span>
+                                    <span
+                                        v-if="props.activeTask.project_name"
+                                        class="rounded-full bg-background px-2 py-1 text-muted-foreground"
+                                    >
+                                        {{ props.activeTask.project_name }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div v-if="props.can.manageTask" class="flex flex-wrap gap-2">
+                                <Button type="button" size="sm" variant="outline" @click="openEditTask">
+                                    <PencilLine class="size-4" />
+                                    {{ t.projects.edit_task }}
+                                </Button>
+                                <Button type="button" size="sm" variant="destructive" @click="deleteCurrentTask">
+                                    <Trash2 class="size-4" />
+                                    {{ t.projects.delete_task }}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                                <div class="mb-1 flex items-center gap-2 text-sm font-medium">
+                                    <UserRound class="size-4 text-muted-foreground" />
+                                    {{ t.projects.assignee }}
+                                </div>
+                                <div class="text-sm text-muted-foreground">{{ fullName(props.activeTask.assignee) }}</div>
+                            </div>
+
+                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                                <div class="mb-1 flex items-center gap-2 text-sm font-medium">
+                                    <Shield class="size-4 text-muted-foreground" />
+                                    {{ t.projects.creator }}
+                                </div>
+                                <div class="text-sm text-muted-foreground">{{ fullName(props.activeTask.creator) }}</div>
+                            </div>
+
+                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                                <div class="mb-1 flex items-center gap-2 text-sm font-medium">
+                                    <CalendarClock class="size-4 text-muted-foreground" />
+                                    {{ t.projects.due_date }}
+                                </div>
+                                <div class="text-sm text-muted-foreground">{{ formatDateTime(props.activeTask.due_at) }}</div>
+                            </div>
+
+                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                                <div class="mb-1 flex items-center gap-2 text-sm font-medium">
+                                    <GitBranchPlus class="size-4 text-muted-foreground" />
+                                    {{ t.projects.parent_task }}
+                                </div>
+                                <div class="text-sm text-muted-foreground">
+                                    <Link
+                                        v-if="props.activeTask.parent_task"
+                                        :href="showWorkspaceTask(props.activeTask.parent_task.id)"
+                                        class="hover:underline"
+                                    >
+                                        {{ props.activeTask.parent_task.title }}
+                                    </Link>
+                                    <span v-else>{{ t.projects.no_parent_task }}</span>
+                                </div>
+                            </div>
+
+                            <div class="rounded-2xl border border-border bg-muted/15 p-4 md:col-span-2">
+                                <div class="mb-1 flex items-center gap-2 text-sm font-medium">
+                                    <UsersRound class="size-4 text-muted-foreground" />
+                                    {{ t.projects.co_assignees }}
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <span
+                                        v-for="member in props.activeTask.co_assignees"
+                                        :key="member.id"
+                                        class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground"
+                                    >
+                                        {{ fullName(member) }}
+                                    </span>
+                                    <span
+                                        v-if="props.activeTask.co_assignees.length === 0"
+                                        class="text-sm text-muted-foreground"
+                                    >
+                                        {{ t.projects.no_co_assignees }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                            <div class="mb-2 text-sm font-medium">{{ t.projects.description_label }}</div>
+                            <p class="whitespace-pre-line text-sm text-muted-foreground">
+                                {{ props.activeTask.description || t.projects.empty_task_description }}
+                            </p>
+                        </div>
+
+                        <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                            <div class="mb-3 flex items-center justify-between gap-3">
+                                <div class="text-sm font-medium">{{ t.projects.subtasks }}</div>
+                                <Button type="button" variant="outline" size="sm" @click="openCreateSubtaskFromActiveTask">
+                                    <GitBranchPlus class="size-4" />
+                                    {{ t.projects.create_subtask }}
+                                </Button>
+                            </div>
+
+                            <div v-if="props.activeTask.subtasks.length === 0" class="text-sm text-muted-foreground">
+                                {{ t.projects.no_subtasks_description }}
+                            </div>
+
+                            <div v-else class="space-y-2">
+                                <Link
+                                    v-for="subtask in props.activeTask.subtasks"
+                                    :key="subtask.id"
+                                    :href="showWorkspaceTask(subtask.id)"
+                                    class="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3 py-3 transition hover:border-primary/40 hover:bg-background"
+                                >
+                                    <div class="min-w-0">
+                                        <div class="truncate text-sm font-medium">{{ subtask.title }}</div>
+                                        <div class="mt-1 flex flex-wrap gap-2 text-xs">
+                                            <span class="rounded-full px-2 py-1" :class="taskStatusClass(subtask.status)">
+                                                {{ optionLabel(props.taskOptions.statuses, subtask.status) }}
+                                            </span>
+                                            <span class="rounded-full px-2 py-1" :class="importanceClass(subtask.importance)">
+                                                {{ optionLabel(props.taskOptions.importances, subtask.importance) }}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <span class="text-xs text-muted-foreground">
+                                        {{ fullName(subtask.assignee) }}
+                                    </span>
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <ProjectTaskConversationPanel :active="taskSheetOpen" :task-id="props.activeTask.id" />
+            </div>
+        </SheetContent>
+    </Sheet>
+</template>

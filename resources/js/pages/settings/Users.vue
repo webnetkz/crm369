@@ -1,0 +1,1569 @@
+<script setup lang="ts">
+import {
+    Head,
+    router,
+    setLayoutProps,
+    useForm,
+    usePage,
+} from '@inertiajs/vue3';
+import {
+    BadgeCheck,
+    Ban,
+    CircleCheck,
+    CircleX,
+    KeyRound,
+    LogIn,
+    Mail,
+    Phone,
+    RefreshCw,
+    RotateCcw,
+    Search,
+    SlidersHorizontal,
+    UserPlus,
+    X,
+} from '@lucide/vue';
+import { useClipboard } from '@vueuse/core';
+import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
+import Heading from '@/components/Heading.vue';
+import InputError from '@/components/InputError.vue';
+import PaginationControls from '@/components/PaginationControls.vue';
+import PasswordInput from '@/components/PasswordInput.vue';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
+import { useInitials } from '@/composables/useInitials';
+import { useLanguage } from '@/composables/useLanguage';
+import { usePasswordGenerator } from '@/composables/usePasswordGenerator';
+import { index, store } from '@/routes/settings/users';
+import { update as updateUserActivation } from '@/routes/settings/users/activation';
+import { update as updateUserGroup } from '@/routes/settings/users/group';
+import { store as startUserImpersonation } from '@/routes/settings/users/impersonation';
+import { reset as resetUserPassword } from '@/routes/settings/users/password';
+import { update as updateUserProfile } from '@/routes/settings/users/profile';
+import type { PaginatedCollection } from '@/types/ui';
+
+type UserGroupOption = {
+    id: number;
+    name: string;
+    display_name: string;
+};
+
+type UserRow = {
+    id: number;
+    name: string;
+    last_name: string | null;
+    email: string;
+    phone: string | null;
+    email_verified_at: string | null;
+    avatar: string | null;
+    avatar_scale: number;
+    created_at: string | null;
+    is_super_admin: boolean;
+    is_active: boolean;
+    can_be_impersonated: boolean;
+    deactivated_at: string | null;
+    group: UserGroupOption | null;
+};
+
+type ManagedProfilePayload = {
+    name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+};
+
+type UserFilters = {
+    search: string;
+    status: string;
+    group: string;
+    registered_from: string;
+    registered_to: string;
+    per_page: number;
+};
+
+const props = defineProps<{
+    can: {
+        manage_users: boolean;
+        manage_activation: boolean;
+        manage_accounts: boolean;
+        impersonate_users: boolean;
+    };
+    users: PaginatedCollection<UserRow>;
+    groups: UserGroupOption[];
+    filters: UserFilters;
+    perPageOptions: number[];
+}>();
+
+const page = usePage();
+const { getInitials } = useInitials();
+const { language, t } = useLanguage();
+const { copy: copyToClipboard } = useClipboard();
+const { generatePassword } = usePasswordGenerator();
+const createUserDialogOpen = ref(false);
+const selectedProfileUser = ref<UserRow | null>(null);
+const selectedPasswordUser = ref<UserRow | null>(null);
+const showAdvancedFilters = ref(
+    props.filters.status !== '' ||
+        props.filters.group !== '' ||
+        props.filters.registered_from !== '' ||
+        props.filters.registered_to !== '',
+);
+const managedProfileSnapshot = ref<ManagedProfilePayload | null>(null);
+const managedProfileSaveState = ref<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle',
+);
+const isSyncingManagedProfile = ref(false);
+const isSyncingFilters = ref(false);
+const defaultKazakhstanPhonePrefix = '+7';
+let managedProfileSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let filterSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const createUserForm = useForm({
+    name: '',
+    email: '',
+    password: '',
+    password_confirmation: '',
+    email_verified: false,
+});
+
+const passwordForm = useForm({
+    password: '',
+    password_confirmation: '',
+});
+
+const managedProfileForm = useForm({
+    name: '',
+    last_name: '',
+    email: '',
+    phone: defaultKazakhstanPhonePrefix,
+});
+
+const filtersForm = useForm<UserFilters>({
+    search: props.filters.search,
+    status: props.filters.status,
+    group: props.filters.group,
+    registered_from: props.filters.registered_from,
+    registered_to: props.filters.registered_to,
+    per_page: props.filters.per_page,
+});
+
+const visibleUsers = computed(() => props.users.data);
+const canAutoSubmitCreateUser = computed(() => {
+    return (
+        createUserForm.name.trim() !== '' && createUserForm.email.trim() !== ''
+    );
+});
+
+const openCreateUserDialog = (): void => {
+    createUserDialogOpen.value = true;
+};
+
+const closeCreateUserDialog = (): void => {
+    createUserDialogOpen.value = false;
+    createUserForm.reset();
+    createUserForm.clearErrors();
+};
+
+watchEffect(() => {
+    setLayoutProps({
+        breadcrumbs: [
+            {
+                title: t.value.admin.users_title,
+                href: index(),
+            },
+        ],
+    });
+});
+
+const submitCreateUser = (): void => {
+    createUserForm.post(store.url(), {
+        preserveScroll: true,
+        onSuccess: () => closeCreateUserDialog(),
+    });
+};
+
+const applyGeneratedCreateUserPassword = async (): Promise<void> => {
+    if (createUserForm.processing) {
+        return;
+    }
+
+    const generatedPassword = generatePassword();
+
+    createUserForm.password = generatedPassword;
+    createUserForm.password_confirmation = generatedPassword;
+
+    try {
+        await copyToClipboard(generatedPassword);
+    } catch {
+        //
+    }
+
+    if (canAutoSubmitCreateUser.value) {
+        submitCreateUser();
+    }
+};
+
+const hasActiveFilters = computed(() => {
+    return (
+        filtersForm.search !== '' ||
+        filtersForm.status !== '' ||
+        filtersForm.group !== '' ||
+        filtersForm.registered_from !== '' ||
+        filtersForm.registered_to !== ''
+    );
+});
+
+const openProfile = (user: UserRow): void => {
+    selectedProfileUser.value = user;
+};
+
+const closeProfile = (): void => {
+    clearManagedProfileSaveTimeout();
+    selectedProfileUser.value = null;
+    managedProfileSnapshot.value = null;
+    managedProfileSaveState.value = 'idle';
+    managedProfileForm.clearErrors();
+};
+
+const openPasswordReset = (user: UserRow): void => {
+    selectedPasswordUser.value = user;
+    passwordForm.clearErrors();
+    passwordForm.reset();
+};
+
+const closePasswordReset = (): void => {
+    selectedPasswordUser.value = null;
+    passwordForm.clearErrors();
+    passwordForm.reset();
+};
+
+const submitPasswordReset = (): void => {
+    if (!selectedPasswordUser.value) {
+        return;
+    }
+
+    passwordForm.patch(resetUserPassword.url(selectedPasswordUser.value.id), {
+        preserveScroll: true,
+        onSuccess: closePasswordReset,
+    });
+};
+
+const updateGroup = (user: UserRow, value: string): void => {
+    router.patch(
+        updateUserGroup.url(user.id),
+        {
+            user_group_id: value === '' ? null : Number(value),
+        },
+        {
+            preserveScroll: true,
+        },
+    );
+};
+
+const toggleActivation = (user: UserRow): void => {
+    router.patch(
+        updateUserActivation.url(user.id),
+        {
+            is_active: !user.is_active,
+        },
+        {
+            preserveScroll: true,
+        },
+    );
+};
+
+const impersonateUser = (user: UserRow): void => {
+    router.post(
+        startUserImpersonation.url(user.id),
+        {},
+        {
+            preserveScroll: true,
+        },
+    );
+};
+
+const canToggleActivation = (user: UserRow): boolean => {
+    return (
+        props.can.manage_activation &&
+        !user.is_super_admin &&
+        user.id !== page.props.auth.user.id
+    );
+};
+
+const canImpersonate = (user: UserRow): boolean => {
+    return (
+        props.can.impersonate_users &&
+        !page.props.auth.isImpersonating &&
+        user.can_be_impersonated
+    );
+};
+
+const canResetPassword = (user: UserRow): boolean => {
+    return (
+        props.can.manage_accounts &&
+        user.id !== page.props.auth.user.id &&
+        (!user.is_super_admin || page.props.auth.isSuperAdmin)
+    );
+};
+
+const canEditProfile = (user: UserRow | null): boolean => {
+    if (!user || !props.can.manage_accounts) {
+        return false;
+    }
+
+    return !user.is_super_admin || page.props.auth.isSuperAdmin;
+};
+
+const selectedProfileAvatarStyle = computed(() => ({
+    objectPosition: 'center',
+    transform: `scale(${selectedProfileUser.value?.avatar_scale ?? 1})`,
+}));
+
+const formatKazakhstanPhone = (value: string | null | undefined): string => {
+    const digits = (value ?? '').replace(/\D/g, '');
+
+    if (digits === '') {
+        return defaultKazakhstanPhonePrefix;
+    }
+
+    let normalizedDigits = digits;
+
+    if (normalizedDigits.startsWith('8')) {
+        normalizedDigits = `7${normalizedDigits.slice(1)}`;
+    } else if (!normalizedDigits.startsWith('7')) {
+        normalizedDigits = `7${normalizedDigits}`;
+    }
+
+    normalizedDigits = normalizedDigits.slice(0, 11);
+
+    const localNumber = normalizedDigits.slice(1);
+    const segments = [
+        localNumber.slice(0, 3),
+        localNumber.slice(3, 6),
+        localNumber.slice(6, 8),
+        localNumber.slice(8, 10),
+    ].filter(Boolean);
+
+    return [defaultKazakhstanPhonePrefix, ...segments].join(' ').trim();
+};
+
+const managedProfilePayload = (): ManagedProfilePayload => ({
+    name: managedProfileForm.name,
+    last_name: managedProfileForm.last_name,
+    email: managedProfileForm.email,
+    phone: managedProfileForm.phone,
+});
+
+const clearManagedProfileSaveTimeout = (): void => {
+    if (managedProfileSaveTimeout !== null) {
+        clearTimeout(managedProfileSaveTimeout);
+        managedProfileSaveTimeout = null;
+    }
+};
+
+const clearFilterSearchTimeout = (): void => {
+    if (filterSearchTimeout !== null) {
+        clearTimeout(filterSearchTimeout);
+        filterSearchTimeout = null;
+    }
+};
+
+const filterQuery = (): Record<string, string> => {
+    const query: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries({
+        search: filtersForm.search,
+        status: filtersForm.status,
+        group: filtersForm.group,
+        registered_from: filtersForm.registered_from,
+        registered_to: filtersForm.registered_to,
+        per_page: String(filtersForm.per_page),
+    })) {
+        if (value !== '') {
+            query[key] = value;
+        }
+    }
+
+    return query;
+};
+
+const submitFilters = (): void => {
+    clearFilterSearchTimeout();
+
+    router.get(index.url(), filterQuery(), {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+};
+
+const queueSearchFilters = (): void => {
+    clearFilterSearchTimeout();
+
+    filterSearchTimeout = setTimeout(() => {
+        submitFilters();
+    }, 350);
+};
+
+const resetFilters = (): void => {
+    clearFilterSearchTimeout();
+    isSyncingFilters.value = true;
+
+    filtersForm.search = '';
+    filtersForm.status = '';
+    filtersForm.group = '';
+    filtersForm.registered_from = '';
+    filtersForm.registered_to = '';
+    filtersForm.per_page = props.perPageOptions[0] ?? 50;
+    showAdvancedFilters.value = false;
+
+    isSyncingFilters.value = false;
+    submitFilters();
+};
+
+const updatePerPage = (value: number): void => {
+    filtersForm.per_page = value;
+    submitFilters();
+};
+
+const syncManagedProfileForm = (user: UserRow | null): void => {
+    isSyncingManagedProfile.value = true;
+    clearManagedProfileSaveTimeout();
+    managedProfileForm.clearErrors();
+
+    managedProfileForm.name = user?.name ?? '';
+    managedProfileForm.last_name = user?.last_name ?? '';
+    managedProfileForm.email = user?.email ?? '';
+    managedProfileForm.phone = formatKazakhstanPhone(user?.phone);
+
+    managedProfileSnapshot.value = managedProfilePayload();
+    managedProfileSaveState.value = 'idle';
+    isSyncingManagedProfile.value = false;
+};
+
+const scheduleManagedProfileSave = (delay = 700): void => {
+    clearManagedProfileSaveTimeout();
+
+    managedProfileSaveTimeout = setTimeout(() => {
+        submitManagedProfileUpdate();
+    }, delay);
+};
+
+const submitManagedProfileUpdate = (): void => {
+    const user = selectedProfileUser.value;
+    const snapshot = managedProfileSnapshot.value;
+
+    if (!user || !snapshot || !canEditProfile(user)) {
+        return;
+    }
+
+    const current = managedProfilePayload();
+
+    if (JSON.stringify(current) === JSON.stringify(snapshot)) {
+        managedProfileSaveState.value = 'idle';
+
+        return;
+    }
+
+    if (managedProfileForm.processing) {
+        scheduleManagedProfileSave(250);
+
+        return;
+    }
+
+    managedProfileSaveState.value = 'saving';
+
+    managedProfileForm.patch(updateUserProfile.url(user.id), {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => {
+            managedProfileSnapshot.value = managedProfilePayload();
+            managedProfileSaveState.value = 'saved';
+
+            window.setTimeout(() => {
+                if (managedProfileSaveState.value === 'saved') {
+                    managedProfileSaveState.value = 'idle';
+                }
+            }, 1400);
+        },
+        onError: () => {
+            managedProfileSaveState.value = 'error';
+        },
+        onFinish: () => {
+            const latest = managedProfileSnapshot.value;
+
+            if (
+                managedProfileSaveState.value !== 'error' &&
+                latest &&
+                JSON.stringify(managedProfilePayload()) !==
+                    JSON.stringify(latest)
+            ) {
+                scheduleManagedProfileSave(350);
+            }
+        },
+    });
+};
+
+const formatDateTime = (value: string | null): string => {
+    if (!value) {
+        return t.value.common.not_specified;
+    }
+
+    return new Intl.DateTimeFormat(
+        language.value === 'ru' ? 'ru-RU' : 'en-US',
+        {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        },
+    ).format(new Date(value));
+};
+
+watch(
+    () => selectedProfileUser.value?.id ?? null,
+    () => {
+        syncManagedProfileForm(selectedProfileUser.value);
+    },
+);
+
+watch(
+    () => props.users.data,
+    (users) => {
+        if (!selectedProfileUser.value) {
+            return;
+        }
+
+        const freshUser = users.find(
+            (user) => user.id === selectedProfileUser.value?.id,
+        );
+
+        if (!freshUser) {
+            closeProfile();
+
+            return;
+        }
+
+        selectedProfileUser.value = freshUser;
+        syncManagedProfileForm(freshUser);
+    },
+);
+
+watch(
+    () => props.filters,
+    (filters) => {
+        isSyncingFilters.value = true;
+
+        filtersForm.search = filters.search;
+        filtersForm.status = filters.status;
+        filtersForm.group = filters.group;
+        filtersForm.registered_from = filters.registered_from;
+        filtersForm.registered_to = filters.registered_to;
+        filtersForm.per_page = filters.per_page;
+
+        if (
+            filters.status !== '' ||
+            filters.group !== '' ||
+            filters.registered_from !== '' ||
+            filters.registered_to !== ''
+        ) {
+            showAdvancedFilters.value = true;
+        }
+
+        isSyncingFilters.value = false;
+    },
+);
+
+watch(
+    () => managedProfileForm.phone,
+    (value) => {
+        const formatted = formatKazakhstanPhone(value);
+
+        if (value !== formatted) {
+            managedProfileForm.phone = formatted;
+        }
+    },
+);
+
+watch(
+    () => filtersForm.search,
+    () => {
+        if (isSyncingFilters.value) {
+            return;
+        }
+
+        queueSearchFilters();
+    },
+);
+
+watch(
+    () => [
+        managedProfileForm.name,
+        managedProfileForm.last_name,
+        managedProfileForm.email,
+        managedProfileForm.phone,
+    ],
+    () => {
+        if (
+            !selectedProfileUser.value ||
+            !managedProfileSnapshot.value ||
+            isSyncingManagedProfile.value ||
+            !canEditProfile(selectedProfileUser.value)
+        ) {
+            return;
+        }
+
+        if (
+            JSON.stringify(managedProfilePayload()) ===
+            JSON.stringify(managedProfileSnapshot.value)
+        ) {
+            managedProfileSaveState.value = 'idle';
+
+            return;
+        }
+
+        scheduleManagedProfileSave();
+    },
+);
+
+onBeforeUnmount(() => {
+    clearManagedProfileSaveTimeout();
+    clearFilterSearchTimeout();
+});
+</script>
+
+<template>
+    <Head :title="t.admin.users_title" />
+
+    <h1 class="sr-only">{{ t.admin.users_title }}</h1>
+
+    <div class="space-y-6">
+        <Heading
+            variant="small"
+            :title="t.admin.users_title"
+            :description="t.admin.users_description"
+        />
+
+        <section class="space-y-4 rounded-lg border border-border p-4">
+            <div
+                class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+            >
+                <div class="flex items-center gap-2 font-medium">
+                    <Search class="size-4" />
+                    {{ t.admin.user_search }}
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <Button
+                        v-if="can.manage_accounts"
+                        type="button"
+                        size="sm"
+                        @click="openCreateUserDialog"
+                    >
+                        <UserPlus class="size-4" />
+                        {{ t.admin.create_user }}
+                    </Button>
+
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        @click="showAdvancedFilters = !showAdvancedFilters"
+                    >
+                        <SlidersHorizontal class="size-4" />
+                        {{ t.admin.advanced_search }}
+                    </Button>
+
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        :disabled="!hasActiveFilters"
+                        @click="resetFilters"
+                    >
+                        <X class="size-4" />
+                        {{ t.admin.reset_filters }}
+                    </Button>
+                </div>
+            </div>
+
+            <div class="relative">
+                <Search
+                    class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                    v-model="filtersForm.search"
+                    class="pl-9"
+                    :placeholder="t.admin.user_search_placeholder"
+                    autocomplete="off"
+                />
+            </div>
+
+            <div
+                v-if="showAdvancedFilters"
+                class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+            >
+                <div class="grid gap-2">
+                    <Label for="status_filter">{{ t.admin.status }}</Label>
+                    <select
+                        id="status_filter"
+                        v-model="filtersForm.status"
+                        class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        @change="submitFilters"
+                    >
+                        <option value="">{{ t.admin.all_statuses }}</option>
+                        <option value="active">{{ t.admin.active }}</option>
+                        <option value="inactive">{{ t.admin.inactive }}</option>
+                    </select>
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="group_filter">{{ t.admin.group }}</Label>
+                    <select
+                        id="group_filter"
+                        v-model="filtersForm.group"
+                        class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        @change="submitFilters"
+                    >
+                        <option value="">{{ t.admin.all_groups }}</option>
+                        <option value="none">{{ t.admin.simple_user }}</option>
+                        <option
+                            v-for="group in groups"
+                            :key="group.id"
+                            :value="String(group.id)"
+                        >
+                            {{ group.display_name }}
+                        </option>
+                    </select>
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="registered_from">
+                        {{ t.admin.registered_from }}
+                    </Label>
+                    <Input
+                        id="registered_from"
+                        v-model="filtersForm.registered_from"
+                        type="date"
+                        @change="submitFilters"
+                    />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="registered_to">
+                        {{ t.admin.registered_to }}
+                    </Label>
+                    <Input
+                        id="registered_to"
+                        v-model="filtersForm.registered_to"
+                        type="date"
+                        @change="submitFilters"
+                    />
+                </div>
+            </div>
+        </section>
+
+        <Dialog
+            :open="createUserDialogOpen"
+            @update:open="(isOpen) => !isOpen && closeCreateUserDialog()"
+        >
+            <DialogContent
+                v-if="can.manage_accounts"
+                class="sm:max-w-2xl"
+            >
+                <DialogHeader>
+                    <div
+                        class="mb-2 flex size-12 items-center justify-center rounded-2xl border border-border bg-muted"
+                    >
+                        <UserPlus class="size-5 text-foreground" />
+                    </div>
+                    <DialogTitle>{{ t.admin.create_user }}</DialogTitle>
+                    <DialogDescription>
+                        {{ t.admin.create_user_description }}
+                    </DialogDescription>
+                </DialogHeader>
+
+                <form class="space-y-4" @submit.prevent="submitCreateUser">
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div class="grid gap-2">
+                            <Label for="new_user_name">{{ t.common.name }}</Label>
+                            <Input
+                                id="new_user_name"
+                                v-model="createUserForm.name"
+                                :placeholder="t.auth.full_name"
+                                autocomplete="off"
+                            />
+                            <InputError :message="createUserForm.errors.name" />
+                        </div>
+
+                        <div class="grid gap-2">
+                            <Label for="new_user_email">{{ t.common.email }}</Label>
+                            <Input
+                                id="new_user_email"
+                                v-model="createUserForm.email"
+                                type="email"
+                                placeholder="email@example.com"
+                                autocomplete="off"
+                            />
+                            <InputError :message="createUserForm.errors.email" />
+                        </div>
+
+                        <div class="grid gap-2">
+                            <Label for="new_user_password">{{
+                                t.common.password
+                            }}</Label>
+                            <PasswordInput
+                                id="new_user_password"
+                                v-model="createUserForm.password"
+                                autocomplete="new-password"
+                            />
+                            <InputError :message="createUserForm.errors.password" />
+                        </div>
+
+                        <div class="grid gap-2">
+                            <Label for="new_user_password_confirmation">
+                                {{ t.auth.confirm_password }}
+                            </Label>
+                            <PasswordInput
+                                id="new_user_password_confirmation"
+                                v-model="createUserForm.password_confirmation"
+                                autocomplete="new-password"
+                            />
+                            <InputError
+                                :message="createUserForm.errors.password_confirmation"
+                            />
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                @click="applyGeneratedCreateUserPassword"
+                            >
+                                <RefreshCw class="size-4" />
+                                {{ t.common.generate_password }}
+                            </Button>
+                        </div>
+                    </div>
+
+                    <label class="flex items-center gap-2 text-sm">
+                        <input
+                            v-model="createUserForm.email_verified"
+                            type="checkbox"
+                            class="size-4 rounded border-input"
+                        />
+                        {{ t.admin.mark_email_verified }}
+                    </label>
+                    <InputError :message="createUserForm.errors.email_verified" />
+
+                    <DialogFooter class="pt-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            @click="closeCreateUserDialog"
+                        >
+                            {{ t.common.cancel }}
+                        </Button>
+                        <Button
+                            type="submit"
+                            :disabled="createUserForm.processing"
+                        >
+                            {{ t.admin.create_user }}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+
+        <div class="space-y-3 md:hidden">
+            <article
+                v-for="user in visibleUsers"
+                :key="user.id"
+                class="rounded-lg border border-border p-4"
+                :class="{ 'bg-muted/30 opacity-80': !user.is_active }"
+            >
+                <div class="flex items-start justify-between gap-3">
+                    <button
+                        type="button"
+                        class="min-w-0 flex-1 rounded-lg text-left transition hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
+                        @click="openProfile(user)"
+                    >
+                        <div class="truncate font-medium">{{ user.name }}</div>
+                        <div class="text-sm break-all text-muted-foreground">
+                            {{ user.email }}
+                        </div>
+                    </button>
+
+                    <div class="flex shrink-0 flex-col items-end gap-2">
+                        <span
+                            v-if="user.is_super_admin"
+                            class="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground"
+                        >
+                            {{ t.admin.super_admin }}
+                        </span>
+                        <span
+                            class="rounded-full px-2 py-1 text-xs"
+                            :class="
+                                user.is_active
+                                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                    : 'bg-destructive/10 text-destructive'
+                            "
+                        >
+                            {{
+                                user.is_active
+                                    ? t.admin.active
+                                    : t.admin.inactive
+                            }}
+                        </span>
+                    </div>
+                </div>
+
+                <dl class="mt-4 grid gap-3 text-sm">
+                    <div class="flex items-center justify-between gap-4">
+                        <dt class="text-muted-foreground">
+                            {{ t.admin.email_verified }}
+                        </dt>
+                        <dd>
+                            <span
+                                class="inline-flex items-center"
+                                :title="
+                                    user.email_verified_at
+                                        ? t.admin.verified
+                                        : t.admin.not_verified
+                                "
+                            >
+                                <CircleCheck
+                                    v-if="user.email_verified_at"
+                                    class="size-5 text-emerald-600 dark:text-emerald-400"
+                                    aria-hidden="true"
+                                />
+                                <CircleX
+                                    v-else
+                                    class="size-5 text-destructive"
+                                    aria-hidden="true"
+                                />
+                                <span class="sr-only">
+                                    {{
+                                        user.email_verified_at
+                                            ? t.admin.verified
+                                            : t.admin.not_verified
+                                    }}
+                                </span>
+                            </span>
+                        </dd>
+                    </div>
+
+                    <div class="grid gap-2">
+                        <dt class="text-muted-foreground">
+                            {{ t.admin.group }}
+                        </dt>
+                        <dd>
+                            <select
+                                v-if="can.manage_users"
+                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                :value="user.group?.id ?? ''"
+                                @change="
+                                    updateGroup(
+                                        user,
+                                        ($event.target as HTMLSelectElement)
+                                            .value,
+                                    )
+                                "
+                            >
+                                <option value="">
+                                    {{ t.admin.simple_user }}
+                                </option>
+                                <option
+                                    v-for="group in groups"
+                                    :key="group.id"
+                                    :value="group.id"
+                                >
+                                    {{ group.display_name }}
+                                </option>
+                            </select>
+                            <span v-else>
+                                {{
+                                    user.group?.display_name ??
+                                    t.admin.simple_user
+                                }}
+                            </span>
+                        </dd>
+                    </div>
+                </dl>
+
+                <div
+                    v-if="
+                        can.manage_activation ||
+                        can.manage_accounts ||
+                        can.impersonate_users
+                    "
+                    class="mt-4 grid gap-2"
+                >
+                    <Button
+                        v-if="can.impersonate_users"
+                        class="w-full"
+                        variant="secondary"
+                        size="sm"
+                        :disabled="!canImpersonate(user)"
+                        @click="impersonateUser(user)"
+                    >
+                        <LogIn />
+                        {{ t.admin.impersonate }}
+                    </Button>
+
+                    <Button
+                        v-if="can.manage_accounts"
+                        class="w-full"
+                        variant="outline"
+                        size="sm"
+                        :disabled="!canResetPassword(user)"
+                        @click="openPasswordReset(user)"
+                    >
+                        <KeyRound />
+                        {{ t.admin.reset_password }}
+                    </Button>
+
+                    <Button
+                        v-if="can.manage_activation"
+                        class="w-full"
+                        :variant="user.is_active ? 'destructive' : 'outline'"
+                        size="sm"
+                        :disabled="!canToggleActivation(user)"
+                        @click="toggleActivation(user)"
+                    >
+                        <Ban v-if="user.is_active" />
+                        <RotateCcw v-else />
+                        {{
+                            user.is_active
+                                ? t.admin.deactivate
+                                : t.admin.activate
+                        }}
+                    </Button>
+                </div>
+            </article>
+        </div>
+
+        <div
+            class="hidden overflow-x-auto rounded-lg border border-border md:block"
+        >
+            <table class="w-full min-w-[1020px] table-fixed text-sm">
+                <thead class="bg-muted/50 text-left">
+                    <tr class="divide-x divide-border">
+                        <th class="w-[20%] px-4 py-3 font-medium">
+                            {{ t.common.name }}
+                        </th>
+                        <th class="w-[24%] px-4 py-3 font-medium">
+                            {{ t.common.email }}
+                        </th>
+                        <th class="w-[12%] px-4 py-3 font-medium">
+                            {{ t.admin.status }}
+                        </th>
+                        <th class="w-[10%] px-4 py-3 text-center font-medium">
+                            {{ t.admin.email_verified }}
+                        </th>
+                        <th class="px-4 py-3 font-medium">
+                            {{ t.admin.group }}
+                        </th>
+                        <th
+                            v-if="
+                                can.manage_activation ||
+                                can.manage_accounts ||
+                                can.impersonate_users
+                            "
+                            class="w-[14%] px-4 py-3 text-right font-medium"
+                        >
+                            {{ t.admin.actions }}
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    <tr
+                        v-for="user in visibleUsers"
+                        :key="user.id"
+                        class="divide-x divide-border"
+                        :class="{ 'bg-muted/30 opacity-80': !user.is_active }"
+                    >
+                        <td class="min-w-0 px-4 py-3">
+                            <button
+                                type="button"
+                                class="w-full rounded-lg text-left transition hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
+                                @click="openProfile(user)"
+                            >
+                                <div class="truncate font-medium">
+                                    {{ user.name }}
+                                </div>
+                                <div
+                                    v-if="user.is_super_admin"
+                                    class="mt-1 text-xs text-muted-foreground"
+                                >
+                                    {{ t.admin.super_admin }}
+                                </div>
+                            </button>
+                        </td>
+                        <td class="px-4 py-3 text-muted-foreground">
+                            <span class="break-all">{{ user.email }}</span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <span
+                                class="rounded-full px-2 py-1 text-xs"
+                                :class="
+                                    user.is_active
+                                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                        : 'bg-destructive/10 text-destructive'
+                                "
+                            >
+                                {{
+                                    user.is_active
+                                        ? t.admin.active
+                                        : t.admin.inactive
+                                }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span
+                                class="inline-flex items-center justify-center"
+                                :title="
+                                    user.email_verified_at
+                                        ? t.admin.verified
+                                        : t.admin.not_verified
+                                "
+                            >
+                                <CircleCheck
+                                    v-if="user.email_verified_at"
+                                    class="size-5 text-emerald-600 dark:text-emerald-400"
+                                    aria-hidden="true"
+                                />
+                                <CircleX
+                                    v-else
+                                    class="size-5 text-destructive"
+                                    aria-hidden="true"
+                                />
+                                <span class="sr-only">
+                                    {{
+                                        user.email_verified_at
+                                            ? t.admin.verified
+                                            : t.admin.not_verified
+                                    }}
+                                </span>
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <select
+                                v-if="can.manage_users"
+                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                :value="user.group?.id ?? ''"
+                                @change="
+                                    updateGroup(
+                                        user,
+                                        ($event.target as HTMLSelectElement)
+                                            .value,
+                                    )
+                                "
+                            >
+                                <option value="">
+                                    {{ t.admin.simple_user }}
+                                </option>
+                                <option
+                                    v-for="group in groups"
+                                    :key="group.id"
+                                    :value="group.id"
+                                >
+                                    {{ group.display_name }}
+                                </option>
+                            </select>
+                            <span v-else>
+                                {{
+                                    user.group?.display_name ??
+                                    t.admin.simple_user
+                                }}
+                            </span>
+                        </td>
+                        <td
+                            v-if="
+                                can.manage_activation ||
+                                can.manage_accounts ||
+                                can.impersonate_users
+                            "
+                            class="px-4 py-3"
+                        >
+                            <div class="flex justify-end gap-2">
+                                <Button
+                                    v-if="can.impersonate_users"
+                                    variant="secondary"
+                                    size="icon-sm"
+                                    :disabled="!canImpersonate(user)"
+                                    :title="t.admin.impersonate"
+                                    @click="impersonateUser(user)"
+                                >
+                                    <LogIn />
+                                </Button>
+
+                                <Button
+                                    v-if="can.manage_accounts"
+                                    variant="outline"
+                                    size="icon-sm"
+                                    :disabled="!canResetPassword(user)"
+                                    :title="t.admin.reset_password"
+                                    @click="openPasswordReset(user)"
+                                >
+                                    <KeyRound />
+                                </Button>
+
+                                <Button
+                                    v-if="can.manage_activation"
+                                    :variant="
+                                        user.is_active
+                                            ? 'destructive'
+                                            : 'outline'
+                                    "
+                                    size="icon-sm"
+                                    :disabled="!canToggleActivation(user)"
+                                    :title="
+                                        user.is_active
+                                            ? t.admin.deactivate
+                                            : t.admin.activate
+                                    "
+                                    @click="toggleActivation(user)"
+                                >
+                                    <Ban v-if="user.is_active" />
+                                    <RotateCcw v-else />
+                                </Button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <PaginationControls
+            :pagination="users"
+            :per-page-options="perPageOptions"
+            @update:per-page="updatePerPage"
+        />
+
+        <Dialog
+            :open="selectedPasswordUser !== null"
+            @update:open="(isOpen) => !isOpen && closePasswordReset()"
+        >
+            <DialogContent
+                :show-close-button="false"
+                class="sm:max-w-md"
+            >
+                <DialogHeader>
+                    <div
+                        class="mb-2 flex size-12 items-center justify-center rounded-2xl border border-border bg-muted"
+                    >
+                        <KeyRound class="size-5 text-foreground" />
+                    </div>
+                    <DialogTitle>{{ t.admin.reset_password }}</DialogTitle>
+                    <DialogDescription v-if="selectedPasswordUser">
+                        {{ selectedPasswordUser.name }} -
+                        {{ selectedPasswordUser.email }}
+                    </DialogDescription>
+                </DialogHeader>
+
+                <form class="space-y-4" @submit.prevent="submitPasswordReset">
+                    <div class="grid gap-4">
+                        <div class="grid gap-2">
+                            <Label for="reset_password">
+                                {{ t.common.password }}
+                            </Label>
+                            <Input
+                                id="reset_password"
+                                v-model="passwordForm.password"
+                                type="password"
+                                autocomplete="new-password"
+                            />
+                            <InputError :message="passwordForm.errors.password" />
+                        </div>
+
+                        <div class="grid gap-2">
+                            <Label for="reset_password_confirmation">
+                                {{ t.auth.confirm_password }}
+                            </Label>
+                            <Input
+                                id="reset_password_confirmation"
+                                v-model="passwordForm.password_confirmation"
+                                type="password"
+                                autocomplete="new-password"
+                            />
+                            <InputError
+                                :message="passwordForm.errors.password_confirmation"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter class="pt-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            @click="closePasswordReset"
+                        >
+                            {{ t.common.cancel }}
+                        </Button>
+                        <Button
+                            type="submit"
+                            :disabled="passwordForm.processing"
+                        >
+                            {{ t.admin.reset_password }}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+
+        <Sheet
+            :open="selectedProfileUser !== null"
+            @update:open="(isOpen) => !isOpen && closeProfile()"
+        >
+            <SheetContent class="w-full sm:max-w-md md:max-w-lg">
+                <SheetHeader class="border-b border-border px-6 py-6 text-left">
+                    <div class="flex items-start gap-4 pr-8">
+                        <Avatar
+                            class="size-18 overflow-hidden rounded-3xl border border-border shadow-sm"
+                        >
+                            <AvatarImage
+                                v-if="selectedProfileUser?.avatar"
+                                :src="selectedProfileUser.avatar"
+                                :alt="selectedProfileUser.name"
+                                :style="selectedProfileAvatarStyle"
+                            />
+                            <AvatarFallback
+                                class="bg-muted text-lg font-semibold text-foreground"
+                            >
+                                {{
+                                    selectedProfileUser
+                                        ? getInitials(selectedProfileUser.name)
+                                        : ''
+                                }}
+                            </AvatarFallback>
+                        </Avatar>
+
+                        <div class="min-w-0 space-y-3">
+                            <div>
+                                <SheetTitle class="truncate pr-2">
+                                    {{ selectedProfileUser?.name }}
+                                </SheetTitle>
+                                <SheetDescription>
+                                    {{ t.admin.profile_description }}
+                                </SheetDescription>
+                            </div>
+
+                            <div class="flex flex-wrap gap-2">
+                                <span
+                                    v-if="selectedProfileUser?.is_super_admin"
+                                    class="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
+                                >
+                                    {{ t.admin.super_admin }}
+                                </span>
+                                <span
+                                    v-if="selectedProfileUser"
+                                    class="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
+                                >
+                                    {{
+                                        selectedProfileUser.group
+                                            ?.display_name ??
+                                        t.admin.simple_user
+                                    }}
+                                </span>
+                                <span
+                                    v-if="selectedProfileUser"
+                                    class="rounded-full px-2.5 py-1 text-xs"
+                                    :class="
+                                        selectedProfileUser.is_active
+                                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                            : 'bg-destructive/10 text-destructive'
+                                    "
+                                >
+                                    {{
+                                        selectedProfileUser.is_active
+                                            ? t.admin.active
+                                            : t.admin.inactive
+                                    }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </SheetHeader>
+
+                <div class="flex-1 space-y-6 overflow-y-auto px-6 py-6">
+                    <div
+                        v-if="canEditProfile(selectedProfileUser)"
+                        class="flex items-center justify-end text-xs text-muted-foreground"
+                    >
+                        <span v-if="managedProfileSaveState === 'saving'">
+                            {{ t.admin.profile_autosave_saving }}
+                        </span>
+                        <span
+                            v-else-if="managedProfileSaveState === 'saved'"
+                            class="text-emerald-600 dark:text-emerald-400"
+                        >
+                            {{ t.admin.profile_autosave_saved }}
+                        </span>
+                    </div>
+
+                    <div class="grid gap-3">
+                        <div class="rounded-2xl border border-border bg-card p-4">
+                            <div
+                                class="mb-1 flex items-center gap-2 text-sm text-muted-foreground"
+                            >
+                                <Mail class="size-4" />
+                                {{ t.common.email }}
+                            </div>
+                            <template v-if="canEditProfile(selectedProfileUser)">
+                                <Input
+                                    v-model="managedProfileForm.email"
+                                    type="email"
+                                    class="mt-2"
+                                    autocomplete="off"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="managedProfileForm.errors.email"
+                                />
+                            </template>
+                            <div v-else class="break-all font-medium">
+                                {{ selectedProfileUser?.email }}
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-border bg-card p-4">
+                            <div
+                                class="mb-1 flex items-center gap-2 text-sm text-muted-foreground"
+                            >
+                                <Phone class="size-4" />
+                                {{ t.common.phone }}
+                            </div>
+                            <template v-if="canEditProfile(selectedProfileUser)">
+                                <Input
+                                    v-model="managedProfileForm.phone"
+                                    type="tel"
+                                    class="mt-2"
+                                    inputmode="tel"
+                                    autocomplete="off"
+                                    :placeholder="t.profile.phone_placeholder"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="managedProfileForm.errors.phone"
+                                />
+                            </template>
+                            <div v-else class="font-medium">
+                                {{
+                                    selectedProfileUser?.phone ??
+                                    t.common.not_specified
+                                }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <div class="rounded-2xl border border-border bg-card p-4">
+                            <div class="text-sm text-muted-foreground">
+                                {{ t.common.name }}
+                            </div>
+                            <template v-if="canEditProfile(selectedProfileUser)">
+                                <Input
+                                    v-model="managedProfileForm.name"
+                                    class="mt-2"
+                                    autocomplete="off"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="managedProfileForm.errors.name"
+                                />
+                            </template>
+                            <div v-else class="mt-1 font-medium">
+                                {{ selectedProfileUser?.name }}
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-border bg-card p-4">
+                            <div class="text-sm text-muted-foreground">
+                                {{ t.common.last_name }}
+                            </div>
+                            <template v-if="canEditProfile(selectedProfileUser)">
+                                <Input
+                                    v-model="managedProfileForm.last_name"
+                                    class="mt-2"
+                                    autocomplete="off"
+                                />
+                                <InputError
+                                    class="mt-2"
+                                    :message="managedProfileForm.errors.last_name"
+                                />
+                            </template>
+                            <div v-else class="mt-1 font-medium">
+                                {{
+                                    selectedProfileUser?.last_name ??
+                                    t.common.not_specified
+                                }}
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-border bg-card p-4">
+                            <div class="text-sm text-muted-foreground">
+                                {{ t.admin.group }}
+                            </div>
+                            <div class="mt-1 font-medium">
+                                {{
+                                    selectedProfileUser?.group?.display_name ??
+                                    t.admin.simple_user
+                                }}
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-border bg-card p-4">
+                            <div class="text-sm text-muted-foreground">
+                                {{ t.admin.email_verified }}
+                            </div>
+                            <div class="mt-1 flex items-center gap-2 font-medium">
+                                <BadgeCheck
+                                    v-if="selectedProfileUser?.email_verified_at"
+                                    class="size-4 text-emerald-600 dark:text-emerald-400"
+                                />
+                                <CircleX
+                                    v-else
+                                    class="size-4 text-destructive"
+                                />
+                                {{
+                                    selectedProfileUser?.email_verified_at
+                                        ? t.admin.verified
+                                        : t.admin.not_verified
+                                }}
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-border bg-card p-4 sm:col-span-2">
+                            <div class="text-sm text-muted-foreground">
+                                {{ t.admin.created_at }}
+                            </div>
+                            <div class="mt-1 font-medium">
+                                {{
+                                    formatDateTime(
+                                        selectedProfileUser?.created_at ?? null,
+                                    )
+                                }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </SheetContent>
+        </Sheet>
+    </div>
+</template>
