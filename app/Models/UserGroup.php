@@ -5,9 +5,9 @@ namespace App\Models;
 use Database\Factories\UserGroupFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /**
@@ -22,10 +22,18 @@ use Illuminate\Support\Carbon;
 class UserGroup extends Model
 {
     public const string ADMINISTRATORS_NAME = 'Administrators';
+
     public const string PERMISSION_VIEW_USERS = 'view_users';
+
     public const string PERMISSION_MANAGE_USER_ACTIVATION = 'manage_user_activation';
+
     public const string PERMISSION_MANAGE_USER_ACCOUNTS = 'manage_user_accounts';
+
     public const string PERMISSION_IMPERSONATE_USERS = 'impersonate_users';
+
+    public const string PERMISSION_ACCESS_PERSON_CONTACTS = 'access_person_contacts';
+
+    public const string PERMISSION_ACCESS_COMPANY_CONTACTS = 'access_company_contacts';
 
     /** @use HasFactory<UserGroupFactory> */
     use HasFactory;
@@ -92,6 +100,14 @@ class UserGroup extends Model
             self::PERMISSION_IMPERSONATE_USERS => [
                 'label_key' => 'ui.admin.permission_impersonate_users',
                 'description_key' => 'ui.admin.permission_impersonate_users_description',
+            ],
+            self::PERMISSION_ACCESS_PERSON_CONTACTS => [
+                'label_key' => 'ui.admin.permission_access_person_contacts',
+                'description_key' => 'ui.admin.permission_access_person_contacts_description',
+            ],
+            self::PERMISSION_ACCESS_COMPANY_CONTACTS => [
+                'label_key' => 'ui.admin.permission_access_company_contacts',
+                'description_key' => 'ui.admin.permission_access_company_contacts_description',
             ],
         ];
     }

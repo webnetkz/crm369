@@ -1,11 +1,12 @@
 <?php
 
-use App\Http\Controllers\Settings\AppearanceController;
 use App\Http\Controllers\Settings\ApiController;
-use App\Http\Controllers\Settings\MessengerIntegrationController;
+use App\Http\Controllers\Settings\AppearanceController;
 use App\Http\Controllers\Settings\MenuController;
-use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\MessengerIntegrationController;
+use App\Http\Controllers\Settings\ModuleController;
 use App\Http\Controllers\Settings\PortalController;
+use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Controllers\Settings\UserController;
 use App\Http\Controllers\Settings\UserGroupController;
@@ -39,6 +40,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 Route::middleware(['auth', 'verified', 'can:view-users'])->group(function () {
     Route::get('settings/users', [UserController::class, 'index'])->name('settings.users.index');
+    Route::get('settings/users/{user}', [UserController::class, 'show'])->name('settings.users.show');
 });
 
 Route::middleware(['auth', 'verified', 'can:manage-user-accounts'])->group(function () {
@@ -79,6 +81,8 @@ Route::middleware(['auth', 'verified', 'can:manage-users'])->group(function () {
 
     Route::get('settings/portal', [PortalController::class, 'edit'])->name('settings.portal.edit');
     Route::post('settings/portal', [PortalController::class, 'update'])->name('settings.portal.update');
+    Route::get('settings/modules', [ModuleController::class, 'edit'])->name('settings.modules.edit');
+    Route::patch('settings/modules', [ModuleController::class, 'update'])->name('settings.modules.update');
 
     Route::get('settings/integrations', [MessengerIntegrationController::class, 'edit'])->name('settings.integrations.edit');
     Route::patch('settings/integrations/{messengerIntegration}', [MessengerIntegrationController::class, 'update'])->name('settings.integrations.update');

@@ -9,19 +9,21 @@ import type { BreadcrumbItem } from '@/types';
 
 type Props = {
     breadcrumbs?: BreadcrumbItem[];
+    sidebarCollapsed?: boolean;
 };
 
 withDefaults(defineProps<Props>(), {
     breadcrumbs: () => [],
+    sidebarCollapsed: false,
 });
 </script>
 
 <template>
-    <AppShell variant="sidebar">
+    <AppShell variant="sidebar" :sidebar-collapsed="sidebarCollapsed">
         <AppSidebar />
         <AppContent
             variant="sidebar"
-            class="min-h-0 overflow-y-auto overflow-x-hidden"
+            class="min-h-0 overflow-x-hidden overflow-y-auto"
         >
             <AppSidebarHeader :breadcrumbs="breadcrumbs" />
             <slot />

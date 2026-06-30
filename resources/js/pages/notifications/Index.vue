@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router, setLayoutProps, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, setLayoutProps, useForm, usePage, usePoll } from '@inertiajs/vue3';
 import { Bell, Check, CheckCheck, ExternalLink } from '@lucide/vue';
 import { computed, watchEffect } from 'vue';
 import { update, updateAll } from '@/actions/App/Http/Controllers/NotificationController';
@@ -23,6 +23,18 @@ const props = defineProps<{
 
 const { language, t } = useLanguage();
 const page = usePage();
+
+usePoll(
+    10000,
+    {
+        only: ['notifications', 'notificationFeed'],
+        preserveScroll: true,
+        preserveState: true,
+    },
+    {
+        mode: 'rest',
+    },
+);
 
 const filtersForm = useForm<Filters>({
     status: props.filters.status,

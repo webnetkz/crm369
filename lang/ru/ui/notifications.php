@@ -24,4 +24,7 @@ return [
     'password_reset_title' => 'Пароль изменён',
     'task_due_soon_message' => 'Срок задачи ":title" наступит меньше чем через 24 часа.',
     'task_due_soon_title' => 'Срок задачи скоро',
+    'task_assigned_from_form_message' => 'Для вас создана задача ":title" из формы ":form".',
+    'task_assigned_message' => ':user создал(а) для вас задачу ":title".',
+    'task_assigned_title' => 'Новая назначенная задача',
 ];

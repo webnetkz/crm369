@@ -4,10 +4,10 @@ namespace App\Models;
 
 use Database\Factories\MenuItemFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -90,59 +90,59 @@ class MenuItem extends Model
     public static function builtInDefinitions(): array
     {
         return [
-            'dashboard' => [
-                'title_key' => 'ui.common.dashboard',
-                'fallback_title' => 'Dashboard',
-                'url' => '/dashboard',
-                'sort_order' => 10,
-            ],
-            'files' => [
-                'title_key' => 'ui.files.title',
-                'fallback_title' => 'Files',
-                'url' => '/files',
-                'sort_order' => 11,
-            ],
-            'forms' => [
-                'title_key' => 'ui.forms.title',
-                'fallback_title' => 'Forms',
-                'url' => '/forms',
-                'sort_order' => 12,
-            ],
             'news' => [
                 'title_key' => 'ui.news.title',
                 'fallback_title' => 'News',
                 'url' => '/news',
-                'sort_order' => 13,
+                'sort_order' => 10,
             ],
             'notifications' => [
                 'title_key' => 'ui.notifications.panel_title',
                 'fallback_title' => 'Notifications',
                 'url' => '/notifications',
-                'sort_order' => 15,
-            ],
-            'chats' => [
-                'title_key' => 'ui.chat.title',
-                'fallback_title' => 'Chats',
-                'url' => '/chats',
-                'sort_order' => 18,
-            ],
-            'knowledge-bases' => [
-                'title_key' => 'ui.knowledge.title',
-                'fallback_title' => 'Knowledge base',
-                'url' => '/knowledge-bases',
                 'sort_order' => 20,
             ],
-            'funnels' => [
-                'title_key' => 'ui.funnels.title',
-                'fallback_title' => 'Funnels',
-                'url' => '/funnels',
-                'sort_order' => 25,
+            'dashboard' => [
+                'title_key' => 'ui.common.dashboard',
+                'fallback_title' => 'Dashboard',
+                'url' => '/dashboard',
+                'sort_order' => 30,
             ],
             'projects' => [
                 'title_key' => 'ui.projects.title',
                 'fallback_title' => 'Tasks & projects',
                 'url' => '/projects',
-                'sort_order' => 30,
+                'sort_order' => 40,
+            ],
+            'chats' => [
+                'title_key' => 'ui.chat.title',
+                'fallback_title' => 'Chats',
+                'url' => '/chats',
+                'sort_order' => 50,
+            ],
+            'knowledge-bases' => [
+                'title_key' => 'ui.knowledge.title',
+                'fallback_title' => 'Knowledge base',
+                'url' => '/knowledge-bases',
+                'sort_order' => 60,
+            ],
+            'funnels' => [
+                'title_key' => 'ui.funnels.title',
+                'fallback_title' => 'Funnels',
+                'url' => '/funnels',
+                'sort_order' => 70,
+            ],
+            'forms' => [
+                'title_key' => 'ui.forms.title',
+                'fallback_title' => 'Forms',
+                'url' => '/forms',
+                'sort_order' => 80,
+            ],
+            'contacts' => [
+                'title_key' => 'ui.contacts.title',
+                'fallback_title' => 'Contacts',
+                'url' => '/contacts',
+                'sort_order' => 90,
             ],
             'settings.profile' => [
                 'title_key' => 'ui.settings.profile',
@@ -186,6 +186,12 @@ class MenuItem extends Model
                 'url' => '/settings/portal',
                 'sort_order' => 170,
             ],
+            'settings.modules' => [
+                'title_key' => 'ui.settings.modules',
+                'fallback_title' => 'Modules',
+                'url' => '/settings/modules',
+                'sort_order' => 172,
+            ],
             'settings.integrations' => [
                 'title_key' => 'ui.settings.integrations',
                 'fallback_title' => 'Integrations',
@@ -213,15 +219,15 @@ class MenuItem extends Model
     public static function sidebarBuiltInKeys(): array
     {
         return [
-            'dashboard',
-            'files',
-            'forms',
             'news',
             'notifications',
+            'dashboard',
+            'projects',
             'chats',
             'knowledge-bases',
             'funnels',
-            'projects',
+            'forms',
+            'contacts',
         ];
     }
 
@@ -316,6 +322,7 @@ class MenuItem extends Model
             ->all();
 
         return collect([...$legacyHiddenKeys, ...$user->hiddenMenuItemKeys()])
+            ->merge(PortalSetting::current()->disabledModules())
             ->filter(fn (mixed $key): bool => is_string($key) && $key !== '')
             ->unique()
             ->values()

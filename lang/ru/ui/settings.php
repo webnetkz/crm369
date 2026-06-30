@@ -30,6 +30,7 @@ return [
     'rights' => 'Права',
     'menu' => 'Меню',
     'portal' => 'Портал',
+    'modules' => 'Модули',
     'integrations' => 'Интеграции',
     'api' => 'API',
     'webhooks' => 'Веб-хуки',

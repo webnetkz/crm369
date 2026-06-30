@@ -39,6 +39,9 @@ export type Auth = {
     canImpersonateUsers: boolean;
     canManageApiTokens: boolean;
     canManageWebhooks: boolean;
+    canAccessContacts: boolean;
+    canAccessPersonContacts: boolean;
+    canAccessCompanyContacts: boolean;
     canManageKnowledgeBases: boolean;
     canAccessFunnels: boolean;
     canManageFunnels: boolean;

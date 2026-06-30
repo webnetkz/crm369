@@ -4,11 +4,12 @@ import type { BreadcrumbItem } from '@/types';
 
 const { breadcrumbs = [] } = defineProps<{
     breadcrumbs?: BreadcrumbItem[];
+    sidebarCollapsed?: boolean;
 }>();
 </script>
 
 <template>
-    <AppLayout :breadcrumbs="breadcrumbs">
+    <AppLayout :breadcrumbs="breadcrumbs" :sidebar-collapsed="sidebarCollapsed">
         <slot />
     </AppLayout>
 </template>

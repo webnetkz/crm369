@@ -2,9 +2,9 @@
 
 namespace App\Providers;
 
-use Carbon\CarbonImmutable;
 use App\Models\ApiAccessToken;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -46,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-users', fn (User $user): bool => $user->isSuperAdmin());
         Gate::define('manage-messenger-integrations', fn (User $user): bool => $user->canManageMessengerIntegrations());
         Gate::define('manage-webhooks', fn (User $user): bool => $user->canManageWebhooks());
+        Gate::define('access-contacts', fn (User $user): bool => $user->canAccessContacts());
         Gate::define('manage-knowledge-bases', fn (User $user): bool => $user->canManageKnowledgeBases());
         Gate::define('manage-funnels', fn (User $user): bool => $user->canManageFunnels());
 

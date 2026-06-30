@@ -3,7 +3,11 @@
 use App\Models\ChatMessage;
 use App\Models\Project;
 use App\Models\ProjectTask;
+use App\Models\ProjectTaskStage;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('project members can open their project while outsiders get 404', function () {
@@ -38,6 +42,232 @@ test('project members can open their project while outsiders get 404', function 
     $this->actingAs($outsider)
         ->get(route('projects.show', $project))
         ->assertNotFound();
+});
+
+test('tasks alias shows only standalone tasks and defaults to list view', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create([
+        'owner_user_id' => $user->id,
+        'created_by_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+    ]);
+    $project->members()->sync([$user->id]);
+
+    ProjectTask::factory()->standalone()->create([
+        'creator_user_id' => $user->id,
+        'assignee_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+        'title' => 'Inbox standalone',
+    ]);
+    ProjectTask::factory()->create([
+        'project_id' => $project->id,
+        'creator_user_id' => $user->id,
+        'assignee_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+        'title' => 'Project-only task',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('tasks.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/Index')
+            ->where('pageMode', 'tasks')
+            ->where('taskDisplayMode', 'list')
+            ->where('activeProject', null)
+            ->has('taskGroups', 1)
+            ->where('taskGroups.0.kind', 'standalone')
+            ->where('taskGroups.0.tasks_count', 1)
+            ->where('taskGroups.0.tasks.0.title', 'Inbox standalone')
+        );
+});
+
+test('tasks alias falls back to default stages when project task stages table is missing', function () {
+    $user = User::factory()->create();
+
+    ProjectTask::factory()->standalone()->create([
+        'creator_user_id' => $user->id,
+        'assignee_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+        'title' => 'Fallback standalone',
+        'status' => ProjectTask::STATUS_TODO,
+    ]);
+
+    Schema::dropIfExists('project_task_stages');
+
+    $this->actingAs($user)
+        ->get(route('tasks.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/Index')
+            ->where('pageMode', 'tasks')
+            ->where('can.manageTaskStages', false)
+            ->has('taskOptions.statuses', count(ProjectTaskStage::defaultStages()))
+            ->where('taskOptions.statuses.0.value', ProjectTask::STATUS_TODO)
+            ->where('taskOptions.statuses.3.value', ProjectTask::STATUS_DONE)
+            ->where('taskGroups.0.tasks.0.title', 'Fallback standalone')
+        );
+});
+
+test('standalone task can be opened in tasks mode while project task returns 404 there', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create([
+        'owner_user_id' => $user->id,
+        'created_by_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+    ]);
+    $project->members()->sync([$user->id]);
+
+    $standaloneTask = ProjectTask::factory()->standalone()->create([
+        'creator_user_id' => $user->id,
+        'assignee_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+        'title' => 'Task mode card',
+    ]);
+    $projectTask = ProjectTask::factory()->create([
+        'project_id' => $project->id,
+        'creator_user_id' => $user->id,
+        'assignee_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+        'title' => 'Hidden project task',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('tasks.show', ['projectTask' => $standaloneTask, 'view' => 'kanban']))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/Index')
+            ->where('pageMode', 'tasks')
+            ->where('taskDisplayMode', 'kanban')
+            ->where('activeTask.id', $standaloneTask->id)
+        );
+
+    $this->actingAs($user)
+        ->get(route('tasks.show', $projectTask))
+        ->assertNotFound();
+});
+
+test('standalone task can be moved across kanban stages and is closed when moved to done', function () {
+    $user = User::factory()->create();
+
+    $task = ProjectTask::factory()->standalone()->create([
+        'creator_user_id' => $user->id,
+        'assignee_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+        'status' => ProjectTask::STATUS_TODO,
+        'completed_at' => null,
+    ]);
+
+    $this->actingAs($user)
+        ->from(route('tasks.index', ['view' => 'kanban']))
+        ->patch(route('projects.workspace.tasks.move', [
+            'projectTask' => $task,
+            'mode' => 'tasks',
+            'view' => 'kanban',
+        ]), [
+            'status' => ProjectTask::STATUS_DONE,
+        ])
+        ->assertRedirect(route('tasks.index', ['view' => 'kanban']));
+
+    $task->refresh();
+
+    expect($task->status)->toBe(ProjectTask::STATUS_DONE)
+        ->and($task->completed_at)->not->toBeNull();
+
+    $this->actingAs($user)
+        ->from(route('tasks.index', ['view' => 'kanban']))
+        ->patch(route('projects.workspace.tasks.move', [
+            'projectTask' => $task,
+            'mode' => 'tasks',
+            'view' => 'kanban',
+        ]), [
+            'status' => ProjectTask::STATUS_IN_PROGRESS,
+        ])
+        ->assertRedirect(route('tasks.index', ['view' => 'kanban']));
+
+    $task->refresh();
+
+    expect($task->status)->toBe(ProjectTask::STATUS_IN_PROGRESS)
+        ->and($task->completed_at)->toBeNull();
+});
+
+test('user can create and rename kanban task stages', function () {
+    $user = User::factory()->create();
+    $todoStage = ProjectTaskStage::query()->where('slug', ProjectTaskStage::SLUG_TODO)->firstOrFail();
+
+    $this->actingAs($user)
+        ->from(route('tasks.index', ['view' => 'kanban']))
+        ->post(route('projects.task-stages.store'), [
+            'name' => 'Waiting client',
+            'color' => '#F97316',
+        ])
+        ->assertRedirect(route('tasks.index', ['view' => 'kanban']));
+
+    $customStage = ProjectTaskStage::query()->where('name', 'Waiting client')->firstOrFail();
+
+    expect($customStage->slug)->toBe('waiting_client')
+        ->and($customStage->color)->toBe('#F97316')
+        ->and($customStage->is_completed)->toBeFalse();
+
+    $this->actingAs($user)
+        ->from(route('tasks.index', ['view' => 'kanban']))
+        ->patch(route('projects.task-stages.update', $todoStage), [
+            'name' => 'Inbox',
+            'color' => '#0F766E',
+        ])
+        ->assertRedirect(route('tasks.index', ['view' => 'kanban']));
+
+    $todoStage->refresh();
+
+    expect($todoStage->name)->toBe('Inbox')
+        ->and($todoStage->color)->toBe('#0F766E');
+
+    $this->actingAs($user)
+        ->get(route('tasks.index', ['view' => 'kanban']))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/Index')
+            ->where('taskDisplayMode', 'kanban')
+            ->where('taskOptions.statuses.0.label', 'Inbox')
+            ->where('taskOptions.statuses.0.color', '#0F766E')
+            ->has('taskOptions.statuses', 5)
+        );
+});
+
+test('user can reorder kanban task stages', function () {
+    $user = User::factory()->create();
+    $orderedStageIds = ProjectTaskStage::query()
+        ->ordered()
+        ->pluck('id')
+        ->map(fn (mixed $value): int => (int) $value)
+        ->values();
+
+    $reorderedStageIds = collect([
+        $orderedStageIds[1],
+        $orderedStageIds[0],
+        $orderedStageIds[2],
+        $orderedStageIds[3],
+    ]);
+
+    $this->actingAs($user)
+        ->from(route('tasks.index', ['view' => 'kanban']))
+        ->patch(route('projects.task-stages.move'), [
+            'stage_ids' => $reorderedStageIds->all(),
+        ])
+        ->assertRedirect(route('tasks.index', ['view' => 'kanban']));
+
+    expect(ProjectTaskStage::query()->ordered()->pluck('id')->all())
+        ->toBe($reorderedStageIds->all());
+
+    $this->actingAs($user)
+        ->get(route('tasks.index', ['view' => 'kanban']))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/Index')
+            ->where('taskDisplayMode', 'kanban')
+            ->where('taskOptions.statuses.0.id', $reorderedStageIds[0])
+            ->where('taskOptions.statuses.1.id', $reorderedStageIds[1])
+        );
 });
 
 test('super admin can open any isolated project', function () {
@@ -111,12 +341,25 @@ test('project member can create task with assignee and co assignees from project
         ->assertRedirect();
 
     $task = ProjectTask::query()->where('project_id', $project->id)->firstOrFail();
+    $notification = $assignee->refresh()->notifications()->latest('created_at')->first();
 
     expect($task->title)->toBe('Prepare timeline')
         ->and($task->assignee_user_id)->toBe($assignee->id)
         ->and($task->complexity)->toBe(8)
         ->and($task->due_at?->toISOString())->toBe($dueAt->toISOString())
         ->and($task->coAssignees()->pluck('users.id')->all())->toBe([$coAssignee->id]);
+
+    expect($notification)->not->toBeNull()
+        ->and($notification?->data['title'])->toBe(
+            __('ui.notifications.task_assigned_title', [], $assignee->resolvedLanguage()),
+        )
+        ->and($notification?->data['message'])->toBe(
+            __('ui.notifications.task_assigned_message', [
+                'title' => $task->title,
+                'user' => trim($owner->name.' '.($owner->last_name ?? '')),
+            ], $assignee->resolvedLanguage()),
+        )
+        ->and($notification?->data['action_url'])->toBe(route('projects.workspace.tasks.show', $task));
 });
 
 test('user can create a standalone task directly in the workspace', function () {
@@ -322,6 +565,7 @@ test('task due reminders are sent once to the assignee during the final day', fu
 test('projects page collects deadline time and transforms it before submit', function () {
     $projectsPage = file_get_contents(resource_path('js/pages/projects/Index.vue'));
     $taskConversationPanel = file_get_contents(resource_path('js/components/ProjectTaskConversationPanel.vue'));
+    $composer = file_get_contents(resource_path('js/components/ChatMessageComposer.vue'));
     $consoleRoutes = file_get_contents(base_path('routes/console.php'));
 
     expect($projectsPage)
@@ -335,16 +579,27 @@ test('projects page collects deadline time and transforms it before submit', fun
         ->and($taskConversationPanel)->toContain('task_discussion_placeholder')
         ->and($taskConversationPanel)->toContain('showTaskConversation.url')
         ->and($taskConversationPanel)->toContain('storeMessage.url')
-        ->and($taskConversationPanel)->toContain('ChatEmojiPicker')
-        ->and($taskConversationPanel)->toContain('@select="insertEmoji"')
-        ->and($taskConversationPanel)->toContain('ref="draftTextarea"')
-        ->and($taskConversationPanel)->toContain('size="icon"')
-        ->and($taskConversationPanel)->toContain('absolute right-3 bottom-3 size-10 rounded-full')
-        ->and($taskConversationPanel)->toContain(':aria-label="sending ? t.chat.sending : t.chat.send"')
-        ->and($taskConversationPanel)->toContain('pr-28')
+        ->and($taskConversationPanel)->toContain('ChatMessageComposer')
+        ->and($taskConversationPanel)->toContain('ChatMessageAttachments')
+        ->and($taskConversationPanel)->toContain("formData.append('attachments[]', attachment)")
+        ->and($taskConversationPanel)->toContain('v-model:attachments="selectedAttachments"')
+        ->and($composer)->toContain('ChatEmojiPicker')
+        ->and($composer)->toContain('multiple')
         ->and($consoleRoutes)->toContain('SendProjectTaskDueSoonRemindersCommand::class')
         ->and($consoleRoutes)->toContain('everyMinute()')
         ->and($consoleRoutes)->toContain('withoutOverlapping()');
+});
+
+test('tasks page includes list, kanban, and gantt standalone views', function () {
+    $projectsPage = file_get_contents(resource_path('js/pages/projects/Index.vue'));
+
+    expect($projectsPage)
+        ->toContain("props.taskDisplayMode === 'list'")
+        ->toContain("props.taskDisplayMode === 'kanban'")
+        ->toContain('ganttGridTemplateColumns')
+        ->toContain('kanbanColumns')
+        ->toContain('view_mode')
+        ->toContain('view_gantt');
 });
 
 test('visible users can open task discussion and send messages while outsiders cannot', function () {
@@ -417,4 +672,46 @@ test('task discussion messages preserve line breaks', function () {
         ->assertJsonPath('conversation.messages.0.body', $body);
 
     expect(ChatMessage::query()->latest('id')->value('body'))->toBe($body);
+});
+
+test('task discussion can send attachment-only messages', function () {
+    Storage::fake('local');
+
+    $creator = User::factory()->create();
+    $assignee = User::factory()->create();
+
+    $task = ProjectTask::factory()->standalone()->create([
+        'creator_user_id' => $creator->id,
+        'assignee_user_id' => $assignee->id,
+        'updated_by_user_id' => $creator->id,
+        'title' => 'Attachment discussion',
+    ]);
+
+    $conversationId = $this->actingAs($creator)
+        ->get(route('projects.workspace.tasks.conversation.show', $task))
+        ->assertSuccessful()
+        ->json('conversation.id');
+
+    $this->actingAs($creator)
+        ->post(route('chats.messages.store', $conversationId), [
+            'body' => '',
+            'attachments' => [
+                UploadedFile::fake()->create('task-note.pdf', 32, 'application/pdf'),
+            ],
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('message.attachments.0.name', 'task-note.pdf');
+
+    $message = ChatMessage::query()->with('attachments')->latest('id')->firstOrFail();
+    $attachment = $message->attachments->first();
+
+    expect($message->body)->toBe('')
+        ->and($attachment)->not->toBeNull();
+
+    Storage::disk('local')->assertExists((string) $attachment?->path);
+
+    $this->actingAs($creator)
+        ->get(route('projects.workspace.tasks.conversation.show', $task))
+        ->assertSuccessful()
+        ->assertJsonPath('conversation.messages.0.attachments.0.name', 'task-note.pdf');
 });

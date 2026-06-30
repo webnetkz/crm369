@@ -30,6 +30,7 @@ return [
     'rights' => 'Rights',
     'menu' => 'Menu',
     'portal' => 'Portal',
+    'modules' => 'Modules',
     'integrations' => 'Integrations',
     'api' => 'API',
     'webhooks' => 'Webhooks',

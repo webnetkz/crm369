@@ -16,6 +16,7 @@ class PortalFormSubmissionManager
     public function __construct(
         private readonly DirectConversationManager $directConversationManager,
         private readonly TaskConversationManager $taskConversationManager,
+        private readonly ProjectTaskAssignmentNotifier $taskAssignmentNotifier,
     ) {}
 
     /**
@@ -78,6 +79,7 @@ class PortalFormSubmissionManager
             if ($form->submission_mode === PortalForm::SUBMISSION_MODE_TASK) {
                 $task = $this->createTask($form, $payload);
                 $this->taskConversationManager->ensureForTask($task, $form->owner);
+                $this->taskAssignmentNotifier->sendForFormCreation($task, $form->name);
 
                 $submission->update([
                     'project_task_id' => $task->id,

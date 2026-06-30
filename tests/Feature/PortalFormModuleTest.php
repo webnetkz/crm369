@@ -20,6 +20,10 @@ test('authenticated user can open forms workspace and create a form with fields'
             ->has('forms')
             ->has('availableUsers')
             ->has('fieldTypes')
+            ->has('formWidthOptions', 4)
+            ->has('formCompletionActionOptions', 3)
+            ->where('formStyleDefaults.container_width', 'lg')
+            ->where('formCompletionDefaults.action', 'message')
             ->where('can.create', true));
 
     $this->actingAs($owner)
@@ -29,6 +33,23 @@ test('authenticated user can open forms workspace and create a form with fields'
             'submission_mode' => PortalForm::SUBMISSION_MODE_TASK,
             'target_user_id' => $target->id,
             'is_active' => true,
+            'style_settings' => [
+                'container_width' => 'xl',
+                'background_color' => '#FEF3C7',
+                'border_color' => '#F59E0B',
+                'text_color' => '#1F2937',
+                'input_background_color' => '#FFFFFF',
+                'input_border_color' => '#FCD34D',
+                'button_background_color' => '#B45309',
+                'button_text_color' => '#FFFFFF',
+                'border_radius' => 30,
+                'padding' => 40,
+            ],
+            'completion_settings' => [
+                'action' => 'message',
+                'success_message' => 'Спасибо! Мы получили вашу заявку и скоро ответим.',
+                'redirect_url' => null,
+            ],
             'fields' => [
                 [
                     'label' => 'Client name',
@@ -53,10 +74,195 @@ test('authenticated user can open forms workspace and create a form with fields'
     expect($form->owner_user_id)->toBe($owner->id)
         ->and($form->target_user_id)->toBe($target->id)
         ->and($form->submission_mode)->toBe(PortalForm::SUBMISSION_MODE_TASK)
-        ->and($form->public_token)->not->toBe('');
+        ->and($form->public_token)->not->toBe('')
+        ->and($form->style_settings)->toMatchArray([
+            'container_width' => 'xl',
+            'background_color' => '#FEF3C7',
+            'border_color' => '#F59E0B',
+            'text_color' => '#1F2937',
+            'input_background_color' => '#FFFFFF',
+            'input_border_color' => '#FCD34D',
+            'button_background_color' => '#B45309',
+            'button_text_color' => '#FFFFFF',
+            'border_radius' => 30,
+            'padding' => 40,
+        ])
+        ->and($form->completion_settings)->toMatchArray([
+            'action' => 'message',
+            'success_message' => 'Спасибо! Мы получили вашу заявку и скоро ответим.',
+            'redirect_url' => null,
+        ]);
 
     expect($form->fields()->count())->toBe(2)
         ->and($form->fields()->pluck('label')->all())->toEqual(['Client name', 'Request details']);
+
+    $this->actingAs($owner)
+        ->get(route('forms.index', ['form' => $form->id]))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('forms/Index')
+            ->has('forms', 1)
+            ->where('forms.0.name', 'Client intake')
+            ->where('forms.0.public_url', route('forms.public.show', ['portalForm' => $form->public_token]))
+            ->where('activeForm.id', $form->id)
+            ->where('activeForm.name', 'Client intake')
+            ->where('activeForm.style_settings.container_width', 'xl')
+            ->where('activeForm.style_settings.border_radius', 30)
+            ->where('activeForm.completion_settings.action', 'message')
+            ->where('activeForm.completion_settings.success_message', 'Спасибо! Мы получили вашу заявку и скоро ответим.')
+            ->has('activeForm.fields', 2)
+            ->where('can.manageActive', true));
+});
+
+test('authenticated user can update and delete a form from forms workspace', function () {
+    $owner = User::factory()->create();
+    $target = User::factory()->create();
+    $nextTarget = User::factory()->create();
+
+    $form = PortalForm::factory()->create([
+        'owner_user_id' => $owner->id,
+        'target_user_id' => $target->id,
+        'name' => 'Lead capture',
+        'submission_mode' => PortalForm::SUBMISSION_MODE_TASK,
+        'is_active' => true,
+    ]);
+
+    $form->fields()->createMany([
+        [
+            'key' => 'name',
+            'label' => 'Name',
+            'type' => 'text',
+            'placeholder' => 'Jane Doe',
+            'is_required' => true,
+            'sort_order' => 10,
+        ],
+        [
+            'key' => 'email',
+            'label' => 'Email',
+            'type' => 'email',
+            'placeholder' => 'jane@example.com',
+            'is_required' => true,
+            'sort_order' => 20,
+        ],
+    ]);
+
+    $fieldIds = $form->fields()->pluck('id')->values();
+
+    $this->actingAs($owner)
+        ->patch(route('forms.update', $form), [
+            'name' => 'Updated lead capture',
+            'description' => 'Updated form description',
+            'submission_mode' => PortalForm::SUBMISSION_MODE_CHAT,
+            'target_user_id' => $nextTarget->id,
+            'is_active' => false,
+            'style_settings' => [
+                'container_width' => 'sm',
+                'background_color' => '#ECFEFF',
+                'border_color' => '#06B6D4',
+                'text_color' => '#164E63',
+                'input_background_color' => '#FFFFFF',
+                'input_border_color' => '#67E8F9',
+                'button_background_color' => '#0F766E',
+                'button_text_color' => '#F0FDFA',
+                'border_radius' => 18,
+                'padding' => 24,
+            ],
+            'completion_settings' => [
+                'action' => 'redirect',
+                'success_message' => null,
+                'redirect_url' => '/thank-you',
+            ],
+            'fields' => [
+                [
+                    'id' => $fieldIds[0],
+                    'label' => 'Full name',
+                    'type' => 'text',
+                    'placeholder' => 'Jane Doe',
+                    'is_required' => true,
+                ],
+                [
+                    'label' => 'Project budget',
+                    'type' => 'number',
+                    'placeholder' => '1000',
+                    'is_required' => false,
+                ],
+            ],
+        ])
+        ->assertRedirect(route('forms.index', ['form' => $form->id]));
+
+    $form->refresh();
+
+    expect($form->name)->toBe('Updated lead capture')
+        ->and($form->description)->toBe('Updated form description')
+        ->and($form->submission_mode)->toBe(PortalForm::SUBMISSION_MODE_CHAT)
+        ->and($form->target_user_id)->toBe($nextTarget->id)
+        ->and($form->is_active)->toBeFalse()
+        ->and($form->style_settings)->toMatchArray([
+            'container_width' => 'sm',
+            'background_color' => '#ECFEFF',
+            'border_color' => '#06B6D4',
+            'text_color' => '#164E63',
+            'input_background_color' => '#FFFFFF',
+            'input_border_color' => '#67E8F9',
+            'button_background_color' => '#0F766E',
+            'button_text_color' => '#F0FDFA',
+            'border_radius' => 18,
+            'padding' => 24,
+        ])
+        ->and($form->completion_settings)->toMatchArray([
+            'action' => 'redirect',
+            'success_message' => null,
+            'redirect_url' => '/thank-you',
+        ])
+        ->and($form->fields()->count())->toBe(2)
+        ->and($form->fields()->pluck('label')->all())->toEqual(['Full name', 'Project budget']);
+
+    $this->actingAs($owner)
+        ->get(route('forms.index', ['form' => $form->id]))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('activeForm.name', 'Updated lead capture')
+            ->where('activeForm.is_active', false)
+            ->where('activeForm.target_user.id', $nextTarget->id)
+            ->where('activeForm.style_settings.container_width', 'sm')
+            ->where('activeForm.style_settings.padding', 24)
+            ->where('activeForm.completion_settings.action', 'redirect')
+            ->where('activeForm.completion_settings.redirect_url', '/thank-you')
+            ->has('activeForm.fields', 2));
+
+    $this->actingAs($owner)
+        ->delete(route('forms.destroy', $form))
+        ->assertRedirect(route('forms.index'));
+
+    expect(PortalForm::query()->find($form->id))->toBeNull();
+});
+
+test('redirect completion action requires a redirect url', function () {
+    $owner = User::factory()->create();
+    $target = User::factory()->create();
+
+    $this->actingAs($owner)
+        ->post(route('forms.store'), [
+            'name' => 'Redirect form',
+            'description' => 'Test form',
+            'submission_mode' => PortalForm::SUBMISSION_MODE_TASK,
+            'target_user_id' => $target->id,
+            'is_active' => true,
+            'completion_settings' => [
+                'action' => 'redirect',
+                'success_message' => null,
+                'redirect_url' => null,
+            ],
+            'fields' => [
+                [
+                    'label' => 'Question',
+                    'type' => 'text',
+                    'placeholder' => 'Answer',
+                    'is_required' => true,
+                ],
+            ],
+        ])
+        ->assertSessionHasErrors('completion_settings.redirect_url');
 });
 
 test('guest can open public form and submission can create a standalone task for target user', function () {
@@ -69,6 +275,23 @@ test('guest can open public form and submission can create a standalone task for
         'name' => 'Website brief',
         'submission_mode' => PortalForm::SUBMISSION_MODE_TASK,
         'is_active' => true,
+        'style_settings' => [
+            'container_width' => 'md',
+            'background_color' => '#FFF7ED',
+            'border_color' => '#FDBA74',
+            'text_color' => '#7C2D12',
+            'input_background_color' => '#FFFFFF',
+            'input_border_color' => '#FED7AA',
+            'button_background_color' => '#C2410C',
+            'button_text_color' => '#FFF7ED',
+            'border_radius' => 28,
+            'padding' => 36,
+        ],
+        'completion_settings' => [
+            'action' => 'close',
+            'success_message' => null,
+            'redirect_url' => null,
+        ],
     ]);
 
     $form->fields()->createMany([
@@ -95,6 +318,9 @@ test('guest can open public form and submission can create a standalone task for
         ->assertInertia(fn (Assert $page) => $page
             ->component('public/forms/Show')
             ->where('form.name', 'Website brief')
+            ->where('form.style_settings.container_width', 'md')
+            ->where('form.style_settings.background_color', '#FFF7ED')
+            ->where('form.completion_settings.action', 'close')
             ->has('form.fields', 2));
 
     $this->post(route('forms.public.submit', ['portalForm' => $form->public_token]), [
@@ -106,6 +332,7 @@ test('guest can open public form and submission can create a standalone task for
 
     $task = ProjectTask::query()->latest('id')->first();
     $submission = PortalFormSubmission::query()->latest('id')->first();
+    $notification = $target->refresh()->notifications()->latest('created_at')->first();
 
     expect($task)->not->toBeNull()
         ->and($task?->project_id)->toBeNull()
@@ -118,6 +345,18 @@ test('guest can open public form and submission can create a standalone task for
         ->and($submission?->portal_form_id)->toBe($form->id)
         ->and($submission?->project_task_id)->toBe($task?->id)
         ->and(collect($submission?->payload)->pluck('value')->all())->toContain('Acme Studio');
+
+    expect($notification)->not->toBeNull()
+        ->and($notification?->data['title'])->toBe(
+            __('ui.notifications.task_assigned_title', [], $target->resolvedLanguage()),
+        )
+        ->and($notification?->data['message'])->toBe(
+            __('ui.notifications.task_assigned_from_form_message', [
+                'title' => $task?->title,
+                'form' => $form->name,
+            ], $target->resolvedLanguage()),
+        )
+        ->and($notification?->data['action_url'])->toBe(route('projects.workspace.tasks.show', $task));
 });
 
 test('guest submission can be delivered as a direct chat message to selected user', function () {
@@ -189,6 +428,12 @@ test('forms module is wired into sidebar menu and public page delivery actions',
         ->and($sidebar)->toContain("isMenuItemVisible('forms')")
         ->and($sidebar)->toContain('formsIndex()')
         ->and($formsPage)->toContain('copyPublicLink')
+        ->and($formsPage)->toContain('openForm(portalForm.id)')
+        ->and($formsPage)->toContain('form.defaults(buildFormDefaults(activeForm));')
+        ->and($formsPage)->toContain('handleEditorSheetOpenChange')
+        ->and($formsPage)->toContain('<SheetContent')
+        ->and($formsPage)->toContain('styleColorSections')
+        ->and($formsPage)->toContain('deleteForm(portalForm.id)')
         ->and($formsPage)->toContain('showWorkspaceTask')
         ->and($publicPage)->toContain('submitPortalForm.url');
 });

@@ -182,117 +182,7 @@ const clearFormatting = (): void => {
 </script>
 
 <template>
-    <div class="space-y-5">
-        <div
-            class="sticky top-4 z-10 rounded-3xl border border-border bg-background/95 p-3 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"
-        >
-            <div class="flex flex-wrap gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    :disabled="!activeEditable"
-                    :title="t.knowledge.format_bold"
-                    @mousedown.prevent="applyInlineCommand('bold')"
-                >
-                    <Bold class="size-4" />
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    :disabled="!activeEditable"
-                    :title="t.knowledge.format_italic"
-                    @mousedown.prevent="applyInlineCommand('italic')"
-                >
-                    <Italic class="size-4" />
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    :disabled="!activeEditable"
-                    :title="t.knowledge.format_underline"
-                    @mousedown.prevent="applyInlineCommand('underline')"
-                >
-                    <Underline class="size-4" />
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    :disabled="!activeEditable"
-                    :title="t.knowledge.format_strikethrough"
-                    @mousedown.prevent="applyInlineCommand('strikeThrough')"
-                >
-                    <Strikethrough class="size-4" />
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    :disabled="!activeEditable"
-                    :title="t.knowledge.format_link"
-                    @mousedown.prevent="insertLink"
-                >
-                    <Link2 class="size-4" />
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    :disabled="!activeEditable"
-                    :title="t.knowledge.clear_formatting"
-                    @mousedown.prevent="clearFormatting"
-                >
-                    <Eraser class="size-4" />
-                </Button>
-            </div>
-
-            <p class="mt-3 text-xs text-muted-foreground">
-                {{ t.knowledge.editor_help }}
-            </p>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                @click="addBlock('paragraph')"
-            >
-                <Pilcrow class="size-4" />
-                {{ t.knowledge.add_paragraph }}
-            </Button>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                @click="addBlock('heading')"
-            >
-                <Type class="size-4" />
-                {{ t.knowledge.add_heading }}
-            </Button>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                @click="addBlock('list')"
-            >
-                <List class="size-4" />
-                {{ t.knowledge.add_list }}
-            </Button>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                @click="addBlock('image')"
-            >
-                <ImagePlus class="size-4" />
-                {{ t.knowledge.add_image }}
-            </Button>
-        </div>
-
+    <div class="space-y-5 pb-32">
         <div class="space-y-4">
             <article
                 v-for="(block, index) in blocks"
@@ -493,6 +383,122 @@ const clearFormatting = (): void => {
                     </div>
                 </div>
             </article>
+        </div>
+
+        <div class="sticky bottom-4 z-20 space-y-3">
+            <div
+                class="rounded-3xl border border-border bg-background/95 p-3 shadow-lg supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"
+            >
+                <div class="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        :disabled="!activeEditable"
+                        :title="t.knowledge.format_bold"
+                        @mousedown.prevent="applyInlineCommand('bold')"
+                    >
+                        <Bold class="size-4" />
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        :disabled="!activeEditable"
+                        :title="t.knowledge.format_italic"
+                        @mousedown.prevent="applyInlineCommand('italic')"
+                    >
+                        <Italic class="size-4" />
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        :disabled="!activeEditable"
+                        :title="t.knowledge.format_underline"
+                        @mousedown.prevent="applyInlineCommand('underline')"
+                    >
+                        <Underline class="size-4" />
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        :disabled="!activeEditable"
+                        :title="t.knowledge.format_strikethrough"
+                        @mousedown.prevent="applyInlineCommand('strikeThrough')"
+                    >
+                        <Strikethrough class="size-4" />
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        :disabled="!activeEditable"
+                        :title="t.knowledge.format_link"
+                        @mousedown.prevent="insertLink"
+                    >
+                        <Link2 class="size-4" />
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        :disabled="!activeEditable"
+                        :title="t.knowledge.clear_formatting"
+                        @mousedown.prevent="clearFormatting"
+                    >
+                        <Eraser class="size-4" />
+                    </Button>
+                </div>
+
+                <p class="mt-3 text-xs text-muted-foreground">
+                    {{ t.knowledge.editor_help }}
+                </p>
+            </div>
+
+            <div
+                class="rounded-3xl border border-border bg-background/95 p-3 shadow-lg supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"
+            >
+                <div class="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        @click="addBlock('paragraph')"
+                    >
+                        <Pilcrow class="size-4" />
+                        {{ t.knowledge.add_paragraph }}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        @click="addBlock('heading')"
+                    >
+                        <Type class="size-4" />
+                        {{ t.knowledge.add_heading }}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        @click="addBlock('list')"
+                    >
+                        <List class="size-4" />
+                        {{ t.knowledge.add_list }}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        @click="addBlock('image')"
+                    >
+                        <ImagePlus class="size-4" />
+                        {{ t.knowledge.add_image }}
+                    </Button>
+                </div>
+            </div>
         </div>
     </div>
 </template>

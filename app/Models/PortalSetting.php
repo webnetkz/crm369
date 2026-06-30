@@ -13,10 +13,11 @@ use Illuminate\Support\Carbon;
  * @property string|null $company_name
  * @property string|null $logo_path
  * @property string $default_language
+ * @property array<int, string>|null $disabled_modules
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['company_name', 'logo_path', 'default_language'])]
+#[Fillable(['company_name', 'logo_path', 'default_language', 'disabled_modules'])]
 class PortalSetting extends Model
 {
     public const string DEFAULT_COMPANY_NAME = 'CRM369';
@@ -28,6 +29,82 @@ class PortalSetting extends Model
 
     /** @use HasFactory<PortalSettingFactory> */
     use HasFactory;
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'disabled_modules' => 'array',
+        ];
+    }
+
+    /**
+     * @return array<string, array{title_key: string, description_key: string}>
+     */
+    public static function availableModules(): array
+    {
+        return [
+            'news' => [
+                'title_key' => 'ui.news.title',
+                'description_key' => 'ui.news.description',
+            ],
+            'projects' => [
+                'title_key' => 'ui.projects.title',
+                'description_key' => 'ui.projects.description',
+            ],
+            'chats' => [
+                'title_key' => 'ui.chat.title',
+                'description_key' => 'ui.chat.description',
+            ],
+            'knowledge-bases' => [
+                'title_key' => 'ui.knowledge.title',
+                'description_key' => 'ui.knowledge.description',
+            ],
+            'funnels' => [
+                'title_key' => 'ui.funnels.title',
+                'description_key' => 'ui.funnels.description',
+            ],
+            'forms' => [
+                'title_key' => 'ui.forms.title',
+                'description_key' => 'ui.forms.description',
+            ],
+            'contacts' => [
+                'title_key' => 'ui.contacts.title',
+                'description_key' => 'ui.contacts.description',
+            ],
+            'files' => [
+                'title_key' => 'ui.files.title',
+                'description_key' => 'ui.files.description',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function availableModuleKeys(): array
+    {
+        return array_keys(self::availableModules());
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function normalizeDisabledModules(mixed $modules): array
+    {
+        $requestedModules = collect(is_array($modules) ? $modules : [])
+            ->filter(fn (mixed $module): bool => is_string($module) && $module !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        return collect(self::availableModuleKeys())
+            ->filter(fn (string $module): bool => in_array($module, $requestedModules, true))
+            ->values()
+            ->all();
+    }
 
     public static function current(): self
     {
@@ -66,5 +143,30 @@ class PortalSetting extends Model
         }
 
         return self::SUPPORTED_LANGUAGES[0];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function disabledModules(): array
+    {
+        return self::normalizeDisabledModules($this->disabled_modules);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function enabledModules(): array
+    {
+        return collect(self::availableModuleKeys())
+            ->reject(fn (string $module): bool => in_array($module, $this->disabledModules(), true))
+            ->values()
+            ->all();
+    }
+
+    public function isModuleEnabled(string $module): bool
+    {
+        return in_array($module, self::availableModuleKeys(), true)
+            && ! in_array($module, $this->disabledModules(), true);
     }
 }

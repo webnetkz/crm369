@@ -290,11 +290,15 @@ onBeforeUnmount(() => {
                             :rel="anchorRel(item)"
                         >
                             <component :is="item.icon" v-if="item.icon" />
-                            <span>{{ item.title }}</span>
+                            <span class="min-w-0 flex-1 truncate">{{
+                                item.title
+                            }}</span>
                         </a>
                         <Link v-else :href="item.href">
                             <component :is="item.icon" v-if="item.icon" />
-                            <span>{{ item.title }}</span>
+                            <span class="min-w-0 flex-1 truncate">{{
+                                item.title
+                            }}</span>
                         </Link>
                     </SidebarMenuButton>
 
@@ -352,7 +356,9 @@ onBeforeUnmount(() => {
                                 :tooltip="item.title"
                             >
                                 <component :is="item.icon" v-if="item.icon" />
-                                <span>{{ item.title }}</span>
+                                <span class="min-w-0 flex-1 truncate">{{
+                                    item.title
+                                }}</span>
                                 <ChevronRight
                                     class="ml-auto mr-5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
                                 />
@@ -411,14 +417,18 @@ onBeforeUnmount(() => {
                                                 :is="child.icon"
                                                 v-if="child.icon"
                                             />
-                                            <span>{{ child.title }}</span>
+                                            <span class="min-w-0 flex-1 truncate">{{
+                                                child.title
+                                            }}</span>
                                         </a>
                                         <Link v-else :href="child.href">
                                             <component
                                                 :is="child.icon"
                                                 v-if="child.icon"
                                             />
-                                            <span>{{ child.title }}</span>
+                                            <span class="min-w-0 flex-1 truncate">{{
+                                                child.title
+                                            }}</span>
                                         </Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
@@ -451,11 +461,15 @@ onBeforeUnmount(() => {
                             :rel="anchorRel(item)"
                         >
                             <component :is="item.icon" v-if="item.icon" />
-                            <span>{{ item.title }}</span>
+                            <span class="min-w-0 flex-1 truncate">{{
+                                item.title
+                            }}</span>
                         </a>
                         <Link v-else :href="item.href">
                             <component :is="item.icon" v-if="item.icon" />
-                            <span>{{ item.title }}</span>
+                            <span class="min-w-0 flex-1 truncate">{{
+                                item.title
+                            }}</span>
                         </Link>
                     </SidebarMenuButton>
 

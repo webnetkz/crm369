@@ -457,8 +457,8 @@ test('menu form keeps visibility enabled by default and nav opens flagged items 
         ->and($menuPage)->toContain('t.menu.icon_label')
         ->and($menuPage)->toContain('resolveMenuIcon(item.icon)')
         ->and($menuPage)->toContain('editForm.is_visible = editMenuItemDefaults.is_visible')
-        ->and($navMain)->toContain(":target=\"anchorTarget(item)\"")
-        ->and($navMain)->toContain(":target=\"anchorTarget(child)\"")
+        ->and($navMain)->toContain(':target="anchorTarget(item)"')
+        ->and($navMain)->toContain(':target="anchorTarget(child)"')
         ->and($navMain)->toContain("return item.opensInNewTab ? '_blank' : undefined")
         ->and($navMain)->toContain("return item.opensInNewTab ? 'noopener noreferrer' : undefined")
         ->and($sidebar)->toContain('resolveMenuIcon(item.icon)');
@@ -470,8 +470,8 @@ test('nav reorder handle appears after two second hover delay and renders six dr
 
     expect($navMain)->toContain('@mouseenter="revealHandleLater(item)"')
         ->and($navMain)->toContain('}, 2000);')
-        ->and($navMain)->toContain("v-for=\"dot in 6\"")
-        ->and($navMain)->toContain(":draggable=\"!props.reordering\"")
+        ->and($navMain)->toContain('v-for="dot in 6"')
+        ->and($navMain)->toContain(':draggable="!props.reordering"')
         ->and($sidebar)->toContain(':reorderable="true"')
         ->and($sidebar)->toContain('@reorder="persistMenuOrder"')
         ->and($sidebar)->toContain("method: 'PATCH'")
@@ -487,4 +487,16 @@ test('collapsed sidebar opens the parent settings item using its default href', 
         ->and($navMain)->toContain('v-if="item.items?.length && useParentHrefWhenCollapsed"')
         ->and($navMain)->toContain('<Link v-else :href="item.href">')
         ->and($sidebar)->toContain('href: settingsItems[0]?.href ?? editMenu()');
+});
+
+test('tasks and projects sidebar item renders two submenu links', function () {
+    $navMain = file_get_contents(resource_path('js/components/NavMain.vue'));
+    $sidebar = file_get_contents(resource_path('js/components/AppSidebar.vue'));
+
+    expect($navMain)->toContain('class="min-w-0 flex-1 truncate">{{')
+        ->and($sidebar)->toContain("isMenuItemVisible('projects')")
+        ->and($sidebar)->toContain('title: t.value.projects.tasks')
+        ->and($sidebar)->toContain('href: tasksIndex()')
+        ->and($sidebar)->toContain('title: t.value.projects.projects_label')
+        ->and($sidebar)->toContain('href: projectsIndex()');
 });

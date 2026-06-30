@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\ChatController;
+use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\KnowledgeBaseController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\MessengerIntegrationController;
@@ -38,72 +39,96 @@ Route::prefix('v1')->middleware(['auth:api', ResolveApiSubjectUser::class, 'thro
         ->middleware('api.token:notifications.write')
         ->name('api.v1.notifications.read.update');
 
-    Route::get('chats', [ChatController::class, 'index'])
-        ->middleware('api.token:chat.read')
-        ->name('api.v1.chats.index');
-    Route::post('chats/direct', [ChatController::class, 'storeDirect'])
-        ->middleware('api.token:chat.write')
-        ->name('api.v1.chats.direct.store');
-    Route::post('chats/{chatConversation}/messages', [ChatController::class, 'storeMessage'])
-        ->middleware('api.token:chat.write')
-        ->name('api.v1.chats.messages.store');
+    Route::middleware('module.enabled:chats')->group(function (): void {
+        Route::get('chats', [ChatController::class, 'index'])
+            ->middleware('api.token:chat.read')
+            ->name('api.v1.chats.index');
+        Route::post('chats/direct', [ChatController::class, 'storeDirect'])
+            ->middleware('api.token:chat.write')
+            ->name('api.v1.chats.direct.store');
+        Route::post('chats/{chatConversation}/messages', [ChatController::class, 'storeMessage'])
+            ->middleware('api.token:chat.write')
+            ->name('api.v1.chats.messages.store');
+    });
 
-    Route::get('knowledge-bases', [KnowledgeBaseController::class, 'index'])
-        ->middleware('api.token:knowledge.read')
-        ->name('api.v1.knowledge-bases.index');
-    Route::get('knowledge-bases/{knowledgeBase}', [KnowledgeBaseController::class, 'show'])
-        ->middleware('api.token:knowledge.read')
-        ->name('api.v1.knowledge-bases.show');
-    Route::get('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'showArticle'])
-        ->middleware('api.token:knowledge.read')
-        ->name('api.v1.knowledge-bases.articles.show');
-    Route::post('knowledge-bases', [KnowledgeBaseController::class, 'store'])
-        ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
-        ->name('api.v1.knowledge-bases.store');
-    Route::patch('knowledge-bases/{knowledgeBase}', [KnowledgeBaseController::class, 'update'])
-        ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
-        ->name('api.v1.knowledge-bases.update');
-    Route::delete('knowledge-bases/{knowledgeBase}', [KnowledgeBaseController::class, 'destroy'])
-        ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
-        ->name('api.v1.knowledge-bases.destroy');
-    Route::post('knowledge-bases/{knowledgeBase}/articles', [KnowledgeBaseController::class, 'storeArticle'])
-        ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
-        ->name('api.v1.knowledge-bases.articles.store');
-    Route::patch('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'updateArticle'])
-        ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
-        ->name('api.v1.knowledge-bases.articles.update');
-    Route::delete('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'destroyArticle'])
-        ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
-        ->name('api.v1.knowledge-bases.articles.destroy');
+    Route::middleware('module.enabled:contacts')->group(function (): void {
+        Route::get('contacts', [ContactController::class, 'index'])
+            ->middleware('api.token:contacts.read')
+            ->name('api.v1.contacts.index');
+        Route::get('contacts/{contact}', [ContactController::class, 'show'])
+            ->middleware('api.token:contacts.read')
+            ->name('api.v1.contacts.show');
+        Route::post('contacts', [ContactController::class, 'store'])
+            ->middleware('api.token:contacts.write')
+            ->name('api.v1.contacts.store');
+        Route::patch('contacts/{contact}', [ContactController::class, 'update'])
+            ->middleware('api.token:contacts.write')
+            ->name('api.v1.contacts.update');
+        Route::delete('contacts/{contact}', [ContactController::class, 'destroy'])
+            ->middleware('api.token:contacts.write')
+            ->name('api.v1.contacts.destroy');
+    });
 
-    Route::get('projects', [ProjectController::class, 'index'])
-        ->middleware('api.token:projects.read')
-        ->name('api.v1.projects.index');
-    Route::post('projects', [ProjectController::class, 'store'])
-        ->middleware('api.token:projects.write')
-        ->name('api.v1.projects.store');
-    Route::get('projects/{project}', [ProjectController::class, 'show'])
-        ->middleware('api.token:projects.read')
-        ->name('api.v1.projects.show');
-    Route::patch('projects/{project}', [ProjectController::class, 'update'])
-        ->middleware('api.token:projects.write')
-        ->name('api.v1.projects.update');
-    Route::delete('projects/{project}', [ProjectController::class, 'destroy'])
-        ->middleware('api.token:projects.write')
-        ->name('api.v1.projects.destroy');
+    Route::middleware('module.enabled:knowledge-bases')->group(function (): void {
+        Route::get('knowledge-bases', [KnowledgeBaseController::class, 'index'])
+            ->middleware('api.token:knowledge.read')
+            ->name('api.v1.knowledge-bases.index');
+        Route::get('knowledge-bases/{knowledgeBase}', [KnowledgeBaseController::class, 'show'])
+            ->middleware('api.token:knowledge.read')
+            ->name('api.v1.knowledge-bases.show');
+        Route::get('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'showArticle'])
+            ->middleware('api.token:knowledge.read')
+            ->name('api.v1.knowledge-bases.articles.show');
+        Route::post('knowledge-bases', [KnowledgeBaseController::class, 'store'])
+            ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
+            ->name('api.v1.knowledge-bases.store');
+        Route::patch('knowledge-bases/{knowledgeBase}', [KnowledgeBaseController::class, 'update'])
+            ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
+            ->name('api.v1.knowledge-bases.update');
+        Route::delete('knowledge-bases/{knowledgeBase}', [KnowledgeBaseController::class, 'destroy'])
+            ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
+            ->name('api.v1.knowledge-bases.destroy');
+        Route::post('knowledge-bases/{knowledgeBase}/articles', [KnowledgeBaseController::class, 'storeArticle'])
+            ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
+            ->name('api.v1.knowledge-bases.articles.store');
+        Route::patch('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'updateArticle'])
+            ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
+            ->name('api.v1.knowledge-bases.articles.update');
+        Route::delete('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'destroyArticle'])
+            ->middleware(['api.token:knowledge.write', 'can:manage-knowledge-bases'])
+            ->name('api.v1.knowledge-bases.articles.destroy');
+    });
 
-    Route::post('tasks', [ProjectController::class, 'storeTask'])
-        ->middleware('api.token:tasks.write')
-        ->name('api.v1.tasks.store');
-    Route::get('tasks/{projectTask}', [ProjectController::class, 'showTask'])
-        ->middleware('api.token:tasks.read')
-        ->name('api.v1.tasks.show');
-    Route::patch('tasks/{projectTask}', [ProjectController::class, 'updateTask'])
-        ->middleware('api.token:tasks.write')
-        ->name('api.v1.tasks.update');
-    Route::delete('tasks/{projectTask}', [ProjectController::class, 'destroyTask'])
-        ->middleware('api.token:tasks.write')
-        ->name('api.v1.tasks.destroy');
+    Route::middleware('module.enabled:projects')->group(function (): void {
+        Route::get('projects', [ProjectController::class, 'index'])
+            ->middleware('api.token:projects.read')
+            ->name('api.v1.projects.index');
+        Route::post('projects', [ProjectController::class, 'store'])
+            ->middleware('api.token:projects.write')
+            ->name('api.v1.projects.store');
+        Route::get('projects/{project}', [ProjectController::class, 'show'])
+            ->middleware('api.token:projects.read')
+            ->name('api.v1.projects.show');
+        Route::patch('projects/{project}', [ProjectController::class, 'update'])
+            ->middleware('api.token:projects.write')
+            ->name('api.v1.projects.update');
+        Route::delete('projects/{project}', [ProjectController::class, 'destroy'])
+            ->middleware('api.token:projects.write')
+            ->name('api.v1.projects.destroy');
+
+        Route::post('tasks', [ProjectController::class, 'storeTask'])
+            ->middleware('api.token:tasks.write')
+            ->name('api.v1.tasks.store');
+        Route::get('tasks/{projectTask}', [ProjectController::class, 'showTask'])
+            ->middleware('api.token:tasks.read')
+            ->name('api.v1.tasks.show');
+        Route::patch('tasks/{projectTask}', [ProjectController::class, 'updateTask'])
+            ->middleware('api.token:tasks.write')
+            ->name('api.v1.tasks.update');
+        Route::delete('tasks/{projectTask}', [ProjectController::class, 'destroyTask'])
+            ->middleware('api.token:tasks.write')
+            ->name('api.v1.tasks.destroy');
+    });
 
     Route::get('users', [UserController::class, 'index'])
         ->middleware(['api.token:users.read', 'can:view-users'])

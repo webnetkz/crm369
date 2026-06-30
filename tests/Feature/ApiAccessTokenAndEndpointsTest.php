@@ -16,8 +16,8 @@ use App\Models\User;
 use App\Models\UserGroup;
 use App\Notifications\SystemNotification;
 use App\Support\ApiCatalog;
-use Inertia\Testing\AssertableInertia as Assert;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 
 function apiAdministratorsGroup(): UserGroup
 {
@@ -792,6 +792,7 @@ test('api token settings form keeps selected permissions in the posted payload',
         ->and($apiPage)->toContain("const tokensSectionId = 'api-tokens'")
         ->and($apiPage)->toContain("const documentationSectionId = 'api-documentation'")
         ->and($apiPage)->toContain(':href="`#${section.id}`"')
+        ->and($apiPage)->toContain('class="sticky top-24 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"')
         ->and($apiPage)->toContain('{{ t.api.target_user_overview }}')
         ->and($apiPage)->toContain('{{ t.api.target_user }}')
         ->and($apiPage)->toContain('{{ endpoint.target_user }}')

@@ -24,4 +24,7 @@ return [
     'password_reset_title' => 'Password changed',
     'task_due_soon_message' => 'The task ":title" is due in less than 24 hours.',
     'task_due_soon_title' => 'Task due soon',
+    'task_assigned_from_form_message' => 'A new task ":title" was created for you from the form ":form".',
+    'task_assigned_message' => ':user created the task ":title" for you.',
+    'task_assigned_title' => 'New assigned task',
 ];

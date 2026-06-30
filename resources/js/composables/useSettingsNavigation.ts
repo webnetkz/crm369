@@ -2,6 +2,7 @@ import { usePage } from '@inertiajs/vue3';
 import {
     BadgeCheck,
     Building2,
+    LayoutGrid,
     LockKeyhole,
     Menu,
     MessageSquareShare,
@@ -22,6 +23,7 @@ import { edit as editApi } from '@/routes/settings/api';
 import { index as groupsIndex } from '@/routes/settings/groups';
 import { edit as editIntegrations } from '@/routes/settings/integrations';
 import { edit as editMenu } from '@/routes/settings/menu';
+import { edit as editModules } from '@/routes/settings/modules';
 import { edit as editPortal } from '@/routes/settings/portal';
 import { index as rightsIndex } from '@/routes/settings/rights';
 import { index as usersIndex } from '@/routes/settings/users';
@@ -109,6 +111,16 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                           title: t.value.settings.portal,
                           href: editPortal(),
                           icon: Building2,
+                      },
+                  ]
+                : []),
+            ...(page.props.auth.isSuperAdmin && isVisible('settings.modules')
+                ? [
+                      {
+                          key: 'settings.modules',
+                          title: t.value.settings.modules,
+                          href: editModules(),
+                          icon: LayoutGrid,
                       },
                   ]
                 : []),

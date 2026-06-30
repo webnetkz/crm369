@@ -4,20 +4,24 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreChatMessageRequest;
 use App\Models\ChatConversation;
-use App\Models\ChatConversationParticipant;
-use App\Models\ChatMessage;
+use App\Models\ChatMessageAttachment;
+use App\Support\ChatMessageData;
+use App\Support\ChatMessageSender;
 use App\Support\TaskConversationManager;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ChatMessageController extends Controller
 {
     public function store(
         StoreChatMessageRequest $request,
         ChatConversation $chatConversation,
+        ChatMessageData $chatMessageData,
+        ChatMessageSender $chatMessageSender,
         TaskConversationManager $taskConversationManager,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $user = $request->user();
         abort_unless($user !== null, 401);
 
@@ -33,38 +37,48 @@ class ChatMessageController extends Controller
             abort_unless($chatConversation->hasParticipant($user), 403);
         }
 
-        $message = DB::transaction(function () use ($chatConversation, $request, $user): ChatMessage {
-            $message = $chatConversation->messages()->create([
-                'user_id' => $user->id,
-                'body' => $request->body(),
-            ]);
-
-            $chatConversation->forceFill([
-                'last_message_at' => $message->created_at,
-            ])->save();
-
-            ChatConversationParticipant::query()
-                ->where('chat_conversation_id', $chatConversation->id)
-                ->where('user_id', $user->id)
-                ->update(['last_read_at' => $message->created_at]);
-
-            return $message->load('user:id,name,last_name,email,avatar_path,avatar_scale,user_group_id');
-        });
+        $message = $chatMessageSender->send($chatConversation, $user, $request);
 
         return response()->json([
-            'message' => [
-                'id' => $message->id,
-                'body' => $message->body,
-                'createdAt' => $message->created_at?->toISOString(),
-                'isOwn' => true,
-                'user' => [
-                    'id' => $message->user->id,
-                    'name' => trim($message->user->name.' '.($message->user->last_name ?? '')),
-                    'email' => $message->user->email,
-                    'avatar' => $message->user->avatar,
-                    'avatarScale' => $message->user->avatar_scale,
-                ],
-            ],
+            'message' => $chatMessageData->serialize($message, $user),
         ]);
+    }
+
+    public function downloadAttachment(ChatMessageAttachment $chatMessageAttachment): StreamedResponse
+    {
+        $user = request()->user();
+        abort_unless($user !== null, 401);
+
+        $chatMessageAttachment->loadMissing('message.conversation.task');
+
+        $conversation = $chatMessageAttachment->message?->conversation;
+
+        abort_unless($conversation !== null && $conversation->isAccessibleBy($user), 403);
+
+        return Storage::disk($chatMessageAttachment->disk)
+            ->download($chatMessageAttachment->path, $chatMessageAttachment->original_name);
+    }
+
+    public function previewAttachment(
+        ChatMessageAttachment $chatMessageAttachment,
+        ChatMessageData $chatMessageData,
+    ): BinaryFileResponse {
+        $user = request()->user();
+        abort_unless($user !== null, 401);
+
+        $chatMessageAttachment->loadMissing('message.conversation.task');
+
+        $conversation = $chatMessageAttachment->message?->conversation;
+
+        abort_unless($conversation !== null && $conversation->isAccessibleBy($user), 403);
+        abort_unless($chatMessageData->isPreviewableImage($chatMessageAttachment), 404);
+
+        return response()->file(
+            Storage::disk($chatMessageAttachment->disk)->path($chatMessageAttachment->path),
+            [
+                'Content-Type' => $chatMessageAttachment->mime_type ?? 'application/octet-stream',
+                'X-Content-Type-Options' => 'nosniff',
+            ],
+        );
     }
 }

@@ -214,6 +214,46 @@ class User extends Authenticatable implements PasskeyUser
         return $this->isSuperAdmin() || $this->isGroupAdministrator();
     }
 
+    public function canAccessPersonContacts(): bool
+    {
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_ACCESS_PERSON_CONTACTS);
+    }
+
+    public function canAccessCompanyContacts(): bool
+    {
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_ACCESS_COMPANY_CONTACTS);
+    }
+
+    public function canAccessContacts(): bool
+    {
+        return $this->canAccessPersonContacts() || $this->canAccessCompanyContacts();
+    }
+
+    public function canAccessContactType(?string $type): bool
+    {
+        return match ($type) {
+            Contact::TYPE_PERSON => $this->canAccessPersonContacts(),
+            Contact::TYPE_COMPANY => $this->canAccessCompanyContacts(),
+            default => false,
+        };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function accessibleContactTypes(): array
+    {
+        return collect(Contact::availableTypes())
+            ->filter(fn (string $type): bool => $this->canAccessContactType($type))
+            ->values()
+            ->all();
+    }
+
+    public function canAccessContact(Contact $contact): bool
+    {
+        return $this->canAccessContactType($contact->type);
+    }
+
     public function canAccessFunnels(): bool
     {
         if ($this->isSuperAdmin()) {

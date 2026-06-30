@@ -3,12 +3,12 @@
 namespace App\Models;
 
 use Database\Factories\ApiAccessTokenFactory;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -42,31 +42,59 @@ use Illuminate\Support\Str;
 class ApiAccessToken extends Model
 {
     public const int TOKEN_PREFIX_LENGTH = 12;
+
     public const int TOKEN_ISSUE_ATTEMPTS = 5;
 
     public const string PERMISSION_PROFILE_READ = 'profile.read';
+
     public const string PERMISSION_PROFILE_WRITE = 'profile.write';
+
     public const string PERMISSION_NOTIFICATIONS_READ = 'notifications.read';
+
     public const string PERMISSION_NOTIFICATIONS_WRITE = 'notifications.write';
+
     public const string PERMISSION_CHAT_READ = 'chat.read';
+
     public const string PERMISSION_CHAT_WRITE = 'chat.write';
+
+    public const string PERMISSION_CONTACTS_READ = 'contacts.read';
+
+    public const string PERMISSION_CONTACTS_WRITE = 'contacts.write';
+
     public const string PERMISSION_KNOWLEDGE_READ = 'knowledge.read';
+
     public const string PERMISSION_KNOWLEDGE_WRITE = 'knowledge.write';
+
     public const string PERMISSION_PROJECTS_READ = 'projects.read';
+
     public const string PERMISSION_PROJECTS_WRITE = 'projects.write';
+
     public const string PERMISSION_TASKS_READ = 'tasks.read';
+
     public const string PERMISSION_TASKS_WRITE = 'tasks.write';
+
     public const string PERMISSION_USERS_READ = 'users.read';
+
     public const string PERMISSION_USERS_WRITE = 'users.write';
+
     public const string PERMISSION_GROUPS_READ = 'groups.read';
+
     public const string PERMISSION_GROUPS_WRITE = 'groups.write';
+
     public const string PERMISSION_MENU_READ = 'menu.read';
+
     public const string PERMISSION_MENU_WRITE = 'menu.write';
+
     public const string PERMISSION_PORTAL_READ = 'portal.read';
+
     public const string PERMISSION_PORTAL_WRITE = 'portal.write';
+
     public const string PERMISSION_INTEGRATIONS_READ = 'integrations.read';
+
     public const string PERMISSION_INTEGRATIONS_WRITE = 'integrations.write';
+
     public const string PERMISSION_WEBHOOKS_READ = 'webhooks.read';
+
     public const string PERMISSION_WEBHOOKS_WRITE = 'webhooks.write';
 
     /** @use HasFactory<ApiAccessTokenFactory> */
@@ -116,6 +144,14 @@ class ApiAccessToken extends Model
             self::PERMISSION_CHAT_WRITE => [
                 'label_key' => 'ui.api.permission_chat_write',
                 'description_key' => 'ui.api.permission_chat_write_description',
+            ],
+            self::PERMISSION_CONTACTS_READ => [
+                'label_key' => 'ui.api.permission_contacts_read',
+                'description_key' => 'ui.api.permission_contacts_read_description',
+            ],
+            self::PERMISSION_CONTACTS_WRITE => [
+                'label_key' => 'ui.api.permission_contacts_write',
+                'description_key' => 'ui.api.permission_contacts_write_description',
             ],
             self::PERMISSION_KNOWLEDGE_READ => [
                 'label_key' => 'ui.api.permission_knowledge_read',

@@ -327,7 +327,7 @@ const formatDateTime = (value: string | null): string => {
 
         <nav
             aria-label="API sections"
-            class="rounded-2xl border border-border bg-card p-4"
+            class="sticky top-24 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"
         >
             <div class="flex flex-wrap gap-3">
                 <a

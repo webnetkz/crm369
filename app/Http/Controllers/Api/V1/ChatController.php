@@ -4,16 +4,15 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Requests\StartDirectChatRequest;
 use App\Http\Requests\StoreChatMessageRequest;
+use App\Http\Resources\ApiChatMessageResource;
 use App\Models\ChatConversation;
-use App\Models\ChatConversationParticipant;
-use App\Models\ChatMessage;
 use App\Support\ApiRequestContext;
+use App\Support\ChatMessageSender;
 use App\Support\ChatSidebarData;
 use App\Support\DirectConversationManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ChatController
 {
@@ -61,44 +60,19 @@ class ChatController
         ], 201);
     }
 
-    public function storeMessage(StoreChatMessageRequest $request, ChatConversation $chatConversation): JsonResponse
-    {
+    public function storeMessage(
+        StoreChatMessageRequest $request,
+        ChatConversation $chatConversation,
+        ChatMessageSender $chatMessageSender,
+    ): JsonResponse {
         $user = ApiRequestContext::subject($request);
         abort_unless($chatConversation->hasParticipant($user), 403);
 
-        $message = DB::transaction(function () use ($chatConversation, $request, $user): ChatMessage {
-            $message = $chatConversation->messages()->create([
-                'user_id' => $user->id,
-                'body' => $request->body(),
-            ]);
-
-            $chatConversation->forceFill([
-                'last_message_at' => $message->created_at,
-            ])->save();
-
-            ChatConversationParticipant::query()
-                ->where('chat_conversation_id', $chatConversation->id)
-                ->where('user_id', $user->id)
-                ->update(['last_read_at' => $message->created_at]);
-
-            return $message->load('user:id,name,last_name,email,avatar_path,avatar_scale,user_group_id');
-        });
+        $message = $chatMessageSender->send($chatConversation, $user, $request);
 
         return response()->json([
             'message' => __('ui.chat.message_sent'),
-            'data' => [
-                'id' => $message->id,
-                'body' => $message->body,
-                'created_at' => $message->created_at?->toISOString(),
-                'is_own' => true,
-                'user' => [
-                    'id' => $message->user->id,
-                    'name' => trim($message->user->name.' '.($message->user->last_name ?? '')),
-                    'email' => $message->user->email,
-                    'avatar' => $message->user->avatar,
-                    'avatar_scale' => $message->user->avatar_scale,
-                ],
-            ],
+            'data' => (new ApiChatMessageResource($message))->resolve(),
         ], 201);
     }
 }

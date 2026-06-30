@@ -59,9 +59,24 @@ class HandleInertiaRequests extends Middleware
                 'canImpersonateUsers' => $request->user()?->canImpersonateUsers() ?? false,
                 'canManageApiTokens' => $request->user()?->canManageApiTokens() ?? false,
                 'canManageWebhooks' => $request->user()?->canManageWebhooks() ?? false,
-                'canManageKnowledgeBases' => $request->user()?->canManageKnowledgeBases() ?? false,
-                'canAccessFunnels' => $this->crmFunnelsEnabled() ? ($request->user()?->canAccessFunnels() ?? false) : false,
-                'canManageFunnels' => $this->crmFunnelsEnabled() ? ($request->user()?->canManageFunnels() ?? false) : false,
+                'canAccessContacts' => $this->moduleEnabled('contacts')
+                    ? ($request->user()?->canAccessContacts() ?? false)
+                    : false,
+                'canAccessPersonContacts' => $this->moduleEnabled('contacts')
+                    ? ($request->user()?->canAccessPersonContacts() ?? false)
+                    : false,
+                'canAccessCompanyContacts' => $this->moduleEnabled('contacts')
+                    ? ($request->user()?->canAccessCompanyContacts() ?? false)
+                    : false,
+                'canManageKnowledgeBases' => $this->moduleEnabled('knowledge-bases')
+                    ? ($request->user()?->canManageKnowledgeBases() ?? false)
+                    : false,
+                'canAccessFunnels' => $this->moduleEnabled('funnels') && $this->crmFunnelsEnabled()
+                    ? ($request->user()?->canAccessFunnels() ?? false)
+                    : false,
+                'canManageFunnels' => $this->moduleEnabled('funnels') && $this->crmFunnelsEnabled()
+                    ? ($request->user()?->canManageFunnels() ?? false)
+                    : false,
                 'isImpersonating' => $impersonator !== null,
                 'impersonator' => $impersonator
                     ? [
@@ -72,12 +87,13 @@ class HandleInertiaRequests extends Middleware
                     : null,
             ],
             'portal' => function (): array {
-                $portal = PortalSetting::current();
+                $portal = $this->portalSettings();
 
                 return [
                     'companyName' => $portal->companyName(),
                     'logoUrl' => $portal->logoUrl(),
                     'defaultLanguage' => $portal->defaultLanguage(),
+                    'enabledModules' => $portal->enabledModules(),
                 ];
             },
             'menu' => fn (): array => $this->menuProps(),
@@ -102,7 +118,8 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
 
         if (
-            ! $user
+            ! $this->moduleEnabled('chats')
+            || ! $user
             || ! Schema::hasTable('chat_conversations')
             || ! Schema::hasTable('chat_conversation_participants')
             || ! Schema::hasTable('chat_messages')
@@ -198,7 +215,8 @@ class HandleInertiaRequests extends Middleware
     private function knowledgeBaseMenuItems(User $user): array
     {
         if (
-            ! Schema::hasTable('knowledge_bases')
+            ! $this->moduleEnabled('knowledge-bases')
+            || ! Schema::hasTable('knowledge_bases')
             || ! Schema::hasTable('knowledge_base_group')
             || ! Schema::hasTable('user_groups')
         ) {
@@ -278,5 +296,15 @@ class HandleInertiaRequests extends Middleware
     {
         return Schema::hasTable('crm_funnels')
             && Schema::hasTable('crm_funnel_user_group');
+    }
+
+    private function moduleEnabled(string $module): bool
+    {
+        return $this->portalSettings()->isModuleEnabled($module);
+    }
+
+    private function portalSettings(): PortalSetting
+    {
+        return once(fn (): PortalSetting => PortalSetting::current());
     }
 }

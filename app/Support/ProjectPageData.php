@@ -4,16 +4,42 @@ namespace App\Support;
 
 use App\Models\Project;
 use App\Models\ProjectTask;
+use App\Models\ProjectTaskStage;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class ProjectPageData
 {
+    public const string MODE_PROJECTS = 'projects';
+
+    public const string MODE_TASKS = 'tasks';
+
+    public const string VIEW_LIST = 'list';
+
+    public const string VIEW_KANBAN = 'kanban';
+
+    public const string VIEW_GANTT = 'gantt';
+
     /**
      * @return array<string, mixed>
      */
-    public function build(User $viewer, ?Project $activeProject = null, ?ProjectTask $activeTask = null): array
-    {
+    public function build(
+        User $viewer,
+        ?Project $activeProject = null,
+        ?ProjectTask $activeTask = null,
+        string $mode = self::MODE_PROJECTS,
+        string $taskDisplayMode = self::VIEW_LIST,
+    ): array {
+        $taskStages = $this->taskStages();
+        $completedStatuses = $taskStages
+            ->where('is_completed', true)
+            ->pluck('slug')
+            ->all();
+        $stageOrderMap = $taskStages
+            ->mapWithKeys(fn (array $stage): array => [$stage['slug'] => $stage['sort_order']])
+            ->all();
+
         $workspaceProjects = Project::query()
             ->visibleTo($viewer)
             ->with([
@@ -23,18 +49,24 @@ class ProjectPageData
             ->withCount([
                 'members',
                 'tasks',
-                'tasks as open_tasks_count' => fn ($query) => $query->where('status', '!=', ProjectTask::STATUS_DONE),
-                'tasks as completed_tasks_count' => fn ($query) => $query->where('status', ProjectTask::STATUS_DONE),
+                'tasks as open_tasks_count' => fn ($query) => $query->when(
+                    $completedStatuses !== [],
+                    fn ($taskQuery) => $taskQuery->whereNotIn('status', $completedStatuses),
+                ),
+                'tasks as completed_tasks_count' => fn ($query) => $query->when(
+                    $completedStatuses !== [],
+                    fn ($taskQuery) => $taskQuery->whereIn('status', $completedStatuses),
+                ),
             ])
             ->orderBy('is_archived')
             ->orderBy('name')
             ->get();
 
-        $resolvedProject = $activeProject
+        $resolvedProject = $mode === self::MODE_PROJECTS && $activeProject
             ? $workspaceProjects->firstWhere('id', $activeProject->id)
             : null;
 
-        if (! $resolvedProject && $activeTask?->project_id !== null) {
+        if ($mode === self::MODE_PROJECTS && ! $resolvedProject && $activeTask?->project_id !== null) {
             $resolvedProject = $workspaceProjects->firstWhere('id', $activeTask->project_id);
         }
 
@@ -50,11 +82,15 @@ class ProjectPageData
                 $resolvedProject !== null,
                 fn ($query) => $query->where('project_id', $resolvedProject->id),
             )
-            ->orderBy('status')
+            ->when(
+                $mode === self::MODE_TASKS,
+                fn ($query) => $query->whereNull('project_id'),
+            )
             ->orderBy('sort_order')
             ->orderBy('due_at')
             ->orderByDesc('created_at')
             ->get();
+        $workspaceTasks = $this->sortTasks($workspaceTasks, $stageOrderMap);
 
         $resolvedTask = null;
 
@@ -65,11 +101,13 @@ class ProjectPageData
         $standaloneTasks = $workspaceTasks->whereNull('project_id')->values();
 
         return [
+            'pageMode' => $mode,
+            'taskDisplayMode' => $taskDisplayMode,
             'projects' => $workspaceProjects
                 ->map(fn (Project $project): array => $this->projectListItem($project))
                 ->values()
                 ->all(),
-            'taskGroups' => $this->taskGroups($workspaceProjects, $workspaceTasks, $resolvedProject),
+            'taskGroups' => $this->taskGroups($workspaceProjects, $workspaceTasks, $resolvedProject, $mode),
             'activeProject' => $resolvedProject ? $this->activeProject($resolvedProject, $workspaceTasks) : null,
             'activeTask' => $resolvedTask ? $this->activeTask($resolvedTask, $workspaceTasks) : null,
             'availableUsers' => User::query()
@@ -95,15 +133,20 @@ class ProjectPageData
             'can' => [
                 'createProject' => true,
                 'createTask' => true,
+                'manageTaskStages' => $taskStages->every(fn (array $stage): bool => $stage['id'] !== null),
                 'manageProject' => $resolvedProject ? $viewer->canManageProject($resolvedProject) : false,
                 'manageTask' => $resolvedTask ? $viewer->canManageTask($resolvedTask) : false,
                 'workOnActiveProject' => $resolvedProject ? $viewer->canWorkOnProject($resolvedProject) : false,
             ],
             'taskOptions' => [
-                'statuses' => collect(ProjectTask::availableStatuses())
-                    ->map(fn (string $status): array => [
-                        'value' => $status,
-                        'label' => __('ui.projects.status_'.$status),
+                'statuses' => $taskStages
+                    ->map(fn (array $stage): array => [
+                        'id' => $stage['id'],
+                        'value' => $stage['slug'],
+                        'label' => $this->stageDisplayName($stage),
+                        'color' => $stage['color'],
+                        'is_completed' => $stage['is_completed'],
+                        'sort_order' => $stage['sort_order'],
                     ])
                     ->values()
                     ->all(),
@@ -118,10 +161,58 @@ class ProjectPageData
             ],
             'workspaceSummary' => [
                 'standalone_tasks_count' => $standaloneTasks->count(),
-                'standalone_open_tasks_count' => $standaloneTasks->where('status', '!=', ProjectTask::STATUS_DONE)->count(),
-                'standalone_completed_tasks_count' => $standaloneTasks->where('status', ProjectTask::STATUS_DONE)->count(),
+                'standalone_open_tasks_count' => $standaloneTasks->filter(
+                    fn (ProjectTask $task): bool => ! in_array($task->status, $completedStatuses, true),
+                )->count(),
+                'standalone_completed_tasks_count' => $standaloneTasks->filter(
+                    fn (ProjectTask $task): bool => in_array($task->status, $completedStatuses, true),
+                )->count(),
             ],
         ];
+    }
+
+    /**
+     * @return Collection<int, array{id: int|null, slug: string, name: string|null, color: string, is_completed: bool, sort_order: int}>
+     */
+    private function taskStages(): Collection
+    {
+        if (Schema::hasTable('project_task_stages')) {
+            $stages = ProjectTaskStage::query()
+                ->ordered()
+                ->get()
+                ->map(fn (ProjectTaskStage $stage): array => [
+                    'id' => $stage->id,
+                    'slug' => $stage->slug,
+                    'name' => $stage->name,
+                    'color' => $stage->color,
+                    'is_completed' => $stage->is_completed,
+                    'sort_order' => $stage->sort_order,
+                ]);
+
+            if ($stages->isNotEmpty()) {
+                return $stages;
+            }
+        }
+
+        return collect(ProjectTaskStage::defaultStages())
+            ->map(fn (array $stage): array => [
+                'id' => null,
+                'slug' => $stage['slug'],
+                'name' => $stage['name'],
+                'color' => $stage['color'],
+                'is_completed' => $stage['is_completed'],
+                'sort_order' => $stage['sort_order'],
+            ]);
+    }
+
+    /**
+     * @param  array{id: int|null, slug: string, name: string|null, color: string, is_completed: bool, sort_order: int}  $stage
+     */
+    private function stageDisplayName(array $stage): string
+    {
+        $taskStage = new ProjectTaskStage($stage);
+
+        return $taskStage->displayName();
     }
 
     /**
@@ -129,8 +220,18 @@ class ProjectPageData
      * @param  Collection<int, ProjectTask>  $tasks
      * @return array<int, array<string, mixed>>
      */
-    private function taskGroups(Collection $projects, Collection $tasks, ?Project $resolvedProject): array
-    {
+    private function taskGroups(
+        Collection $projects,
+        Collection $tasks,
+        ?Project $resolvedProject,
+        string $mode,
+    ): array {
+        if ($mode === self::MODE_TASKS) {
+            return [
+                $this->standaloneTaskGroup($tasks->whereNull('project_id')->values()),
+            ];
+        }
+
         if ($resolvedProject !== null) {
             return [
                 $this->projectTaskGroup($resolvedProject, $tasks),
@@ -155,6 +256,8 @@ class ProjectPageData
      */
     private function standaloneTaskGroup(Collection $tasks): array
     {
+        $completedStatuses = ProjectTaskStage::completedSlugs();
+
         return [
             'key' => 'standalone',
             'kind' => 'standalone',
@@ -162,8 +265,12 @@ class ProjectPageData
             'description' => __('ui.projects.no_project_group_description'),
             'project' => null,
             'tasks_count' => $tasks->count(),
-            'open_tasks_count' => $tasks->where('status', '!=', ProjectTask::STATUS_DONE)->count(),
-            'completed_tasks_count' => $tasks->where('status', ProjectTask::STATUS_DONE)->count(),
+            'open_tasks_count' => $tasks->filter(
+                fn (ProjectTask $task): bool => ! in_array($task->status, $completedStatuses, true),
+            )->count(),
+            'completed_tasks_count' => $tasks->filter(
+                fn (ProjectTask $task): bool => in_array($task->status, $completedStatuses, true),
+            )->count(),
             'tasks' => $this->taskTree($tasks),
         ];
     }
@@ -174,6 +281,8 @@ class ProjectPageData
      */
     private function projectTaskGroup(Project $project, Collection $tasks): array
     {
+        $completedStatuses = ProjectTaskStage::completedSlugs();
+
         return [
             'key' => 'project-'.$project->id,
             'kind' => 'project',
@@ -188,8 +297,12 @@ class ProjectPageData
                 'members_count' => $project->members_count,
             ],
             'tasks_count' => $tasks->count(),
-            'open_tasks_count' => $tasks->where('status', '!=', ProjectTask::STATUS_DONE)->count(),
-            'completed_tasks_count' => $tasks->where('status', ProjectTask::STATUS_DONE)->count(),
+            'open_tasks_count' => $tasks->filter(
+                fn (ProjectTask $task): bool => ! in_array($task->status, $completedStatuses, true),
+            )->count(),
+            'completed_tasks_count' => $tasks->filter(
+                fn (ProjectTask $task): bool => in_array($task->status, $completedStatuses, true),
+            )->count(),
             'tasks' => $this->taskTree($tasks),
         ];
     }
@@ -220,6 +333,7 @@ class ProjectPageData
                 'complexity' => $task->complexity,
                 'due_at' => $task->due_at?->toISOString(),
                 'completed_at' => $task->completed_at?->toISOString(),
+                'created_at' => $task->created_at?->toISOString(),
                 'assignee' => $this->userSummary($task->assignee),
                 'creator' => $this->userSummary($task->creator),
                 'co_assignees_count' => $task->coAssignees->count(),
@@ -293,6 +407,7 @@ class ProjectPageData
             'complexity' => $task->complexity,
             'due_at' => $task->due_at?->toISOString(),
             'completed_at' => $task->completed_at?->toISOString(),
+            'created_at' => $task->created_at?->toISOString(),
             'sort_order' => $task->sort_order,
             'creator' => $this->userSummary($task->creator),
             'assignee' => $this->userSummary($task->assignee),
@@ -313,6 +428,7 @@ class ProjectPageData
                     'complexity' => $childTask->complexity,
                     'due_at' => $childTask->due_at?->toISOString(),
                     'completed_at' => $childTask->completed_at?->toISOString(),
+                    'created_at' => $childTask->created_at?->toISOString(),
                     'assignee' => $this->userSummary($childTask->assignee),
                     'creator' => $this->userSummary($childTask->creator),
                     'co_assignees_count' => $childTask->coAssignees->count(),
@@ -324,6 +440,42 @@ class ProjectPageData
                 ->all(),
             'updated_at' => $task->updated_at?->toISOString(),
         ];
+    }
+
+    /**
+     * @param  Collection<int, ProjectTask>  $tasks
+     * @param  array<string, int>  $stageOrderMap
+     * @return Collection<int, ProjectTask>
+     */
+    private function sortTasks(Collection $tasks, array $stageOrderMap): Collection
+    {
+        return $tasks
+            ->sort(function (ProjectTask $first, ProjectTask $second) use ($stageOrderMap): int {
+                $firstStageOrder = $stageOrderMap[$first->status] ?? PHP_INT_MAX;
+                $secondStageOrder = $stageOrderMap[$second->status] ?? PHP_INT_MAX;
+                $stageComparison = $firstStageOrder <=> $secondStageOrder;
+
+                if ($stageComparison !== 0) {
+                    return $stageComparison;
+                }
+
+                $sortOrderComparison = $first->sort_order <=> $second->sort_order;
+
+                if ($sortOrderComparison !== 0) {
+                    return $sortOrderComparison;
+                }
+
+                $firstDueTimestamp = $first->due_at?->getTimestamp() ?? PHP_INT_MAX;
+                $secondDueTimestamp = $second->due_at?->getTimestamp() ?? PHP_INT_MAX;
+                $dueComparison = $firstDueTimestamp <=> $secondDueTimestamp;
+
+                if ($dueComparison !== 0) {
+                    return $dueComparison;
+                }
+
+                return ($second->created_at?->getTimestamp() ?? 0) <=> ($first->created_at?->getTimestamp() ?? 0);
+            })
+            ->values();
     }
 
     /**

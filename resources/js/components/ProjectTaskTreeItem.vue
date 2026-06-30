@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
+import type { InertiaLinkProps } from '@inertiajs/vue3';
 import {
     ClipboardList,
     FolderKanban,
@@ -9,7 +10,11 @@ import { computed } from 'vue';
 import { showWorkspaceTask } from '@/actions/App/Http/Controllers/ProjectController';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/composables/useLanguage';
-import type { ProjectTaskListItem, ProjectTaskOption } from '@/types/ui';
+import type {
+    ProjectTaskListItem,
+    ProjectTaskOption,
+    ProjectTaskStageOption,
+} from '@/types/ui';
 
 defineOptions({
     name: 'ProjectTaskTreeItem',
@@ -19,11 +24,14 @@ type Props = {
     task: ProjectTaskListItem;
     activeTaskId: number | null;
     taskOptions: {
-        statuses: ProjectTaskOption[];
+        statuses: ProjectTaskStageOption[];
         importances: ProjectTaskOption[];
     };
     level?: number;
     canCreateSubtasks?: boolean;
+    taskHrefResolver?: (
+        task: ProjectTaskListItem,
+    ) => NonNullable<InertiaLinkProps['href']>;
 };
 
 const props = withDefaults(defineProps<Props>(), {
@@ -37,19 +45,28 @@ const emit = defineEmits<{
 
 const { t } = useLanguage();
 
-const taskHref = computed(() => showWorkspaceTask.url(props.task.id));
+const taskHref = computed(() => {
+    return props.taskHrefResolver
+        ? props.taskHrefResolver(props.task)
+        : showWorkspaceTask(props.task.id);
+});
 
 const indentStyle = computed<Record<string, string>>(() => ({
     marginLeft: `${Math.min(props.level, 5) * 1.25}rem`,
 }));
 
-const statusClass = (status: string): string => {
+const stageBadgeStyle = (status: string): Record<string, string> => {
+    const color = props.taskOptions.statuses.find((option) => option.value === status)?.color;
+
+    if (!color) {
+        return {};
+    }
+
     return {
-        todo: 'bg-slate-500/10 text-slate-700 dark:text-slate-300',
-        in_progress: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
-        review: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
-        done: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-    }[status] ?? 'bg-muted text-muted-foreground';
+        backgroundColor: `${color}1A`,
+        borderColor: `${color}33`,
+        color,
+    };
 };
 
 const importanceClass = (importance: string): string => {
@@ -68,31 +85,43 @@ const optionLabel = (options: ProjectTaskOption[], value: string): string => {
 const handleCreateSubtask = (): void => {
     emit('create-subtask', props.task);
 };
+
+const visitTask = (): void => {
+    router.visit(taskHref.value, {
+        preserveScroll: true,
+        preserveState: true,
+    });
+};
 </script>
 
 <template>
     <div class="space-y-3" :style="indentStyle">
         <div
-            class="rounded-2xl border px-4 py-4 transition"
+            class="group cursor-pointer rounded-2xl border px-4 py-4 transition"
             :class="
                 activeTaskId === task.id
                     ? 'border-primary/50 bg-background'
                     : 'border-border bg-card hover:border-primary/40 hover:bg-background'
             "
+            role="link"
+            tabindex="0"
+            @click="visitTask"
+            @keydown.enter.prevent="visitTask"
+            @keydown.space.prevent="visitTask"
         >
             <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div class="min-w-0 flex-1 space-y-2">
                     <div class="flex items-center gap-2">
                         <ClipboardList class="size-4 text-muted-foreground" />
-                        <Link :href="taskHref" class="truncate font-medium hover:underline">
+                        <div class="truncate font-medium group-hover:underline">
                             {{ task.title }}
-                        </Link>
+                        </div>
                     </div>
 
                     <div class="flex flex-wrap gap-2 text-xs">
                         <span
-                            class="rounded-full px-2 py-1 font-medium"
-                            :class="statusClass(task.status)"
+                            class="rounded-full border px-2 py-1 font-medium"
+                            :style="stageBadgeStyle(task.status)"
                         >
                             {{ optionLabel(taskOptions.statuses, task.status) }}
                         </span>
@@ -136,7 +165,9 @@ const handleCreateSubtask = (): void => {
                         variant="ghost"
                         size="sm"
                         class="h-7 px-2 text-xs"
-                        @click="handleCreateSubtask"
+                        @click.stop="handleCreateSubtask"
+                        @keydown.enter.stop
+                        @keydown.space.stop
                     >
                         <GitBranchPlus class="size-3.5" />
                         {{ t.projects.create_subtask }}
@@ -154,6 +185,7 @@ const handleCreateSubtask = (): void => {
                 :task-options="taskOptions"
                 :level="level + 1"
                 :can-create-subtasks="canCreateSubtasks"
+                :task-href-resolver="taskHrefResolver"
                 @create-subtask="emit('create-subtask', $event)"
             />
         </div>

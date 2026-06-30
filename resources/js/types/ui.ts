@@ -42,6 +42,7 @@ export type Portal = {
     companyName: string;
     logoUrl: string | null;
     defaultLanguage: Language;
+    enabledModules: string[];
 };
 
 export type AppearanceSettings = {
@@ -82,6 +83,39 @@ export type PortalFormFieldTypeOption = {
     label: string;
 };
 
+export type PortalFormWidth = 'sm' | 'md' | 'lg' | 'xl';
+
+export type PortalFormStyleSettings = {
+    container_width: PortalFormWidth;
+    background_color: string;
+    border_color: string;
+    text_color: string;
+    input_background_color: string;
+    input_border_color: string;
+    button_background_color: string;
+    button_text_color: string;
+    border_radius: number;
+    padding: number;
+};
+
+export type PortalFormWidthOption = {
+    value: PortalFormWidth;
+    label: string;
+};
+
+export type PortalFormCompletionAction = 'message' | 'redirect' | 'close';
+
+export type PortalFormCompletionSettings = {
+    action: PortalFormCompletionAction;
+    success_message: string | null;
+    redirect_url: string | null;
+};
+
+export type PortalFormCompletionActionOption = {
+    value: PortalFormCompletionAction;
+    label: string;
+};
+
 export type PortalFormFieldItem = {
     id: number | null;
     key: string | null;
@@ -102,6 +136,8 @@ export type PortalFormListItem = {
     target_user_name: string | null;
     fields_count: number;
     submissions_count: number;
+    style_settings: PortalFormStyleSettings;
+    completion_settings: PortalFormCompletionSettings;
     last_submission_at: string | null;
 };
 
@@ -128,6 +164,8 @@ export type PortalFormActiveItem = {
     submission_mode: 'task' | 'chat';
     is_active: boolean;
     public_url: string;
+    style_settings: PortalFormStyleSettings;
+    completion_settings: PortalFormCompletionSettings;
     target_user: PortalFormAvailableUser | null;
     owner: PortalFormAvailableUser | null;
     fields: PortalFormFieldItem[];
@@ -139,6 +177,8 @@ export type PortalFormPublicItem = {
     public_token: string;
     name: string;
     description: string | null;
+    style_settings: PortalFormStyleSettings;
+    completion_settings: PortalFormCompletionSettings;
     fields: Array<{
         id: number;
         key: string;
@@ -318,6 +358,7 @@ export type ProjectTaskListItem = {
     complexity: number;
     due_at: string | null;
     completed_at: string | null;
+    created_at: string | null;
     assignee: ProjectUserSummary | null;
     creator: ProjectUserSummary | null;
     co_assignees_count: number;
@@ -381,6 +422,7 @@ export type ProjectActiveTask = {
     complexity: number;
     due_at: string | null;
     completed_at: string | null;
+    created_at: string | null;
     sort_order: number;
     creator: ProjectUserSummary | null;
     assignee: ProjectUserSummary | null;
@@ -389,15 +431,62 @@ export type ProjectActiveTask = {
     updated_at: string | null;
 };
 
+export type ProjectPageMode = 'projects' | 'tasks';
+
+export type ProjectTaskDisplayMode = 'list' | 'kanban' | 'gantt';
+
 export type ProjectTaskOption = {
     value: string;
     label: string;
+};
+
+export type ProjectTaskStageOption = {
+    id: number | null;
+    value: string;
+    label: string;
+    color: string;
+    is_completed: boolean;
+    sort_order: number;
+};
+
+export type UserGroupOption = {
+    id: number;
+    name: string;
+    display_name: string;
+};
+
+export type ManagedUserProfile = {
+    id: number;
+    name: string;
+    last_name: string | null;
+    email: string;
+    phone: string | null;
+    email_verified_at: string | null;
+    avatar: string | null;
+    avatar_scale: number;
+    created_at: string | null;
+    updated_at: string | null;
+    is_super_admin: boolean;
+    is_active: boolean;
+    deactivated_at: string | null;
+    group: UserGroupOption | null;
+};
+
+export type ManagedProfileSaveState = 'idle' | 'saving' | 'saved' | 'error';
+
+export type ManagedProfileFormState = {
+    name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    errors: Record<string, string | undefined>;
 };
 
 export type ChatUserSummary = {
     id: number;
     name: string;
     email: string;
+    phone: string | null;
     avatar: string | null;
     avatarScale: number;
 };
@@ -413,12 +502,23 @@ export type ChatConversationListItem = {
     participant: ChatUserSummary | null;
 };
 
+export type ChatAttachmentItem = {
+    id: number;
+    name: string;
+    mimeType: string | null;
+    extension: string | null;
+    sizeBytes: number;
+    downloadUrl: string;
+    previewUrl: string | null;
+};
+
 export type ChatMessageItem = {
     id: number;
     body: string;
     createdAt: string | null;
     isOwn: boolean;
     user: ChatUserSummary;
+    attachments: ChatAttachmentItem[];
 };
 
 export type ChatActiveConversation = {

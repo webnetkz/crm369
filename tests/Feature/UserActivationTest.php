@@ -329,28 +329,29 @@ test('users page shows password reset in a modal dialog', function () {
 
 test('users page shows profile details in a right sheet sidebar', function () {
     $usersPage = file_get_contents(resource_path('js/pages/settings/Users.vue'));
+    $profileSheet = file_get_contents(resource_path('js/components/UserProfileSheet.vue'));
 
     expect($usersPage)
-        ->toContain('<Sheet')
-        ->toContain('<SheetContent')
+        ->toContain('<UserProfileSheet')
         ->toContain('selectedProfileUser !== null')
         ->toContain('@click="openProfile(user)"')
-        ->toContain('formatDateTime(')
-        ->toContain('t.admin.profile_description')
-        ->toContain("selectedProfileUser.group")
-        ->toContain('t.admin.simple_user');
+        ->and($profileSheet)->toContain('t.admin.profile_description')
+        ->and($profileSheet)->toContain('formatDateTime(')
+        ->and($profileSheet)->toContain('t.admin.simple_user')
+        ->and($profileSheet)->toContain('profile_autosave_saving');
 });
 
 test('users page supports inline profile editing with autosave', function () {
     $usersPage = file_get_contents(resource_path('js/pages/settings/Users.vue'));
+    $profileSheet = file_get_contents(resource_path('js/components/UserProfileSheet.vue'));
 
     expect($usersPage)
         ->toContain('managedProfileForm')
         ->toContain('scheduleManagedProfileSave')
         ->toContain('submitManagedProfileUpdate')
         ->toContain('updateUserProfile.url')
-        ->toContain('profile_autosave_saving')
-        ->toContain('profile_autosave_saved');
+        ->and($profileSheet)->toContain('profile_autosave_saving')
+        ->and($profileSheet)->toContain('profile_autosave_saved');
 });
 
 test('sidebar user button opens a left bottom sheet instead of a dropdown', function () {

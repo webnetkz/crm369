@@ -1,21 +1,59 @@
 <script setup lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { useBackgroundPreview } from '@/composables/useBackgroundPreview';
 import type { AppVariant } from '@/types';
 
 type Props = {
     variant?: AppVariant;
+    sidebarCollapsed?: boolean;
 };
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
     variant: 'sidebar',
+    sidebarCollapsed: false,
 });
 
-const isOpen = usePage().props.sidebarOpen;
 const page = usePage();
+const sidebarOpen = ref(page.props.sidebarOpen);
+const sidebarStateBeforeAutoCollapse = ref<boolean | null>(null);
 const { persisted, preview, setPersisted } = useBackgroundPreview();
+
+watch(
+    () => page.props.sidebarOpen,
+    (value) => {
+        if (sidebarStateBeforeAutoCollapse.value === null) {
+            sidebarOpen.value = value;
+        }
+    },
+    { immediate: true },
+);
+
+watch(
+    () => props.sidebarCollapsed,
+    (collapsed) => {
+        if (props.variant !== 'sidebar') {
+            return;
+        }
+
+        if (collapsed) {
+            if (sidebarStateBeforeAutoCollapse.value === null) {
+                sidebarStateBeforeAutoCollapse.value = sidebarOpen.value;
+            }
+
+            sidebarOpen.value = false;
+
+            return;
+        }
+
+        if (sidebarStateBeforeAutoCollapse.value !== null) {
+            sidebarOpen.value = sidebarStateBeforeAutoCollapse.value;
+            sidebarStateBeforeAutoCollapse.value = null;
+        }
+    },
+    { immediate: true },
+);
 
 const authBackgroundSettings = computed(() => {
     const user = page.props.auth.user;
@@ -38,9 +76,13 @@ const authBackgroundSettings = computed(() => {
     };
 });
 
-watch(authBackgroundSettings, (value) => {
-    setPersisted(value);
-}, { immediate: true });
+watch(
+    authBackgroundSettings,
+    (value) => {
+        setPersisted(value);
+    },
+    { immediate: true },
+);
 
 const backgroundSettings = computed(() => {
     return preview.value ?? persisted.value ?? authBackgroundSettings.value;
@@ -84,16 +126,20 @@ const backgroundImageStyle = computed<Record<string, string>>(() => ({
     transform: 'scale(1.08)',
 }));
 
-watch(backgroundSettings, (value) => {
-    if (typeof document === 'undefined') {
-        return;
-    }
+watch(
+    backgroundSettings,
+    (value) => {
+        if (typeof document === 'undefined') {
+            return;
+        }
 
-    const backgroundColor = value.color ?? 'var(--background)';
+        const backgroundColor = value.color ?? 'var(--background)';
 
-    document.documentElement.style.backgroundColor = backgroundColor;
-    document.body.style.backgroundColor = backgroundColor;
-}, { immediate: true });
+        document.documentElement.style.backgroundColor = backgroundColor;
+        document.body.style.backgroundColor = backgroundColor;
+    },
+    { immediate: true },
+);
 </script>
 
 <template>
@@ -121,7 +167,12 @@ watch(backgroundSettings, (value) => {
         >
             <slot />
         </div>
-        <SidebarProvider v-else :default-open="isOpen" class="relative z-10">
+        <SidebarProvider
+            v-else
+            v-model:open="sidebarOpen"
+            :default-open="page.props.sidebarOpen"
+            class="relative z-10"
+        >
             <slot />
         </SidebarProvider>
     </div>

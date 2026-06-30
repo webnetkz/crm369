@@ -37,7 +37,18 @@ class ApiCatalog
                 'endpoints' => [
                     $this->endpoint('GET', '/api/v1/chats', 'ui.api.endpoint_chats_index', ApiAccessToken::PERMISSION_CHAT_READ, 'ui.api.access_scope_based', targetUserKey: 'ui.api.target_user_supported'),
                     $this->endpoint('POST', '/api/v1/chats/direct', 'ui.api.endpoint_chats_direct_store', ApiAccessToken::PERMISSION_CHAT_WRITE, 'ui.api.access_scope_based', targetUserKey: 'ui.api.target_user_supported'),
-                    $this->endpoint('POST', '/api/v1/chats/{chatConversation}/messages', 'ui.api.endpoint_chats_messages_store', ApiAccessToken::PERMISSION_CHAT_WRITE, 'ui.api.access_scope_based', targetUserKey: 'ui.api.target_user_supported'),
+                    $this->endpoint('POST', '/api/v1/chats/{chatConversation}/messages', 'ui.api.endpoint_chats_messages_store', ApiAccessToken::PERMISSION_CHAT_WRITE, 'ui.api.access_scope_based', 'multipart/form-data', 'ui.api.target_user_supported'),
+                ],
+            ],
+            [
+                'title' => __('ui.api.section_contacts'),
+                'description' => __('ui.api.section_contacts_description'),
+                'endpoints' => [
+                    $this->endpoint('GET', '/api/v1/contacts', 'ui.api.endpoint_contacts_index', ApiAccessToken::PERMISSION_CONTACTS_READ, 'ui.api.access_scope_based'),
+                    $this->endpoint('GET', '/api/v1/contacts/{contact}', 'ui.api.endpoint_contacts_show', ApiAccessToken::PERMISSION_CONTACTS_READ, 'ui.api.access_scope_based'),
+                    $this->endpoint('POST', '/api/v1/contacts', 'ui.api.endpoint_contacts_store', ApiAccessToken::PERMISSION_CONTACTS_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('PATCH', '/api/v1/contacts/{contact}', 'ui.api.endpoint_contacts_update', ApiAccessToken::PERMISSION_CONTACTS_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('DELETE', '/api/v1/contacts/{contact}', 'ui.api.endpoint_contacts_destroy', ApiAccessToken::PERMISSION_CONTACTS_WRITE, 'ui.api.access_scope_based'),
                 ],
             ],
             [

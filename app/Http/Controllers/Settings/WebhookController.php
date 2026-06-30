@@ -22,6 +22,16 @@ class WebhookController extends Controller
                 ->get()
                 ->map(fn (PortalWebhook $webhook): array => $this->serializeWebhook($webhook))
                 ->values(),
+            'documentation' => [
+                'base_url' => url('/portal-webhooks').'/{webhook_id}',
+                'users_index_url' => url('/portal-webhooks').'/{webhook_id}/users',
+                'users_show_url' => url('/portal-webhooks').'/{webhook_id}/users/{user_id}',
+                'contacts_index_url' => url('/portal-webhooks').'/{webhook_id}/contacts',
+                'contacts_show_url' => url('/portal-webhooks').'/{webhook_id}/contacts/{contact_id}',
+                'contacts_store_url' => url('/portal-webhooks').'/{webhook_id}/contacts',
+                'contacts_update_url' => url('/portal-webhooks').'/{webhook_id}/contacts/{contact_id}',
+                'contacts_destroy_url' => url('/portal-webhooks').'/{webhook_id}/contacts/{contact_id}',
+            ],
             'availablePermissions' => collect(PortalWebhook::permissionDefinitions())
                 ->map(fn (array $definition, string $key): array => [
                     'key' => $key,

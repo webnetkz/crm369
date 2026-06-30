@@ -6,6 +6,7 @@ import { index } from '@/actions/App/Http/Controllers/ChatSidebarController';
 import ChatCenterSheet from '@/components/ChatCenterSheet.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { useChatCenterPresence } from '@/composables/useChatCenterPresence';
 import { getInitials } from '@/composables/useInitials';
 import { useLanguage } from '@/composables/useLanguage';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
@@ -26,6 +27,7 @@ type DockEntry = {
 
 const page = usePage();
 const { t } = useLanguage();
+const { isAnyChatCenterVisible } = useChatCenterPresence();
 const open = ref(false);
 const mode = ref<SheetMode>('chats');
 const initialConversationId = ref<number | null>(null);
@@ -42,6 +44,12 @@ const unreadBadge = computed(() => {
     }
 
     return count > 99 ? '99+' : String(count);
+});
+
+const shouldShowDock = computed(() => {
+    return (
+        page.component !== 'chats/Index' && !isAnyChatCenterVisible.value
+    );
 });
 
 const dockEntries = computed<DockEntry[]>(() => {
@@ -156,7 +164,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="pointer-events-none fixed right-3 bottom-5 z-30 sm:right-5">
+    <div
+        v-if="shouldShowDock"
+        class="pointer-events-none fixed right-3 bottom-5 z-30 sm:right-5"
+    >
         <div class="pointer-events-auto relative flex flex-col items-end gap-3 group/dock">
             <div
                 aria-hidden="true"
@@ -221,13 +232,13 @@ onBeforeUnmount(() => {
                 </Button>
             </div>
         </div>
-
-        <ChatCenterSheet
-            :open="open"
-            :mode="mode"
-            :initial-conversation-id="initialConversationId"
-            :initial-contact-id="initialContactId"
-            @update:open="open = $event"
-        />
     </div>
+
+    <ChatCenterSheet
+        :open="open"
+        :mode="mode"
+        :initial-conversation-id="initialConversationId"
+        :initial-contact-id="initialContactId"
+        @update:open="open = $event"
+    />
 </template>

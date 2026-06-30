@@ -7,14 +7,16 @@ import {
     usePage,
 } from '@inertiajs/vue3';
 import {
+    BookText,
     CheckSquare2,
+    ChevronRight,
     Copy,
     KeyRound,
     RefreshCcw,
     Trash2,
     Webhook,
 } from '@lucide/vue';
-import { ref, watch, watchEffect } from 'vue';
+import { computed, ref, watch, watchEffect } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -71,6 +73,17 @@ type IssuedWebhook = {
     signed_url: string;
 } | null;
 
+type WebhookDocumentation = {
+    base_url: string;
+    users_index_url: string;
+    users_show_url: string;
+    contacts_index_url: string;
+    contacts_show_url: string;
+    contacts_store_url: string;
+    contacts_update_url: string;
+    contacts_destroy_url: string;
+};
+
 type DraftWebhook = {
     name: string;
     is_active: boolean;
@@ -86,6 +99,7 @@ type PageProps = {
 };
 
 const props = defineProps<{
+    documentation: WebhookDocumentation;
     webhooks: WebhookRow[];
     availablePermissions: PermissionOption[];
 }>();
@@ -157,6 +171,99 @@ const webhookHeaderValue = (token: string): string => {
     return `X-Webhook-Token: ${token}`;
 };
 
+const PortalWebhookUsersReadPermission = 'users.read';
+const PortalWebhookContactsReadPermission = 'contacts.read';
+const PortalWebhookContactsWritePermission = 'contacts.write';
+const tokenQueryValue = '{token}';
+const existingSectionId = 'webhook-existing';
+const createSectionId = 'webhook-create';
+const documentationSectionId = 'webhook-documentation';
+
+const authenticationExamples = computed(() => [
+    {
+        label: t.value.webhooks.documentation_auth_bearer,
+        value: authorizationHeaderValue(tokenQueryValue),
+    },
+    {
+        label: t.value.webhooks.documentation_auth_header,
+        value: webhookHeaderValue(tokenQueryValue),
+    },
+    {
+        label: t.value.webhooks.documentation_auth_query,
+        value: `${props.documentation.base_url}?token=${tokenQueryValue}`,
+    },
+]);
+
+const endpointExamples = computed(() => [
+    {
+        method: 'GET',
+        path: props.documentation.base_url,
+        title: t.value.webhooks.documentation_endpoint_invoke_title,
+        description: t.value.webhooks.documentation_endpoint_invoke_description,
+        permission: t.value.webhooks.documentation_permission_none,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.users_index_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_users_index_title,
+        description: t.value.webhooks.documentation_endpoint_users_index_description,
+        permission: PortalWebhookUsersReadPermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.users_show_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_users_show_title,
+        description: t.value.webhooks.documentation_endpoint_users_show_description,
+        permission: PortalWebhookUsersReadPermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.contacts_index_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_contacts_index_title,
+        description: t.value.webhooks.documentation_endpoint_contacts_index_description,
+        permission: PortalWebhookContactsReadPermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.contacts_show_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_contacts_show_title,
+        description: t.value.webhooks.documentation_endpoint_contacts_show_description,
+        permission: PortalWebhookContactsReadPermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.contacts_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_contacts_store_title,
+        description: t.value.webhooks.documentation_endpoint_contacts_store_description,
+        permission: PortalWebhookContactsWritePermission,
+    },
+    {
+        method: 'PATCH',
+        path: `${props.documentation.contacts_update_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_contacts_update_title,
+        description: t.value.webhooks.documentation_endpoint_contacts_update_description,
+        permission: PortalWebhookContactsWritePermission,
+    },
+    {
+        method: 'DELETE',
+        path: `${props.documentation.contacts_destroy_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_contacts_destroy_title,
+        description: t.value.webhooks.documentation_endpoint_contacts_destroy_description,
+        permission: PortalWebhookContactsWritePermission,
+    },
+]);
+
+const sidebarNavigationSections = computed(() => [
+    {
+        id: createSectionId,
+        title: t.value.webhooks.create_title,
+    },
+    {
+        id: documentationSectionId,
+        title: t.value.webhooks.documentation_title,
+    },
+]);
+
 const syncDrafts = (): void => {
     drafts.value = Object.fromEntries(
         props.webhooks.map((webhook) => [
@@ -176,6 +283,48 @@ watch(
     () => props.webhooks,
     () => syncDrafts(),
     { deep: true, immediate: true },
+);
+
+const selectedWebhookId = ref<number | null>(props.webhooks[0]?.id ?? null);
+
+const selectedWebhook = computed(() => {
+    if (selectedWebhookId.value === null) {
+        return props.webhooks[0] ?? null;
+    }
+
+    return (
+        props.webhooks.find((webhook) => webhook.id === selectedWebhookId.value) ??
+        props.webhooks[0] ??
+        null
+    );
+});
+
+const selectedWebhookDraft = computed(() => {
+    if (!selectedWebhook.value) {
+        return null;
+    }
+
+    return drafts.value[selectedWebhook.value.id] ?? null;
+});
+
+watch(
+    () => props.webhooks,
+    (webhooks) => {
+        if (webhooks.length === 0) {
+            selectedWebhookId.value = null;
+
+            return;
+        }
+
+        const hasSelectedWebhook = webhooks.some(
+            (webhook) => webhook.id === selectedWebhookId.value,
+        );
+
+        if (!hasSelectedWebhook) {
+            selectedWebhookId.value = webhooks[0].id;
+        }
+    },
+    { immediate: true },
 );
 
 watchEffect(() => {
@@ -308,6 +457,10 @@ const copyWebhookToken = async (): Promise<void> => {
 const closeIssuedWebhookDialog = (): void => {
     issuedWebhookDialogOpen.value = false;
 };
+
+const selectWebhook = (webhookId: number): void => {
+    selectedWebhookId.value = webhookId;
+};
 </script>
 
 <template>
@@ -419,151 +572,116 @@ const closeIssuedWebhookDialog = (): void => {
             :description="t.webhooks.description"
         />
 
-        <section class="space-y-4 rounded-2xl border border-border bg-card p-5">
-            <Heading
-                variant="small"
-                :title="t.webhooks.create_title"
-                :description="t.webhooks.create_description"
-            />
-
-            <form class="space-y-5" @submit.prevent="submitCreate">
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <div class="grid gap-2">
-                        <Label for="webhook-name">{{ t.webhooks.name }}</Label>
-                        <Input
-                            id="webhook-name"
-                            v-model="createForm.name"
-                            :placeholder="t.webhooks.name_placeholder"
-                        />
-                        <InputError :message="createForm.errors.name" />
+        <div class="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)] xl:items-start">
+            <aside class="space-y-4 xl:sticky xl:top-24">
+                <section class="rounded-2xl border border-border bg-card p-4">
+                    <div class="text-sm font-semibold">
+                        {{ t.webhooks.existing_title }}
                     </div>
 
-                    <div class="grid gap-2">
-                        <Label>{{ t.webhooks.status }}</Label>
-                        <label class="flex items-center gap-2 text-sm">
-                            <Checkbox
-                                :checked="createForm.is_active"
-                                @update:checked="
-                                    (value: boolean | 'indeterminate') =>
-                                        (createForm.is_active = value === true)
-                                "
-                            />
-                            <span>{{ t.webhooks.active }}</span>
-                        </label>
-                        <InputError :message="createForm.errors.is_active" />
-                    </div>
-                </div>
-
-                <div class="space-y-3">
-                    <div class="flex items-center gap-2 text-sm font-medium">
-                        <CheckSquare2 class="size-4 text-muted-foreground" />
-                        {{ t.webhooks.permissions }}
-                    </div>
-                    <p class="text-sm text-muted-foreground">
-                        {{ t.webhooks.permissions_description }}
-                    </p>
-
-                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        <label
-                            v-for="permission in availablePermissions"
-                            :key="`create-${permission.key}`"
-                            class="flex items-start gap-3 rounded-xl border border-border bg-background/70 p-4"
-                        >
-                            <Checkbox
-                                :checked="
-                                    createForm.permissions.includes(
-                                        permission.key,
-                                    )
-                                "
-                                @update:checked="
-                                    (value: boolean | 'indeterminate') =>
-                                        (createForm.permissions =
-                                            togglePermission(
-                                                createForm.permissions,
-                                                permission.key,
-                                                value,
-                                            ))
-                                "
-                            />
-                            <div class="space-y-1">
-                                <div class="text-sm font-medium">
-                                    {{ permission.label }}
-                                </div>
-                                <p class="text-sm text-muted-foreground">
-                                    {{ permission.description }}
-                                </p>
-                            </div>
-                        </label>
-                    </div>
-                    <InputError :message="createForm.errors.permissions" />
-                </div>
-
-                <div class="grid gap-4 lg:grid-cols-2">
                     <div
-                        class="space-y-3 rounded-xl border border-border bg-background/70 p-4"
+                        v-if="webhooks.length === 0"
+                        class="mt-4 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground"
                     >
-                        <label
-                            class="flex items-center gap-2 text-sm font-medium"
-                        >
-                            <Checkbox
-                                :checked="createForm.never_expires"
-                                @update:checked="
-                                    (value: boolean | 'indeterminate') => {
-                                        createForm.never_expires =
-                                            value === true;
-                                        if (createForm.never_expires) {
-                                            createForm.expires_at = '';
-                                        }
-                                    }
-                                "
-                            />
-                            <span>{{ t.webhooks.never_expires }}</span>
-                        </label>
-
-                        <div
-                            v-if="!createForm.never_expires"
-                            class="grid gap-2"
-                        >
-                            <Label for="create-expires-at">{{
-                                t.webhooks.expires_at
-                            }}</Label>
-                            <Input
-                                id="create-expires-at"
-                                v-model="createForm.expires_at"
-                                type="datetime-local"
-                            />
-                            <InputError
-                                :message="createForm.errors.expires_at"
-                            />
-                        </div>
-
-                        <p class="text-sm text-muted-foreground">
-                            {{ t.webhooks.expires_at_help }}
-                        </p>
+                        {{ t.webhooks.empty }}
                     </div>
+
+                    <div v-else class="mt-4 grid gap-2">
+                        <button
+                            v-for="webhook in webhooks"
+                            :key="`sidebar-webhook-${webhook.id}`"
+                            type="button"
+                            class="rounded-xl border px-3 py-3 text-left transition-colors"
+                            :class="
+                                selectedWebhookId === webhook.id
+                                    ? 'border-primary bg-primary/5'
+                                    : 'border-border bg-background/70 hover:bg-muted'
+                            "
+                            @click="selectWebhook(webhook.id)"
+                        >
+                            <div
+                                class="flex items-start justify-between gap-3"
+                            >
+                                <div class="min-w-0">
+                                    <div class="truncate text-sm font-medium">
+                                        {{
+                                            drafts[webhook.id]?.name ??
+                                            webhook.name
+                                        }}
+                                    </div>
+                                    <div
+                                        class="mt-1 font-mono text-xs text-muted-foreground"
+                                    >
+                                        {{ webhook.token_prefix }}
+                                    </div>
+                                </div>
+
+                                <span
+                                    class="shrink-0 rounded-full px-2 py-1 text-[11px]"
+                                    :class="
+                                        webhook.is_expired
+                                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                            : drafts[webhook.id]?.is_active
+                                              ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
+                                              : 'bg-muted text-muted-foreground'
+                                    "
+                                >
+                                    {{
+                                        webhook.is_expired
+                                            ? t.webhooks.expired
+                                            : drafts[webhook.id]?.is_active
+                                              ? t.webhooks.active
+                                              : t.webhooks.inactive
+                                    }}
+                                </span>
+                            </div>
+                        </button>
+                    </div>
+                </section>
+
+                <section class="rounded-2xl border border-border bg-card p-4">
+                    <div class="text-sm font-semibold">
+                        {{ t.webhooks.title }}
+                    </div>
+
+                    <div class="mt-4 grid gap-2">
+                        <a
+                            :href="`#${existingSectionId}`"
+                            class="rounded-xl border border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+                        >
+                            {{ t.webhooks.existing_title }}
+                        </a>
+                        <a
+                            v-for="section in sidebarNavigationSections"
+                            :key="section.id"
+                            :href="`#${section.id}`"
+                            class="rounded-xl border border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+                        >
+                            {{ section.title }}
+                        </a>
+                    </div>
+                </section>
+            </aside>
+
+            <div class="space-y-8">
+            <section
+                :id="existingSectionId"
+                class="scroll-mt-24 space-y-4 rounded-2xl border border-border bg-card p-5"
+            >
+                <Heading variant="small" :title="t.webhooks.existing_title" />
+
+                <div
+                    v-if="webhooks.length === 0"
+                    class="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground"
+                >
+                    {{ t.webhooks.empty }}
                 </div>
 
-                <Button type="submit" :disabled="createForm.processing">
-                    {{ t.webhooks.create }}
-                </Button>
-            </form>
-        </section>
-
-        <section class="space-y-4">
-            <Heading variant="small" :title="t.webhooks.existing_title" />
-
-            <div
-                v-if="webhooks.length === 0"
-                class="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground"
-            >
-                {{ t.webhooks.empty }}
-            </div>
-
-            <article
-                v-for="webhook in webhooks"
-                :key="webhook.id"
-                class="space-y-5 rounded-2xl border border-border bg-card p-5"
-            >
+                <article
+                    v-else-if="selectedWebhook && selectedWebhookDraft"
+                    :id="`webhook-${selectedWebhook.id}`"
+                    class="space-y-5"
+                >
                 <div
                     class="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-start lg:justify-between"
                 >
@@ -571,24 +689,27 @@ const closeIssuedWebhookDialog = (): void => {
                         <div class="flex items-center gap-2">
                             <Webhook class="size-4 text-muted-foreground" />
                             <h2 class="text-lg font-semibold">
-                                {{ drafts[webhook.id]?.name || webhook.name }}
+                                {{
+                                    selectedWebhookDraft.name ||
+                                    selectedWebhook.name
+                                }}
                             </h2>
                         </div>
                         <div class="flex flex-wrap gap-2 text-xs">
                             <span
                                 class="rounded-full px-2.5 py-1"
                                 :class="
-                                    webhook.is_expired
+                                    selectedWebhook.is_expired
                                         ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                                        : drafts[webhook.id]?.is_active
+                                        : selectedWebhookDraft.is_active
                                           ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
                                           : 'bg-muted text-muted-foreground'
                                 "
                             >
                                 {{
-                                    webhook.is_expired
+                                    selectedWebhook.is_expired
                                         ? t.webhooks.expired
-                                        : drafts[webhook.id]?.is_active
+                                        : selectedWebhookDraft.is_active
                                           ? t.webhooks.active
                                           : t.webhooks.inactive
                                 }}
@@ -597,7 +718,7 @@ const closeIssuedWebhookDialog = (): void => {
                                 class="rounded-full bg-muted px-2.5 py-1 text-muted-foreground"
                             >
                                 {{ t.webhooks.token_prefix }}:
-                                {{ webhook.token_prefix }}
+                                {{ selectedWebhook.token_prefix }}
                             </span>
                         </div>
                     </div>
@@ -605,15 +726,13 @@ const closeIssuedWebhookDialog = (): void => {
                     <label class="flex items-center gap-2 text-sm">
                         <Checkbox
                             :checked="
-                                drafts[webhook.id]?.is_active ??
-                                webhook.is_active
+                                selectedWebhookDraft.is_active ??
+                                selectedWebhook.is_active
                             "
                             @update:checked="
                                 (value: boolean | 'indeterminate') => {
-                                    if (drafts[webhook.id]) {
-                                        drafts[webhook.id].is_active =
-                                            value === true;
-                                    }
+                                    selectedWebhookDraft.is_active =
+                                        value === true;
                                 }
                             "
                         />
@@ -622,123 +741,23 @@ const closeIssuedWebhookDialog = (): void => {
                 </div>
 
                 <div
-                    class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]"
+                    class="space-y-4 rounded-2xl border border-border bg-background/70 p-4"
                 >
-                    <div class="space-y-5">
-                        <div class="grid gap-4 lg:grid-cols-2">
-                            <div class="grid gap-2 lg:col-span-2">
-                                <Label :for="`webhook-name-${webhook.id}`">{{
-                                    t.webhooks.name
-                                }}</Label>
-                                <Input
-                                    :id="`webhook-name-${webhook.id}`"
-                                    v-model="drafts[webhook.id].name"
-                                    :placeholder="t.webhooks.name_placeholder"
-                                />
-                                <p
-                                    v-if="webhookErrors[webhook.id]?.name"
-                                    class="text-sm text-destructive"
-                                >
-                                    {{ webhookErrors[webhook.id].name }}
-                                </p>
-                            </div>
-
-                            <div class="grid gap-2 lg:col-span-2">
-                                <Label>{{ t.webhooks.endpoint_url }}</Label>
-                                <textarea
-                                    class="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                    rows="2"
-                                    readonly
-                                    :value="webhook.endpoint_url"
-                                ></textarea>
-                                <p class="text-sm text-muted-foreground">
-                                    {{ t.webhooks.token_usage_help }}
-                                </p>
-                                <p class="text-sm text-muted-foreground">
-                                    {{ t.webhooks.token_regenerate_hint }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="space-y-3">
-                            <div
-                                class="flex items-center gap-2 text-sm font-medium"
-                            >
-                                <CheckSquare2
-                                    class="size-4 text-muted-foreground"
-                                />
-                                {{ t.webhooks.permissions }}
-                            </div>
-
-                            <div
-                                class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
-                            >
-                                <label
-                                    v-for="permission in availablePermissions"
-                                    :key="`${webhook.id}-${permission.key}`"
-                                    class="flex items-start gap-3 rounded-xl border border-border bg-background/70 p-4"
-                                >
-                                    <Checkbox
-                                        :checked="
-                                            drafts[
-                                                webhook.id
-                                            ].permissions.includes(
-                                                permission.key,
-                                            )
-                                        "
-                                        @update:checked="
-                                            (
-                                                value:
-                                                    boolean | 'indeterminate',
-                                            ) => {
-                                                drafts[webhook.id].permissions =
-                                                    togglePermission(
-                                                        drafts[webhook.id]
-                                                            .permissions,
-                                                        permission.key,
-                                                        value,
-                                                    );
-                                            }
-                                        "
-                                    />
-                                    <div class="space-y-1">
-                                        <div class="text-sm font-medium">
-                                            {{ permission.label }}
-                                        </div>
-                                        <p
-                                            class="text-sm text-muted-foreground"
-                                        >
-                                            {{ permission.description }}
-                                        </p>
-                                    </div>
-                                </label>
-                            </div>
-                            <p
-                                v-if="webhookErrors[webhook.id]?.permissions"
-                                class="text-sm text-destructive"
-                            >
-                                {{ webhookErrors[webhook.id].permissions }}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div
-                        class="space-y-4 rounded-2xl border border-border bg-background/70 p-4"
-                    >
+                    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
                         <div class="grid gap-3">
                             <label
                                 class="flex items-center gap-2 text-sm font-medium"
                             >
                                 <Checkbox
-                                    :checked="drafts[webhook.id].never_expires"
+                                    :checked="
+                                        selectedWebhookDraft.never_expires
+                                    "
                                     @update:checked="
                                         (value: boolean | 'indeterminate') => {
-                                            drafts[webhook.id].never_expires =
+                                            selectedWebhookDraft.never_expires =
                                                 value === true;
-                                            if (
-                                                drafts[webhook.id].never_expires
-                                            ) {
-                                                drafts[webhook.id].expires_at =
+                                            if (selectedWebhookDraft.never_expires) {
+                                                selectedWebhookDraft.expires_at =
                                                     '';
                                             }
                                         }
@@ -748,22 +767,30 @@ const closeIssuedWebhookDialog = (): void => {
                             </label>
 
                             <div
-                                v-if="!drafts[webhook.id].never_expires"
+                                v-if="!selectedWebhookDraft.never_expires"
                                 class="grid gap-2"
                             >
-                                <Label :for="`expires-at-${webhook.id}`">{{
+                                <Label
+                                    :for="`expires-at-${selectedWebhook.id}`"
+                                >{{
                                     t.webhooks.expires_at
                                 }}</Label>
                                 <Input
-                                    :id="`expires-at-${webhook.id}`"
-                                    v-model="drafts[webhook.id].expires_at"
+                                    :id="`expires-at-${selectedWebhook.id}`"
+                                    v-model="selectedWebhookDraft.expires_at"
                                     type="datetime-local"
                                 />
                                 <p
-                                    v-if="webhookErrors[webhook.id]?.expires_at"
+                                    v-if="
+                                        webhookErrors[selectedWebhook.id]
+                                            ?.expires_at
+                                    "
                                     class="text-sm text-destructive"
                                 >
-                                    {{ webhookErrors[webhook.id].expires_at }}
+                                    {{
+                                        webhookErrors[selectedWebhook.id]
+                                            .expires_at
+                                    }}
                                 </p>
                             </div>
 
@@ -777,15 +804,17 @@ const closeIssuedWebhookDialog = (): void => {
                                 <span class="text-muted-foreground"
                                     >{{ t.webhooks.created_by }}:</span
                                 >
-                                {{ webhook.creator?.name ?? '—' }}
+                                {{ selectedWebhook.creator?.name ?? '—' }}
                             </div>
                             <div>
                                 <span class="text-muted-foreground"
                                     >{{ t.webhooks.created_at }}:</span
                                 >
                                 {{
-                                    webhook.created_at
-                                        ? formatDateTime(webhook.created_at)
+                                    selectedWebhook.created_at
+                                        ? formatDateTime(
+                                              selectedWebhook.created_at,
+                                          )
                                         : '—'
                                 }}
                             </div>
@@ -794,8 +823,10 @@ const closeIssuedWebhookDialog = (): void => {
                                     >{{ t.webhooks.last_used_at }}:</span
                                 >
                                 {{
-                                    webhook.last_used_at
-                                        ? formatDateTime(webhook.last_used_at)
+                                    selectedWebhook.last_used_at
+                                        ? formatDateTime(
+                                              selectedWebhook.last_used_at,
+                                          )
                                         : t.webhooks.never_used
                                 }}
                             </div>
@@ -804,8 +835,10 @@ const closeIssuedWebhookDialog = (): void => {
                                     >{{ t.webhooks.expires_at }}:</span
                                 >
                                 {{
-                                    webhook.expires_at
-                                        ? formatDateTime(webhook.expires_at)
+                                    selectedWebhook.expires_at
+                                        ? formatDateTime(
+                                              selectedWebhook.expires_at,
+                                          )
                                         : t.webhooks.never_expires
                                 }}
                             </div>
@@ -813,11 +846,105 @@ const closeIssuedWebhookDialog = (): void => {
                     </div>
                 </div>
 
+                <div class="space-y-5">
+                    <div class="grid gap-2">
+                        <Label
+                            :for="`webhook-name-${selectedWebhook.id}`"
+                        >{{
+                            t.webhooks.name
+                        }}</Label>
+                        <Input
+                            :id="`webhook-name-${selectedWebhook.id}`"
+                            v-model="selectedWebhookDraft.name"
+                            :placeholder="t.webhooks.name_placeholder"
+                        />
+                        <p
+                            v-if="webhookErrors[selectedWebhook.id]?.name"
+                            class="text-sm text-destructive"
+                        >
+                            {{ webhookErrors[selectedWebhook.id].name }}
+                        </p>
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label>{{ t.webhooks.endpoint_url }}</Label>
+                        <textarea
+                            class="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            rows="2"
+                            readonly
+                            :value="selectedWebhook.endpoint_url"
+                        ></textarea>
+                        <p class="text-sm text-muted-foreground">
+                            {{ t.webhooks.token_usage_help }}
+                        </p>
+                        <p class="text-sm text-muted-foreground">
+                            {{ t.webhooks.token_regenerate_hint }}
+                        </p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div
+                            class="flex items-center gap-2 text-sm font-medium"
+                        >
+                            <CheckSquare2 class="size-4 text-muted-foreground" />
+                            {{ t.webhooks.permissions }}
+                        </div>
+
+                        <div
+                            class="grid gap-3 md:grid-cols-2 2xl:grid-cols-3"
+                        >
+                            <label
+                                v-for="permission in availablePermissions"
+                                :key="`${selectedWebhook.id}-${permission.key}`"
+                                class="flex items-start gap-3 rounded-xl border border-border bg-background/70 p-4"
+                            >
+                                <Checkbox
+                                    :checked="
+                                        selectedWebhookDraft.permissions.includes(
+                                            permission.key,
+                                        )
+                                    "
+                                    @update:checked="
+                                        (
+                                            value: boolean | 'indeterminate',
+                                        ) => {
+                                            selectedWebhookDraft.permissions =
+                                                togglePermission(
+                                                    selectedWebhookDraft.permissions,
+                                                    permission.key,
+                                                    value,
+                                                );
+                                        }
+                                    "
+                                />
+                                <div class="min-w-0 space-y-1">
+                                    <div class="text-sm font-medium">
+                                        {{ permission.label }}
+                                    </div>
+                                    <p
+                                        class="break-words text-sm text-muted-foreground"
+                                    >
+                                        {{ permission.description }}
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+                        <p
+                            v-if="
+                                webhookErrors[selectedWebhook.id]?.permissions
+                            "
+                            class="text-sm text-destructive"
+                        >
+                            {{ webhookErrors[selectedWebhook.id].permissions }}
+                        </p>
+                    </div>
+                </div>
+
                 <div class="flex flex-wrap gap-3 border-t border-border pt-5">
                     <Button
                         type="button"
-                        :disabled="savingWebhookId === webhook.id"
-                        @click="saveWebhook(webhook)"
+                        :disabled="savingWebhookId === selectedWebhook.id"
+                        @click="saveWebhook(selectedWebhook)"
                     >
                         {{ t.webhooks.save }}
                     </Button>
@@ -825,7 +952,7 @@ const closeIssuedWebhookDialog = (): void => {
                     <Button
                         type="button"
                         variant="outline"
-                        @click="regenerateWebhook(webhook)"
+                        @click="regenerateWebhook(selectedWebhook)"
                     >
                         <RefreshCcw class="mr-2 size-4" />
                         {{ t.webhooks.regenerate }}
@@ -834,13 +961,293 @@ const closeIssuedWebhookDialog = (): void => {
                     <Button
                         type="button"
                         variant="outline"
-                        @click="deleteWebhook(webhook)"
+                        @click="deleteWebhook(selectedWebhook)"
                     >
                         <Trash2 class="mr-2 size-4" />
                         {{ t.webhooks.delete }}
                     </Button>
                 </div>
-            </article>
-        </section>
+                </article>
+            </section>
+
+            <section
+                :id="createSectionId"
+                class="scroll-mt-24 space-y-4 rounded-2xl border border-border bg-card p-5"
+            >
+                <Heading
+                    variant="small"
+                    :title="t.webhooks.create_title"
+                    :description="t.webhooks.create_description"
+                />
+
+                <form class="space-y-5" @submit.prevent="submitCreate">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <div class="grid gap-2">
+                            <Label for="webhook-name">{{
+                                t.webhooks.name
+                            }}</Label>
+                            <Input
+                                id="webhook-name"
+                                v-model="createForm.name"
+                                :placeholder="t.webhooks.name_placeholder"
+                            />
+                            <InputError :message="createForm.errors.name" />
+                        </div>
+
+                        <div class="grid gap-2">
+                            <Label>{{ t.webhooks.status }}</Label>
+                            <label class="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                    :checked="createForm.is_active"
+                                    @update:checked="
+                                        (value: boolean | 'indeterminate') =>
+                                            (createForm.is_active =
+                                                value === true)
+                                    "
+                                />
+                                <span>{{ t.webhooks.active }}</span>
+                            </label>
+                            <InputError
+                                :message="createForm.errors.is_active"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2 text-sm font-medium">
+                            <CheckSquare2 class="size-4 text-muted-foreground" />
+                            {{ t.webhooks.permissions }}
+                        </div>
+                        <p class="text-sm text-muted-foreground">
+                            {{ t.webhooks.permissions_description }}
+                        </p>
+
+                        <div class="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                            <label
+                                v-for="permission in availablePermissions"
+                                :key="`create-${permission.key}`"
+                                class="flex items-start gap-3 rounded-xl border border-border bg-background/70 p-4"
+                            >
+                                <Checkbox
+                                    :checked="
+                                        createForm.permissions.includes(
+                                            permission.key,
+                                        )
+                                    "
+                                    @update:checked="
+                                        (value: boolean | 'indeterminate') =>
+                                            (createForm.permissions =
+                                                togglePermission(
+                                                    createForm.permissions,
+                                                    permission.key,
+                                                    value,
+                                                ))
+                                    "
+                                />
+                                <div class="min-w-0 space-y-1">
+                                    <div class="text-sm font-medium">
+                                        {{ permission.label }}
+                                    </div>
+                                    <p
+                                        class="break-words text-sm text-muted-foreground"
+                                    >
+                                        {{ permission.description }}
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+                        <InputError :message="createForm.errors.permissions" />
+                    </div>
+
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <div
+                            class="space-y-3 rounded-xl border border-border bg-background/70 p-4"
+                        >
+                            <label
+                                class="flex items-center gap-2 text-sm font-medium"
+                            >
+                                <Checkbox
+                                    :checked="createForm.never_expires"
+                                    @update:checked="
+                                        (
+                                            value:
+                                                boolean | 'indeterminate',
+                                        ) => {
+                                            createForm.never_expires =
+                                                value === true;
+                                            if (createForm.never_expires) {
+                                                createForm.expires_at = '';
+                                            }
+                                        }
+                                    "
+                                />
+                                <span>{{ t.webhooks.never_expires }}</span>
+                            </label>
+
+                            <div
+                                v-if="!createForm.never_expires"
+                                class="grid gap-2"
+                            >
+                                <Label for="create-expires-at">{{
+                                    t.webhooks.expires_at
+                                }}</Label>
+                                <Input
+                                    id="create-expires-at"
+                                    v-model="createForm.expires_at"
+                                    type="datetime-local"
+                                />
+                                <InputError
+                                    :message="createForm.errors.expires_at"
+                                />
+                            </div>
+
+                            <p class="text-sm text-muted-foreground">
+                                {{ t.webhooks.expires_at_help }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <Button type="submit" :disabled="createForm.processing">
+                        {{ t.webhooks.create }}
+                    </Button>
+                </form>
+            </section>
+
+            <section
+                :id="documentationSectionId"
+                class="scroll-mt-24 space-y-5 rounded-2xl border border-border bg-card p-5"
+            >
+                <Heading
+                    variant="small"
+                    :title="t.webhooks.documentation_title"
+                    :description="t.webhooks.documentation_description"
+                />
+
+                <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-2 text-base font-medium">
+                            <BookText class="size-5" />
+                            {{ t.webhooks.documentation_overview_title }}
+                        </div>
+
+                        <p class="text-sm text-muted-foreground">
+                            {{ t.webhooks.documentation_overview_description }}
+                        </p>
+
+                        <div class="grid gap-2">
+                            <Label>{{
+                                t.webhooks.documentation_base_url
+                            }}</Label>
+                            <Input
+                                :model-value="props.documentation.base_url"
+                                readonly
+                            />
+                        </div>
+
+                        <div
+                            class="rounded-xl border border-border bg-background/70 p-4"
+                        >
+                            <div class="text-sm font-medium">
+                                {{ t.webhooks.documentation_auth_title }}
+                            </div>
+                            <p class="mt-2 text-sm text-muted-foreground">
+                                {{
+                                    t.webhooks.documentation_auth_description
+                                }}
+                            </p>
+
+                            <div class="mt-4 space-y-3">
+                                <div
+                                    v-for="example in authenticationExamples"
+                                    :key="example.label"
+                                    class="grid gap-2"
+                                >
+                                    <Label>{{ example.label }}</Label>
+                                    <textarea
+                                        class="min-h-16 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                        rows="2"
+                                        readonly
+                                        :value="example.value"
+                                    ></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="space-y-3 rounded-2xl border border-border bg-background/70 p-4"
+                    >
+                        <div class="text-sm font-medium">
+                            {{ t.webhooks.documentation_notes_title }}
+                        </div>
+
+                        <div
+                            class="flex items-start gap-2 text-sm text-muted-foreground"
+                        >
+                            <ChevronRight class="mt-0.5 size-4 shrink-0" />
+                            <span>{{
+                                t.webhooks.documentation_note_token
+                            }}</span>
+                        </div>
+
+                        <div
+                            class="flex items-start gap-2 text-sm text-muted-foreground"
+                        >
+                            <ChevronRight class="mt-0.5 size-4 shrink-0" />
+                            <span>{{
+                                t.webhooks.documentation_note_base
+                            }}</span>
+                        </div>
+
+                        <div
+                            class="flex items-start gap-2 text-sm text-muted-foreground"
+                        >
+                            <ChevronRight class="mt-0.5 size-4 shrink-0" />
+                            <span>{{
+                                t.webhooks.documentation_note_permissions
+                            }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="text-base font-medium">
+                        {{ t.webhooks.documentation_endpoints_title }}
+                    </div>
+
+                    <article
+                        v-for="endpoint in endpointExamples"
+                        :key="endpoint.path"
+                        class="space-y-3 rounded-2xl border border-border bg-background/70 p-4"
+                    >
+                        <div class="flex flex-wrap items-center gap-2 text-sm">
+                            <span
+                                class="rounded-full bg-emerald-100 px-2.5 py-1 font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                            >
+                                {{ endpoint.method }}
+                            </span>
+                            <span class="font-mono text-xs break-all">
+                                {{ endpoint.path }}
+                            </span>
+                        </div>
+
+                        <div class="space-y-1">
+                            <div class="font-medium">{{ endpoint.title }}</div>
+                            <p class="text-sm text-muted-foreground">
+                                {{ endpoint.description }}
+                            </p>
+                        </div>
+
+                        <p class="text-sm text-muted-foreground">
+                            {{ t.webhooks.documentation_permission_label }}:
+                            <span class="font-mono">{{
+                                endpoint.permission
+                            }}</span>
+                        </p>
+                    </article>
+                </div>
+            </section>
+            </div>
+        </div>
     </div>
 </template>

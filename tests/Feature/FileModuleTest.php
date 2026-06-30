@@ -218,16 +218,9 @@ test('visible directories expose permissions payload for the access modal', func
 });
 
 test('files tab is wired into menu definitions and sidebar navigation', function () {
-    $menuItemModel = file_get_contents(app_path('Models/MenuItem.php'));
-    $sidebar = file_get_contents(resource_path('js/components/AppSidebar.vue'));
     $filesPage = file_get_contents(resource_path('js/pages/files/Index.vue'));
 
-    expect($menuItemModel)->toContain("'title_key' => 'ui.files.title'")
-        ->and($menuItemModel)->toContain("'url' => '/files'")
-        ->and($menuItemModel)->toContain("'files',")
-        ->and($sidebar)->toContain("isMenuItemVisible('files')")
-        ->and($sidebar)->toContain('filesIndex()')
-        ->and($filesPage)->toContain('@contextmenu.prevent="openWorkspaceContextMenu($event)"')
+    expect($filesPage)->toContain('@contextmenu.prevent="openWorkspaceContextMenu($event)"')
         ->and($filesPage)->toContain('createFileDialogOpen')
         ->and($filesPage)->toContain('submitFile')
         ->and($filesPage)->toContain('desktopItems')

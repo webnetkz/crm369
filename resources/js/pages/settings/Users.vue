@@ -7,14 +7,10 @@ import {
     usePage,
 } from '@inertiajs/vue3';
 import {
-    BadgeCheck,
     Ban,
     CircleCheck,
-    CircleX,
     KeyRound,
     LogIn,
-    Mail,
-    Phone,
     RefreshCw,
     RotateCcw,
     Search,
@@ -28,7 +24,6 @@ import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import PaginationControls from '@/components/PaginationControls.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -40,14 +35,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet';
-import { useInitials } from '@/composables/useInitials';
+import UserProfileSheet from '@/components/UserProfileSheet.vue';
 import { useLanguage } from '@/composables/useLanguage';
 import { usePasswordGenerator } from '@/composables/usePasswordGenerator';
 import { index, store } from '@/routes/settings/users';
@@ -56,29 +44,15 @@ import { update as updateUserGroup } from '@/routes/settings/users/group';
 import { store as startUserImpersonation } from '@/routes/settings/users/impersonation';
 import { reset as resetUserPassword } from '@/routes/settings/users/password';
 import { update as updateUserProfile } from '@/routes/settings/users/profile';
-import type { PaginatedCollection } from '@/types/ui';
+import type {
+    ManagedProfileSaveState,
+    ManagedUserProfile,
+    PaginatedCollection,
+    UserGroupOption,
+} from '@/types/ui';
 
-type UserGroupOption = {
-    id: number;
-    name: string;
-    display_name: string;
-};
-
-type UserRow = {
-    id: number;
-    name: string;
-    last_name: string | null;
-    email: string;
-    phone: string | null;
-    email_verified_at: string | null;
-    avatar: string | null;
-    avatar_scale: number;
-    created_at: string | null;
-    is_super_admin: boolean;
-    is_active: boolean;
+type UserRow = ManagedUserProfile & {
     can_be_impersonated: boolean;
-    deactivated_at: string | null;
-    group: UserGroupOption | null;
 };
 
 type ManagedProfilePayload = {
@@ -111,8 +85,7 @@ const props = defineProps<{
 }>();
 
 const page = usePage();
-const { getInitials } = useInitials();
-const { language, t } = useLanguage();
+const { t } = useLanguage();
 const { copy: copyToClipboard } = useClipboard();
 const { generatePassword } = usePasswordGenerator();
 const createUserDialogOpen = ref(false);
@@ -125,9 +98,7 @@ const showAdvancedFilters = ref(
         props.filters.registered_to !== '',
 );
 const managedProfileSnapshot = ref<ManagedProfilePayload | null>(null);
-const managedProfileSaveState = ref<'idle' | 'saving' | 'saved' | 'error'>(
-    'idle',
-);
+const managedProfileSaveState = ref<ManagedProfileSaveState>('idle');
 const isSyncingManagedProfile = ref(false);
 const isSyncingFilters = ref(false);
 const defaultKazakhstanPhonePrefix = '+7';
@@ -330,11 +301,6 @@ const canEditProfile = (user: UserRow | null): boolean => {
     return !user.is_super_admin || page.props.auth.isSuperAdmin;
 };
 
-const selectedProfileAvatarStyle = computed(() => ({
-    objectPosition: 'center',
-    transform: `scale(${selectedProfileUser.value?.avatar_scale ?? 1})`,
-}));
-
 const formatKazakhstanPhone = (value: string | null | undefined): string => {
     const digits = (value ?? '').replace(/\D/g, '');
 
@@ -518,20 +484,6 @@ const submitManagedProfileUpdate = (): void => {
             }
         },
     });
-};
-
-const formatDateTime = (value: string | null): string => {
-    if (!value) {
-        return t.value.common.not_specified;
-    }
-
-    return new Intl.DateTimeFormat(
-        language.value === 'ru' ? 'ru-RU' : 'en-US',
-        {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-        },
-    ).format(new Date(value));
 };
 
 watch(
@@ -781,10 +733,7 @@ onBeforeUnmount(() => {
             :open="createUserDialogOpen"
             @update:open="(isOpen) => !isOpen && closeCreateUserDialog()"
         >
-            <DialogContent
-                v-if="can.manage_accounts"
-                class="sm:max-w-2xl"
-            >
+            <DialogContent v-if="can.manage_accounts" class="sm:max-w-2xl">
                 <DialogHeader>
                     <div
                         class="mb-2 flex size-12 items-center justify-center rounded-2xl border border-border bg-muted"
@@ -800,7 +749,9 @@ onBeforeUnmount(() => {
                 <form class="space-y-4" @submit.prevent="submitCreateUser">
                     <div class="grid gap-4 md:grid-cols-2">
                         <div class="grid gap-2">
-                            <Label for="new_user_name">{{ t.common.name }}</Label>
+                            <Label for="new_user_name">{{
+                                t.common.name
+                            }}</Label>
                             <Input
                                 id="new_user_name"
                                 v-model="createUserForm.name"
@@ -811,7 +762,9 @@ onBeforeUnmount(() => {
                         </div>
 
                         <div class="grid gap-2">
-                            <Label for="new_user_email">{{ t.common.email }}</Label>
+                            <Label for="new_user_email">{{
+                                t.common.email
+                            }}</Label>
                             <Input
                                 id="new_user_email"
                                 v-model="createUserForm.email"
@@ -819,7 +772,9 @@ onBeforeUnmount(() => {
                                 placeholder="email@example.com"
                                 autocomplete="off"
                             />
-                            <InputError :message="createUserForm.errors.email" />
+                            <InputError
+                                :message="createUserForm.errors.email"
+                            />
                         </div>
 
                         <div class="grid gap-2">
@@ -831,7 +786,9 @@ onBeforeUnmount(() => {
                                 v-model="createUserForm.password"
                                 autocomplete="new-password"
                             />
-                            <InputError :message="createUserForm.errors.password" />
+                            <InputError
+                                :message="createUserForm.errors.password"
+                            />
                         </div>
 
                         <div class="grid gap-2">
@@ -844,7 +801,9 @@ onBeforeUnmount(() => {
                                 autocomplete="new-password"
                             />
                             <InputError
-                                :message="createUserForm.errors.password_confirmation"
+                                :message="
+                                    createUserForm.errors.password_confirmation
+                                "
                             />
                         </div>
 
@@ -869,7 +828,9 @@ onBeforeUnmount(() => {
                         />
                         {{ t.admin.mark_email_verified }}
                     </label>
-                    <InputError :message="createUserForm.errors.email_verified" />
+                    <InputError
+                        :message="createUserForm.errors.email_verified"
+                    />
 
                     <DialogFooter class="pt-2">
                         <Button
@@ -1260,10 +1221,7 @@ onBeforeUnmount(() => {
             :open="selectedPasswordUser !== null"
             @update:open="(isOpen) => !isOpen && closePasswordReset()"
         >
-            <DialogContent
-                :show-close-button="false"
-                class="sm:max-w-md"
-            >
+            <DialogContent :show-close-button="false" class="sm:max-w-md">
                 <DialogHeader>
                     <div
                         class="mb-2 flex size-12 items-center justify-center rounded-2xl border border-border bg-muted"
@@ -1289,7 +1247,9 @@ onBeforeUnmount(() => {
                                 type="password"
                                 autocomplete="new-password"
                             />
-                            <InputError :message="passwordForm.errors.password" />
+                            <InputError
+                                :message="passwordForm.errors.password"
+                            />
                         </div>
 
                         <div class="grid gap-2">
@@ -1303,7 +1263,9 @@ onBeforeUnmount(() => {
                                 autocomplete="new-password"
                             />
                             <InputError
-                                :message="passwordForm.errors.password_confirmation"
+                                :message="
+                                    passwordForm.errors.password_confirmation
+                                "
                             />
                         </div>
                     </div>
@@ -1327,243 +1289,13 @@ onBeforeUnmount(() => {
             </DialogContent>
         </Dialog>
 
-        <Sheet
+        <UserProfileSheet
             :open="selectedProfileUser !== null"
+            :user="selectedProfileUser"
+            :can-edit="canEditProfile(selectedProfileUser)"
+            :save-state="managedProfileSaveState"
+            v-model:form="managedProfileForm"
             @update:open="(isOpen) => !isOpen && closeProfile()"
-        >
-            <SheetContent class="w-full sm:max-w-md md:max-w-lg">
-                <SheetHeader class="border-b border-border px-6 py-6 text-left">
-                    <div class="flex items-start gap-4 pr-8">
-                        <Avatar
-                            class="size-18 overflow-hidden rounded-3xl border border-border shadow-sm"
-                        >
-                            <AvatarImage
-                                v-if="selectedProfileUser?.avatar"
-                                :src="selectedProfileUser.avatar"
-                                :alt="selectedProfileUser.name"
-                                :style="selectedProfileAvatarStyle"
-                            />
-                            <AvatarFallback
-                                class="bg-muted text-lg font-semibold text-foreground"
-                            >
-                                {{
-                                    selectedProfileUser
-                                        ? getInitials(selectedProfileUser.name)
-                                        : ''
-                                }}
-                            </AvatarFallback>
-                        </Avatar>
-
-                        <div class="min-w-0 space-y-3">
-                            <div>
-                                <SheetTitle class="truncate pr-2">
-                                    {{ selectedProfileUser?.name }}
-                                </SheetTitle>
-                                <SheetDescription>
-                                    {{ t.admin.profile_description }}
-                                </SheetDescription>
-                            </div>
-
-                            <div class="flex flex-wrap gap-2">
-                                <span
-                                    v-if="selectedProfileUser?.is_super_admin"
-                                    class="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
-                                >
-                                    {{ t.admin.super_admin }}
-                                </span>
-                                <span
-                                    v-if="selectedProfileUser"
-                                    class="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
-                                >
-                                    {{
-                                        selectedProfileUser.group
-                                            ?.display_name ??
-                                        t.admin.simple_user
-                                    }}
-                                </span>
-                                <span
-                                    v-if="selectedProfileUser"
-                                    class="rounded-full px-2.5 py-1 text-xs"
-                                    :class="
-                                        selectedProfileUser.is_active
-                                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                                            : 'bg-destructive/10 text-destructive'
-                                    "
-                                >
-                                    {{
-                                        selectedProfileUser.is_active
-                                            ? t.admin.active
-                                            : t.admin.inactive
-                                    }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </SheetHeader>
-
-                <div class="flex-1 space-y-6 overflow-y-auto px-6 py-6">
-                    <div
-                        v-if="canEditProfile(selectedProfileUser)"
-                        class="flex items-center justify-end text-xs text-muted-foreground"
-                    >
-                        <span v-if="managedProfileSaveState === 'saving'">
-                            {{ t.admin.profile_autosave_saving }}
-                        </span>
-                        <span
-                            v-else-if="managedProfileSaveState === 'saved'"
-                            class="text-emerald-600 dark:text-emerald-400"
-                        >
-                            {{ t.admin.profile_autosave_saved }}
-                        </span>
-                    </div>
-
-                    <div class="grid gap-3">
-                        <div class="rounded-2xl border border-border bg-card p-4">
-                            <div
-                                class="mb-1 flex items-center gap-2 text-sm text-muted-foreground"
-                            >
-                                <Mail class="size-4" />
-                                {{ t.common.email }}
-                            </div>
-                            <template v-if="canEditProfile(selectedProfileUser)">
-                                <Input
-                                    v-model="managedProfileForm.email"
-                                    type="email"
-                                    class="mt-2"
-                                    autocomplete="off"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="managedProfileForm.errors.email"
-                                />
-                            </template>
-                            <div v-else class="break-all font-medium">
-                                {{ selectedProfileUser?.email }}
-                            </div>
-                        </div>
-
-                        <div class="rounded-2xl border border-border bg-card p-4">
-                            <div
-                                class="mb-1 flex items-center gap-2 text-sm text-muted-foreground"
-                            >
-                                <Phone class="size-4" />
-                                {{ t.common.phone }}
-                            </div>
-                            <template v-if="canEditProfile(selectedProfileUser)">
-                                <Input
-                                    v-model="managedProfileForm.phone"
-                                    type="tel"
-                                    class="mt-2"
-                                    inputmode="tel"
-                                    autocomplete="off"
-                                    :placeholder="t.profile.phone_placeholder"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="managedProfileForm.errors.phone"
-                                />
-                            </template>
-                            <div v-else class="font-medium">
-                                {{
-                                    selectedProfileUser?.phone ??
-                                    t.common.not_specified
-                                }}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <div class="rounded-2xl border border-border bg-card p-4">
-                            <div class="text-sm text-muted-foreground">
-                                {{ t.common.name }}
-                            </div>
-                            <template v-if="canEditProfile(selectedProfileUser)">
-                                <Input
-                                    v-model="managedProfileForm.name"
-                                    class="mt-2"
-                                    autocomplete="off"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="managedProfileForm.errors.name"
-                                />
-                            </template>
-                            <div v-else class="mt-1 font-medium">
-                                {{ selectedProfileUser?.name }}
-                            </div>
-                        </div>
-
-                        <div class="rounded-2xl border border-border bg-card p-4">
-                            <div class="text-sm text-muted-foreground">
-                                {{ t.common.last_name }}
-                            </div>
-                            <template v-if="canEditProfile(selectedProfileUser)">
-                                <Input
-                                    v-model="managedProfileForm.last_name"
-                                    class="mt-2"
-                                    autocomplete="off"
-                                />
-                                <InputError
-                                    class="mt-2"
-                                    :message="managedProfileForm.errors.last_name"
-                                />
-                            </template>
-                            <div v-else class="mt-1 font-medium">
-                                {{
-                                    selectedProfileUser?.last_name ??
-                                    t.common.not_specified
-                                }}
-                            </div>
-                        </div>
-
-                        <div class="rounded-2xl border border-border bg-card p-4">
-                            <div class="text-sm text-muted-foreground">
-                                {{ t.admin.group }}
-                            </div>
-                            <div class="mt-1 font-medium">
-                                {{
-                                    selectedProfileUser?.group?.display_name ??
-                                    t.admin.simple_user
-                                }}
-                            </div>
-                        </div>
-
-                        <div class="rounded-2xl border border-border bg-card p-4">
-                            <div class="text-sm text-muted-foreground">
-                                {{ t.admin.email_verified }}
-                            </div>
-                            <div class="mt-1 flex items-center gap-2 font-medium">
-                                <BadgeCheck
-                                    v-if="selectedProfileUser?.email_verified_at"
-                                    class="size-4 text-emerald-600 dark:text-emerald-400"
-                                />
-                                <CircleX
-                                    v-else
-                                    class="size-4 text-destructive"
-                                />
-                                {{
-                                    selectedProfileUser?.email_verified_at
-                                        ? t.admin.verified
-                                        : t.admin.not_verified
-                                }}
-                            </div>
-                        </div>
-
-                        <div class="rounded-2xl border border-border bg-card p-4 sm:col-span-2">
-                            <div class="text-sm text-muted-foreground">
-                                {{ t.admin.created_at }}
-                            </div>
-                            <div class="mt-1 font-medium">
-                                {{
-                                    formatDateTime(
-                                        selectedProfileUser?.created_at ?? null,
-                                    )
-                                }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </SheetContent>
-        </Sheet>
+        />
     </div>
 </template>

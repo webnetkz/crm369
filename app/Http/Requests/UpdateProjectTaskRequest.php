@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Project;
 use App\Models\ProjectTask;
+use App\Models\ProjectTaskStage;
 use App\Support\ApiRequestContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -63,7 +64,7 @@ class UpdateProjectTaskRequest extends FormRequest
             'parent_task_id' => ['nullable', 'integer', 'exists:project_tasks,id'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
-            'status' => ['required', 'string', Rule::in(ProjectTask::availableStatuses())],
+            'status' => ['required', 'string', Rule::in(ProjectTaskStage::availableSlugs())],
             'importance' => ['required', 'string', Rule::in(ProjectTask::availableImportances())],
             'complexity' => ['required', 'integer', 'between:1,10'],
             'due_at' => ['nullable', 'date'],

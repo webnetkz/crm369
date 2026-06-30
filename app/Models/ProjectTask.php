@@ -37,13 +37,19 @@ use Illuminate\Support\Carbon;
 class ProjectTask extends Model
 {
     public const string STATUS_TODO = 'todo';
+
     public const string STATUS_IN_PROGRESS = 'in_progress';
+
     public const string STATUS_REVIEW = 'review';
+
     public const string STATUS_DONE = 'done';
 
     public const string IMPORTANCE_LOW = 'low';
+
     public const string IMPORTANCE_NORMAL = 'normal';
+
     public const string IMPORTANCE_HIGH = 'high';
+
     public const string IMPORTANCE_CRITICAL = 'critical';
 
     /** @use HasFactory<ProjectTaskFactory> */
@@ -99,11 +105,16 @@ class ProjectTask extends Model
      */
     public function scopeDueSoonReminderPending(Builder $query, CarbonInterface $from, CarbonInterface $to): Builder
     {
+        $completedStatuses = ProjectTaskStage::completedSlugs();
+
         return $query
             ->whereNull('due_reminder_sent_at')
             ->whereNotNull('due_at')
             ->whereNotNull('assignee_user_id')
-            ->where('status', '!=', self::STATUS_DONE)
+            ->when(
+                $completedStatuses !== [],
+                fn (Builder $taskQuery): Builder => $taskQuery->whereNotIn('status', $completedStatuses),
+            )
             ->whereBetween('due_at', [$from, $to])
             ->whereHas('assignee', fn (Builder $assigneeQuery): Builder => $assigneeQuery->where('is_active', true));
     }
@@ -113,12 +124,7 @@ class ProjectTask extends Model
      */
     public static function availableStatuses(): array
     {
-        return [
-            self::STATUS_TODO,
-            self::STATUS_IN_PROGRESS,
-            self::STATUS_REVIEW,
-            self::STATUS_DONE,
-        ];
+        return ProjectTaskStage::availableSlugs();
     }
 
     /**
@@ -172,7 +178,6 @@ class ProjectTask extends Model
     public function subtasks(): HasMany
     {
         return $this->hasMany(self::class, 'parent_task_id')
-            ->orderBy('status')
             ->orderBy('sort_order')
             ->orderBy('due_at')
             ->orderByDesc('created_at');

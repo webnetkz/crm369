@@ -56,6 +56,8 @@ class PortalFormController extends Controller
                 'submission_mode' => (string) $request->validated('submission_mode'),
                 'public_token' => $this->newPublicToken(),
                 'is_active' => $request->boolean('is_active'),
+                'style_settings' => $request->styleSettings(),
+                'completion_settings' => $request->completionSettings(),
             ]);
 
             $submissionManager->syncFields($form, $request->fieldRows());
@@ -82,6 +84,8 @@ class PortalFormController extends Controller
                 'description' => $request->validated('description'),
                 'submission_mode' => (string) $request->validated('submission_mode'),
                 'is_active' => $request->boolean('is_active'),
+                'style_settings' => $request->styleSettings(),
+                'completion_settings' => $request->completionSettings(),
             ]);
 
             $submissionManager->syncFields($visibleForm, $request->fieldRows());

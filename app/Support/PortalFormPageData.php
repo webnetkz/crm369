@@ -42,6 +42,22 @@ class PortalFormPageData
                 ])
                 ->values()
                 ->all(),
+            'formStyleDefaults' => PortalForm::defaultStyleSettings(),
+            'formWidthOptions' => collect(PortalForm::availableContainerWidths())
+                ->map(fn (string $width): array => [
+                    'value' => $width,
+                    'label' => __('ui.forms.style_width_'.$width),
+                ])
+                ->values()
+                ->all(),
+            'formCompletionDefaults' => PortalForm::defaultCompletionSettings(),
+            'formCompletionActionOptions' => collect(PortalForm::availableCompletionActions())
+                ->map(fn (string $action): array => [
+                    'value' => $action,
+                    'label' => __('ui.forms.completion_action_'.$action),
+                ])
+                ->values()
+                ->all(),
             'can' => [
                 'create' => true,
                 'manageActive' => $activeForm
@@ -66,6 +82,8 @@ class PortalFormPageData
             'target_user_name' => $form->targetUser ? $this->displayName($form->targetUser) : null,
             'fields_count' => $form->fields_count ?? $form->fields->count(),
             'submissions_count' => $form->submissions_count ?? $form->submissions->count(),
+            'style_settings' => PortalForm::normalizeStyleSettings($form->style_settings),
+            'completion_settings' => PortalForm::normalizeCompletionSettings($form->completion_settings),
             'last_submission_at' => is_string($form->submissions_max_created_at)
                 ? Carbon::parse($form->submissions_max_created_at)->toISOString()
                 : null,
@@ -84,6 +102,8 @@ class PortalFormPageData
             'submission_mode' => $form->submission_mode,
             'is_active' => $form->is_active,
             'public_url' => route('forms.public.show', ['portalForm' => $form->public_token]),
+            'style_settings' => PortalForm::normalizeStyleSettings($form->style_settings),
+            'completion_settings' => PortalForm::normalizeCompletionSettings($form->completion_settings),
             'target_user' => $form->targetUser ? [
                 'id' => $form->targetUser->id,
                 'name' => $this->displayName($form->targetUser),

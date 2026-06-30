@@ -13,8 +13,10 @@ use App\Models\PortalSetting;
 use App\Models\User;
 use App\Models\UserGroup;
 use App\Notifications\SystemNotification;
+use App\Support\ManagedUserProfileData;
 use App\Support\PaginationData;
 use App\Support\PerPageOptions;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Lang;
@@ -23,7 +25,7 @@ use Inertia\Response;
 
 class UserController extends Controller
 {
-    public function index(FilterUsersIndexRequest $request): Response
+    public function index(FilterUsersIndexRequest $request, ManagedUserProfileData $managedUserProfileData): Response
     {
         $viewer = $request->user();
         $canManageUsers = $viewer?->can('manage-users') ?? false;
@@ -68,26 +70,8 @@ class UserController extends Controller
             ->paginate($filters['per_page'])
             ->withQueryString()
             ->through(fn (User $user): array => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'last_name' => $user->last_name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'email_verified_at' => $user->email_verified_at?->toISOString(),
-                'avatar' => $user->avatar,
-                'avatar_scale' => $user->avatar_scale,
-                'created_at' => $user->created_at?->toISOString(),
-                'is_super_admin' => $user->isSuperAdmin(),
-                'is_active' => $user->is_active,
+                ...$managedUserProfileData->serialize($user),
                 'can_be_impersonated' => $user->canBeImpersonatedBy($viewer),
-                'deactivated_at' => $user->deactivated_at?->toISOString(),
-                'group' => $user->group
-                    ? [
-                        'id' => $user->group->id,
-                        'name' => $user->group->name,
-                        'display_name' => $user->group->displayName(),
-                    ]
-                    : null,
             ]);
 
         return Inertia::render('settings/Users', [
@@ -112,6 +96,14 @@ class UserController extends Controller
                     ->values()
                 : [],
             'perPageOptions' => PerPageOptions::allowed(),
+        ]);
+    }
+
+    public function show(User $user, ManagedUserProfileData $managedUserProfileData): JsonResponse
+    {
+        return response()->json([
+            'data' => $managedUserProfileData->serialize($user->load('group:id,name')),
+            'canEdit' => $managedUserProfileData->canEdit(request()->user(), $user),
         ]);
     }
 

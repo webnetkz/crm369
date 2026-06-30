@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage, usePoll } from '@inertiajs/vue3';
 import { Bell, Check, CheckCheck, ExternalLink } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { update, updateAll } from '@/actions/App/Http/Controllers/NotificationController';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,9 +19,39 @@ import type { NotificationCenter, PortalNotificationItem } from '@/types/ui';
 const page = usePage();
 const { language, t } = useLanguage();
 const optimisticallyReadNotificationIds = ref<Set<string>>(new Set());
+const isNotificationsPage = computed(() => page.component === 'notifications/Index');
 
 const notifications = computed(
     () => page.props.notifications as NotificationCenter,
+);
+
+const { start, stop } = usePoll(
+    10000,
+    {
+        only: ['notifications'],
+        preserveScroll: true,
+        preserveState: true,
+    },
+    {
+        autoStart: false,
+        mode: 'rest',
+    },
+);
+
+watch(
+    isNotificationsPage,
+    (value) => {
+        if (value) {
+            stop();
+
+            return;
+        }
+
+        start();
+    },
+    {
+        immediate: true,
+    },
 );
 
 const unreadBadge = computed(() => {

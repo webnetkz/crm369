@@ -11,6 +11,10 @@ use Illuminate\Support\Arr;
 
 class ChatSidebarData
 {
+    public function __construct(
+        private readonly ChatMessageData $chatMessageData,
+    ) {}
+
     /**
      * @return array{unreadCount: int, conversations: array<int, array<string, mixed>>, contacts: array<int, array<string, mixed>>, activeConversation: array<string, mixed>|null}
      */
@@ -19,8 +23,8 @@ class ChatSidebarData
         $conversations = $this->conversationCollection($user, $search);
         $unreadCounts = $this->unreadCounts($user);
         $resolvedActiveConversation = $activeConversation?->fresh([
-            'participants.user:id,name,last_name,email,avatar_path,avatar_scale,user_group_id',
-            'messages.user:id,name,last_name,email,avatar_path,avatar_scale,user_group_id',
+            'participants.user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
+            'messages.user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
         ]) ?? $activeConversation;
 
         return [
@@ -63,8 +67,9 @@ class ChatSidebarData
             ->where('type', ChatConversation::TYPE_DIRECT)
             ->whereHas('participants', fn ($query) => $query->where('user_id', $user->id))
             ->with([
-                'participants.user:id,name,last_name,email,avatar_path,avatar_scale,user_group_id',
-                'latestMessage.user:id,name,last_name,email,avatar_path,avatar_scale,user_group_id',
+                'participants.user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
+                'latestMessage.user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
+                'latestMessage.attachments',
             ])
             ->when($search !== '', function ($query) use ($search, $user): void {
                 $query->where(function ($conversationQuery) use ($search, $user): void {
@@ -133,7 +138,7 @@ class ChatSidebarData
             'subtitle' => $conversation->type === ChatConversation::TYPE_DIRECT
                 ? $otherParticipant?->email
                 : null,
-            'excerpt' => $latestMessage?->body,
+            'excerpt' => $this->chatMessageData->excerpt($latestMessage),
             'lastMessageAt' => $conversation->last_message_at?->toISOString(),
             'unreadCount' => Arr::get($unreadCounts, $conversation->id, 0),
             'participant' => $otherParticipant ? $this->serializeUserSummary($otherParticipant) : null,
@@ -146,7 +151,7 @@ class ChatSidebarData
     private function contactRows(User $user, string $search): array
     {
         return User::query()
-            ->select(['id', 'name', 'last_name', 'email', 'avatar_path', 'avatar_scale', 'is_active'])
+            ->select(['id', 'name', 'last_name', 'email', 'phone', 'avatar_path', 'avatar_scale', 'is_active'])
             ->where('id', '!=', $user->id)
             ->where('is_active', true)
             ->when($search !== '', function ($query) use ($search): void {
@@ -172,19 +177,16 @@ class ChatSidebarData
     {
         $otherParticipant = $this->otherParticipant($conversation, $user);
         $messages = $conversation->messages()
-            ->with('user:id,name,last_name,email,avatar_path,avatar_scale,user_group_id')
+            ->with([
+                'user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
+                'attachments',
+            ])
             ->latest('id')
             ->limit(50)
             ->get()
             ->reverse()
             ->values()
-            ->map(fn (ChatMessage $message): array => [
-                'id' => $message->id,
-                'body' => $message->body,
-                'createdAt' => $message->created_at?->toISOString(),
-                'isOwn' => $message->user_id === $user->id,
-                'user' => $this->serializeUserSummary($message->user),
-            ])
+            ->map(fn (ChatMessage $message): array => $this->chatMessageData->serialize($message, $user))
             ->all();
 
         return [
@@ -213,7 +215,7 @@ class ChatSidebarData
     }
 
     /**
-     * @return array{id: int, name: string, email: string, avatar: string|null, avatarScale: float}
+     * @return array{id: int, name: string, email: string, phone: string|null, avatar: string|null, avatarScale: float}
      */
     private function serializeUserSummary(User $user): array
     {
@@ -221,6 +223,7 @@ class ChatSidebarData
             'id' => $user->id,
             'name' => $this->displayName($user),
             'email' => $user->email,
+            'phone' => $user->phone,
             'avatar' => $user->avatar,
             'avatarScale' => $user->avatar_scale,
         ];

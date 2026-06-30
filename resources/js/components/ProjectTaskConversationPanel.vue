@@ -1,16 +1,14 @@
 <script setup lang="ts">
 import {
-    LoaderCircle,
     MessageSquareMore,
-    SendHorizontal,
     Users,
 } from '@lucide/vue';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { store as storeMessage } from '@/actions/App/Http/Controllers/ChatMessageController';
 import { show as showTaskConversation } from '@/actions/App/Http/Controllers/ProjectTaskConversationController';
-import ChatEmojiPicker from '@/components/ChatEmojiPicker.vue';
+import ChatMessageAttachments from '@/components/ChatMessageAttachments.vue';
+import ChatMessageComposer from '@/components/ChatMessageComposer.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { useInitials } from '@/composables/useInitials';
 import { useLanguage } from '@/composables/useLanguage';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
@@ -32,7 +30,7 @@ const loading = ref(false);
 const sending = ref(false);
 const loadError = ref<string | null>(null);
 const draft = ref('');
-const draftTextarea = ref<HTMLTextAreaElement | null>(null);
+const selectedAttachments = ref<File[]>([]);
 const messagesContainer = ref<HTMLElement | null>(null);
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -85,22 +83,6 @@ const scrollMessagesToBottom = async (): Promise<void> => {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
 };
 
-const insertEmoji = async (emoji: string): Promise<void> => {
-    const textarea = draftTextarea.value;
-    const selectionStart = textarea?.selectionStart ?? draft.value.length;
-    const selectionEnd = textarea?.selectionEnd ?? draft.value.length;
-
-    draft.value = `${draft.value.slice(0, selectionStart)}${emoji}${draft.value.slice(selectionEnd)}`;
-
-    await nextTick();
-
-    textarea?.focus();
-
-    const nextSelection = selectionStart + emoji.length;
-
-    textarea?.setSelectionRange(nextSelection, nextSelection);
-};
-
 const loadConversation = async (): Promise<void> => {
     if (!props.active) {
         return;
@@ -127,7 +109,11 @@ const loadConversation = async (): Promise<void> => {
 };
 
 const sendMessage = async (): Promise<void> => {
-    if (!conversationId.value || draft.value.trim() === '' || sending.value) {
+    if (
+        !conversationId.value ||
+        (draft.value.trim() === '' && selectedAttachments.value.length === 0) ||
+        sending.value
+    ) {
         return;
     }
 
@@ -135,12 +121,21 @@ const sendMessage = async (): Promise<void> => {
     loadError.value = null;
 
     try {
+        const formData = new FormData();
+
+        formData.append('body', draft.value);
+
+        selectedAttachments.value.forEach((attachment) => {
+            formData.append('attachments[]', attachment);
+        });
+
         await fetchSameOriginJson(storeMessage.url(conversationId.value), {
             method: 'POST',
-            body: JSON.stringify({ body: draft.value }),
+            body: formData,
         });
 
         draft.value = '';
+        selectedAttachments.value = [];
         await loadConversation();
     } catch (error) {
         console.error(error);
@@ -148,15 +143,6 @@ const sendMessage = async (): Promise<void> => {
     } finally {
         sending.value = false;
     }
-};
-
-const handleDraftKeydown = async (event: KeyboardEvent): Promise<void> => {
-    if (event.key !== 'Enter' || event.shiftKey) {
-        return;
-    }
-
-    event.preventDefault();
-    await sendMessage();
 };
 
 const startPolling = (): void => {
@@ -308,7 +294,16 @@ onBeforeUnmount(() => {
                                     : 'border border-border bg-background text-foreground'
                             "
                         >
-                            {{ message.body }}
+                            <div
+                                v-if="message.body !== ''"
+                                class="break-words whitespace-pre-wrap"
+                            >
+                                {{ message.body }}
+                            </div>
+                            <ChatMessageAttachments
+                                :attachments="message.attachments"
+                                :own="message.isOwn"
+                            />
                         </div>
                         <div
                             class="px-1 text-[11px] text-muted-foreground"
@@ -330,31 +325,13 @@ onBeforeUnmount(() => {
                 {{ loadError }}
             </div>
 
-            <div class="relative">
-                <textarea
-                    ref="draftTextarea"
-                    v-model="draft"
-                    rows="3"
-                    class="min-h-24 w-full resize-none rounded-3xl border border-input bg-background px-4 py-3 pr-28 text-sm transition outline-none focus:border-ring focus:ring-[3px] focus:ring-ring/50"
-                    :placeholder="t.projects.task_discussion_placeholder"
-                    @keydown="handleDraftKeydown"
-                ></textarea>
-
-                <ChatEmojiPicker :disabled="sending" @select="insertEmoji" />
-
-                <Button
-                    type="button"
-                    size="icon"
-                    class="absolute right-3 bottom-3 size-10 rounded-full"
-                    :title="sending ? t.chat.sending : t.chat.send"
-                    :aria-label="sending ? t.chat.sending : t.chat.send"
-                    :disabled="sending || draft.trim() === ''"
-                    @click="sendMessage"
-                >
-                    <LoaderCircle v-if="sending" class="size-4 animate-spin" />
-                    <SendHorizontal v-else class="size-4" />
-                </Button>
-            </div>
+            <ChatMessageComposer
+                v-model="draft"
+                v-model:attachments="selectedAttachments"
+                :sending="sending"
+                :placeholder="t.projects.task_discussion_placeholder"
+                @submit="sendMessage"
+            />
         </div>
     </div>
 </template>

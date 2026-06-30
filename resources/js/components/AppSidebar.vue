@@ -4,13 +4,13 @@ import {
     BellRing,
     BookOpenText,
     ClipboardList,
-    FolderOpen,
     LayoutGrid,
     LayoutDashboard,
     MessageSquareMore,
     Newspaper,
     Settings,
     ListTodo,
+    Users,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { index as funnelsIndex } from '@/actions/App/Http/Controllers/CrmFunnelController';
@@ -18,7 +18,6 @@ import {
     index as knowledgeBasesIndex,
     show as showKnowledgeBase,
 } from '@/actions/App/Http/Controllers/KnowledgeBaseController';
-import { index as projectsIndex } from '@/actions/App/Http/Controllers/ProjectController';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -37,12 +36,14 @@ import { resolveMenuIcon } from '@/lib/menuIcons';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
 import { dashboard } from '@/routes';
 import { index as chatsIndex } from '@/routes/chats';
-import { index as filesIndex } from '@/routes/files';
+import { index as contactsIndex } from '@/routes/contacts';
 import { index as formsIndex } from '@/routes/forms';
 import { index as newsIndex } from '@/routes/news';
 import { index as notificationsIndex } from '@/routes/notifications';
+import { index as projectsIndex } from '@/routes/projects';
 import { edit as editMenu } from '@/routes/settings/menu';
 import { update as updateMenuOrder } from '@/routes/settings/menu/order';
+import { index as tasksIndex } from '@/routes/tasks';
 import type { Menu as MenuState, NavItem } from '@/types';
 
 const page = usePage();
@@ -62,36 +63,6 @@ const isMenuItemVisible = (key: string): boolean => {
 
 const baseMainNavItems = computed<NavItem[]>(() => {
     const items: NavItem[] = [
-        ...(isMenuItemVisible('dashboard')
-            ? [
-                  {
-                      key: 'dashboard',
-                      title: t.value.common.dashboard,
-                      href: dashboard(),
-                      icon: LayoutDashboard,
-                  },
-              ]
-            : []),
-        ...(isMenuItemVisible('files')
-            ? [
-                  {
-                      key: 'files',
-                      title: t.value.files.title,
-                      href: filesIndex(),
-                      icon: FolderOpen,
-                  },
-              ]
-            : []),
-        ...(isMenuItemVisible('forms')
-            ? [
-                  {
-                      key: 'forms',
-                      title: t.value.forms.title,
-                      href: formsIndex(),
-                      icon: ClipboardList,
-                  },
-              ]
-            : []),
         ...(isMenuItemVisible('news')
             ? [
                   {
@@ -109,6 +80,36 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                       title: t.value.notifications.panel_title,
                       href: notificationsIndex(),
                       icon: BellRing,
+                  },
+              ]
+            : []),
+        ...(isMenuItemVisible('dashboard')
+            ? [
+                  {
+                      key: 'dashboard',
+                      title: t.value.common.dashboard,
+                      href: dashboard(),
+                      icon: LayoutDashboard,
+                  },
+              ]
+            : []),
+        ...(isMenuItemVisible('projects')
+            ? [
+                  {
+                      key: 'projects',
+                      title: t.value.projects.title,
+                      href: projectsIndex(),
+                      icon: ListTodo,
+                      items: [
+                          {
+                              title: t.value.projects.tasks,
+                              href: tasksIndex(),
+                          },
+                          {
+                              title: t.value.projects.projects_label,
+                              href: projectsIndex(),
+                          },
+                      ],
                   },
               ]
             : []),
@@ -153,13 +154,23 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(isMenuItemVisible('projects')
+        ...(isMenuItemVisible('forms')
             ? [
                   {
-                      key: 'projects',
-                      title: t.value.projects.title,
-                      href: projectsIndex(),
-                      icon: ListTodo,
+                      key: 'forms',
+                      title: t.value.forms.title,
+                      href: formsIndex(),
+                      icon: ClipboardList,
+                  },
+              ]
+            : []),
+        ...(page.props.auth.canAccessContacts && isMenuItemVisible('contacts')
+            ? [
+                  {
+                      key: 'contacts',
+                      title: t.value.contacts.title,
+                      href: contactsIndex(),
+                      icon: Users,
                   },
               ]
             : []),

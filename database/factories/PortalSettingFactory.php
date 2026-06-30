@@ -21,6 +21,7 @@ class PortalSettingFactory extends Factory
             'company_name' => fake()->company(),
             'logo_path' => null,
             'default_language' => 'ru',
+            'disabled_modules' => [],
         ];
     }
 }

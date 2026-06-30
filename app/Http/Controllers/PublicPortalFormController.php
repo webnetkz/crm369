@@ -21,6 +21,8 @@ class PublicPortalFormController extends Controller
                 'public_token' => $portalForm->public_token,
                 'name' => $portalForm->name,
                 'description' => $portalForm->description,
+                'style_settings' => PortalForm::normalizeStyleSettings($portalForm->style_settings),
+                'completion_settings' => PortalForm::normalizeCompletionSettings($portalForm->completion_settings),
                 'fields' => $portalForm->fields
                     ->map(fn ($field): array => [
                         'id' => $field->id,
@@ -44,8 +46,6 @@ class PublicPortalFormController extends Controller
         abort_unless($portalForm->is_active, 404);
 
         $submissionManager->submit($portalForm, $request->submissionPayload());
-
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.forms.submitted_success')]);
 
         return to_route('forms.public.show', ['portalForm' => $portalForm->public_token]);
     }

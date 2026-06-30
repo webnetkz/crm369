@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
 import { ClipboardList, Send } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { submit as submitPortalForm } from '@/actions/App/Http/Controllers/PublicPortalFormController';
-import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/composables/useLanguage';
+import {
+    buildPortalFormBadgeStyle,
+    buildPortalFormButtonStyle,
+    buildPortalFormCardStyle,
+    buildPortalFormInputStyle,
+    buildPortalFormMutedTextStyle,
+    portalFormWidthClass,
+} from '@/lib/portalFormStyles';
 import type { PortalFormPublicItem } from '@/types/ui';
 
 const props = defineProps<{
@@ -21,19 +27,63 @@ const defaultValues = computed<Record<string, string>>(() => {
     return Object.fromEntries(props.form.fields.map((field) => [field.key, '']));
 });
 
-const form = useForm({
+const submissionForm = useForm({
     values: defaultValues.value,
 });
 
+const formWidthClass = computed(() => {
+    return portalFormWidthClass(props.form.style_settings.container_width);
+});
+
+const sectionStyle = computed(() => {
+    return buildPortalFormCardStyle(props.form.style_settings);
+});
+
+const badgeStyle = computed(() => {
+    return buildPortalFormBadgeStyle(props.form.style_settings);
+});
+
+const inputStyle = computed(() => {
+    return buildPortalFormInputStyle(props.form.style_settings);
+});
+
+const buttonStyle = computed(() => {
+    return buildPortalFormButtonStyle(props.form.style_settings);
+});
+
+const mutedTextStyle = computed(() => {
+    return buildPortalFormMutedTextStyle(props.form.style_settings);
+});
+
+const submittedMessage = ref<string | null>(null);
+const closeFallbackVisible = ref(false);
+
 const fieldError = (key: string): string | undefined => {
-    return form.errors[`values.${key}`];
+    return submissionForm.errors[`values.${key}`];
 };
 
 const submit = (): void => {
-    form.post(submitPortalForm.url(props.form.public_token), {
+    submissionForm.post(submitPortalForm.url(props.form.public_token), {
         preserveScroll: true,
         onSuccess: () => {
-            form.values = defaultValues.value;
+            const completionSettings = props.form.completion_settings;
+
+            if (completionSettings.action === 'redirect' && completionSettings.redirect_url) {
+                window.location.assign(completionSettings.redirect_url);
+
+                return;
+            }
+
+            if (completionSettings.action === 'close') {
+                window.close();
+                closeFallbackVisible.value = true;
+
+                return;
+            }
+
+            submittedMessage.value = completionSettings.success_message || t.value.forms.submitted_success;
+            closeFallbackVisible.value = false;
+            submissionForm.values = defaultValues.value;
         },
     });
 };
@@ -42,57 +92,96 @@ const submit = (): void => {
 <template>
     <Head :title="props.form.name" />
 
-    <div class="mx-auto flex min-h-screen w-full max-w-4xl items-center px-4 py-10 sm:px-6">
-        <section class="w-full rounded-[2rem] border border-border bg-card p-6 shadow-sm sm:p-8">
-            <div class="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                <ClipboardList class="size-4" />
-                {{ t.forms.public_page_title }}
-            </div>
-
-            <div class="mt-4">
-                <Heading
-                    variant="small"
-                    :title="props.form.name"
-                    :description="props.form.description || t.forms.public_page_description"
-                />
-            </div>
-
-            <form class="mt-8 space-y-6" @submit.prevent="submit">
+    <div class="mx-auto flex min-h-screen w-full items-center px-4 py-10 sm:px-6">
+        <div class="mx-auto w-full" :class="formWidthClass">
+            <section class="w-full border shadow-sm" :style="sectionStyle">
                 <div
-                    v-for="field in props.form.fields"
-                    :key="field.id"
-                    class="grid gap-2"
+                    class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium"
+                    :style="badgeStyle"
                 >
-                    <Label :for="field.key">
-                        {{ field.label }}
-                        <span v-if="field.is_required" class="text-primary">*</span>
-                    </Label>
-
-                    <textarea
-                        v-if="field.type === 'textarea'"
-                        :id="field.key"
-                        v-model="form.values[field.key]"
-                        rows="5"
-                        class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                        :placeholder="field.placeholder || ''"
-                    ></textarea>
-
-                    <Input
-                        v-else
-                        :id="field.key"
-                        v-model="form.values[field.key]"
-                        :type="field.type === 'number' ? 'number' : field.type"
-                        :placeholder="field.placeholder || ''"
-                    />
-
-                    <InputError :message="fieldError(field.key)" />
+                    <ClipboardList class="size-4" />
+                    {{ t.forms.public_page_title }}
                 </div>
 
-                <Button type="submit" size="lg" :disabled="form.processing" class="w-full sm:w-auto">
-                    <Send class="size-4" />
-                    {{ t.forms.submit }}
-                </Button>
-            </form>
-        </section>
+                <div class="mt-4">
+                    <h1 class="text-2xl font-semibold">
+                        {{ props.form.name }}
+                    </h1>
+                    <p class="mt-2 text-sm" :style="mutedTextStyle">
+                        {{ props.form.description || t.forms.public_page_description }}
+                    </p>
+                </div>
+
+                <div
+                    v-if="submittedMessage || closeFallbackVisible"
+                    class="mt-8 space-y-4 rounded-2xl border px-5 py-6"
+                    :style="inputStyle"
+                >
+                    <h2 class="text-lg font-semibold">
+                        {{
+                            closeFallbackVisible
+                                ? t.forms.completion_close_title
+                                : t.forms.submitted_success
+                        }}
+                    </h2>
+                    <p class="text-sm whitespace-pre-wrap" :style="mutedTextStyle">
+                        {{
+                            closeFallbackVisible
+                                ? t.forms.completion_close_fallback
+                                : submittedMessage
+                        }}
+                    </p>
+                </div>
+
+                <form v-else class="mt-8 space-y-6" @submit.prevent="submit">
+                    <div
+                        v-for="field in props.form.fields"
+                        :key="field.id"
+                        class="grid gap-2"
+                    >
+                        <Label :for="field.key">
+                            {{ field.label }}
+                            <span v-if="field.is_required" class="opacity-75">*</span>
+                        </Label>
+
+                        <textarea
+                            v-if="field.type === 'textarea'"
+                            :id="field.key"
+                            v-model="submissionForm.values[field.key]"
+                            rows="5"
+                            class="w-full border px-3 py-3 text-sm shadow-xs outline-none transition placeholder:opacity-70 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                            :style="inputStyle"
+                            :placeholder="field.placeholder || ''"
+                        ></textarea>
+
+                        <Input
+                            v-else
+                            :id="field.key"
+                            v-model="submissionForm.values[field.key]"
+                            :type="field.type === 'number' ? 'number' : field.type"
+                            :placeholder="field.placeholder || ''"
+                            :style="inputStyle"
+                            class="h-11 border px-3"
+                        />
+
+                        <InputError :message="fieldError(field.key)" />
+                    </div>
+
+                    <p class="text-sm" :style="mutedTextStyle">
+                        {{ t.forms.public_page_description }}
+                    </p>
+
+                    <button
+                        type="submit"
+                        class="inline-flex h-11 w-full items-center justify-center gap-2 border px-4 text-sm font-medium shadow-xs transition sm:w-auto"
+                        :style="buttonStyle"
+                        :disabled="submissionForm.processing"
+                    >
+                        <Send class="size-4" />
+                        {{ t.forms.submit }}
+                    </button>
+                </form>
+            </section>
+        </div>
     </div>
 </template>

@@ -29,13 +29,25 @@ use Illuminate\Support\Str;
 class PortalWebhook extends Model
 {
     public const string PERMISSION_USERS_READ = 'users.read';
+
     public const string PERMISSION_USERS_WRITE = 'users.write';
+
+    public const string PERMISSION_CONTACTS_READ = 'contacts.read';
+
+    public const string PERMISSION_CONTACTS_WRITE = 'contacts.write';
+
     public const string PERMISSION_KNOWLEDGE_READ = 'knowledge.read';
+
     public const string PERMISSION_KNOWLEDGE_WRITE = 'knowledge.write';
+
     public const string PERMISSION_PROJECTS_READ = 'projects.read';
+
     public const string PERMISSION_PROJECTS_WRITE = 'projects.write';
+
     public const string PERMISSION_CHAT_READ = 'chat.read';
+
     public const string PERMISSION_CHAT_WRITE = 'chat.write';
+
     public const string PERMISSION_NOTIFICATIONS_READ = 'notifications.read';
 
     /** @use HasFactory<PortalWebhookFactory> */
@@ -68,6 +80,14 @@ class PortalWebhook extends Model
             self::PERMISSION_USERS_WRITE => [
                 'label_key' => 'ui.webhooks.permission_users_write',
                 'description_key' => 'ui.webhooks.permission_users_write_description',
+            ],
+            self::PERMISSION_CONTACTS_READ => [
+                'label_key' => 'ui.webhooks.permission_contacts_read',
+                'description_key' => 'ui.webhooks.permission_contacts_read_description',
+            ],
+            self::PERMISSION_CONTACTS_WRITE => [
+                'label_key' => 'ui.webhooks.permission_contacts_write',
+                'description_key' => 'ui.webhooks.permission_contacts_write_description',
             ],
             self::PERMISSION_KNOWLEDGE_READ => [
                 'label_key' => 'ui.webhooks.permission_knowledge_read',

@@ -1,21 +1,24 @@
 <script setup lang="ts">
-import { usePage } from '@inertiajs/vue3';
+import { useForm, usePage } from '@inertiajs/vue3';
 import {
-    LoaderCircle,
     MessageSquareMore,
     Search,
-    SendHorizontal,
     Users,
 } from '@lucide/vue';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { store as storeMessage } from '@/actions/App/Http/Controllers/ChatMessageController';
 import {
     index,
+    showUserProfile,
     startDirect,
 } from '@/actions/App/Http/Controllers/ChatSidebarController';
-import ChatEmojiPicker from '@/components/ChatEmojiPicker.vue';
+import { updateProfile as updateUserProfile } from '@/actions/App/Http/Controllers/Settings/UserController';
+import ChatMessageAttachments from '@/components/ChatMessageAttachments.vue';
+import ChatMessageComposer from '@/components/ChatMessageComposer.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { useChatCenterPresence } from '@/composables/useChatCenterPresence';
+import UserProfileSheet from '@/components/UserProfileSheet.vue';
 import { useInitials } from '@/composables/useInitials';
 import { useLanguage } from '@/composables/useLanguage';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
@@ -24,6 +27,8 @@ import type {
     ChatCenter,
     ChatConversationListItem,
     ChatUserSummary,
+    ManagedProfileSaveState,
+    ManagedUserProfile,
 } from '@/types/ui';
 
 type PanelMode = 'chats' | 'search';
@@ -35,6 +40,13 @@ type Props = {
     initialContactId?: number | null;
 };
 
+type ManagedProfilePayload = {
+    name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+};
+
 const props = withDefaults(defineProps<Props>(), {
     active: true,
     initialConversationId: null,
@@ -44,18 +56,35 @@ const props = withDefaults(defineProps<Props>(), {
 const page = usePage();
 const { getInitials } = useInitials();
 const { language, t } = useLanguage();
+const { setChatCenterVisible } = useChatCenterPresence();
 const payload = ref<ChatCenter | null>(null);
 const loading = ref(false);
 const sending = ref(false);
 const loadError = ref<string | null>(null);
 const search = ref('');
 const draft = ref('');
+const selectedAttachments = ref<File[]>([]);
 const activeConversationId = ref<number | null>(null);
+const selectedProfileUser = ref<ManagedUserProfile | null>(null);
+const selectedProfileCanEdit = ref(false);
+const managedProfileSnapshot = ref<ManagedProfilePayload | null>(null);
+const managedProfileSaveState = ref<ManagedProfileSaveState>('idle');
+const isSyncingManagedProfile = ref(false);
 const searchInput = ref<HTMLInputElement | null>(null);
-const draftTextarea = ref<HTMLTextAreaElement | null>(null);
 const messagesContainer = ref<HTMLElement | null>(null);
+const defaultKazakhstanPhonePrefix = '+7';
+const managedProfileForm = useForm({
+    name: '',
+    last_name: '',
+    email: '',
+    phone: defaultKazakhstanPhonePrefix,
+});
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+let managedProfileSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+let profileRequestSequence = 0;
+let sidebarRequestSequence = 0;
+let sidebarAbortController: AbortController | null = null;
 
 const conversations = computed<ChatConversationListItem[]>(() => {
     return payload.value?.conversations ?? [];
@@ -102,23 +131,12 @@ const focusSearch = async (): Promise<void> => {
     searchInput.value?.focus();
 };
 
-const insertEmoji = async (emoji: string): Promise<void> => {
-    const textarea = draftTextarea.value;
-    const selectionStart = textarea?.selectionStart ?? draft.value.length;
-    const selectionEnd = textarea?.selectionEnd ?? draft.value.length;
-
-    draft.value = `${draft.value.slice(0, selectionStart)}${emoji}${draft.value.slice(selectionEnd)}`;
-
-    await nextTick();
-
-    textarea?.focus();
-
-    const nextSelection = selectionStart + emoji.length;
-
-    textarea?.setSelectionRange(nextSelection, nextSelection);
-};
-
 const fetchSidebar = async (): Promise<void> => {
+    const requestSequence = ++sidebarRequestSequence;
+
+    sidebarAbortController?.abort();
+    sidebarAbortController = new AbortController();
+
     loading.value = payload.value === null;
     loadError.value = null;
 
@@ -132,8 +150,13 @@ const fetchSidebar = async (): Promise<void> => {
             }),
             {
                 method: 'GET',
+                signal: sidebarAbortController.signal,
             },
         );
+
+        if (requestSequence !== sidebarRequestSequence) {
+            return;
+        }
 
         payload.value = data;
         activeConversationId.value =
@@ -141,16 +164,67 @@ const fetchSidebar = async (): Promise<void> => {
         syncSharedUnread(data.unreadCount);
         await scrollMessagesToBottom();
     } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            return;
+        }
+
+        if (requestSequence !== sidebarRequestSequence) {
+            return;
+        }
+
         console.error(error);
         loadError.value = t.value.common.error;
     } finally {
-        loading.value = false;
+        if (requestSequence === sidebarRequestSequence) {
+            sidebarAbortController = null;
+            loading.value = false;
+        }
     }
 };
 
 const openConversation = async (conversationId: number): Promise<void> => {
     activeConversationId.value = conversationId;
     await fetchSidebar();
+};
+
+const openProfile = async (
+    user: ChatUserSummary | null | undefined,
+): Promise<void> => {
+    if (!user) {
+        return;
+    }
+
+    const requestSequence = ++profileRequestSequence;
+
+    try {
+        const response = await fetchSameOriginJson<{
+            data: ManagedUserProfile;
+            canEdit: boolean;
+        }>(showUserProfile.url(user.id), {
+            method: 'GET',
+        });
+
+        if (requestSequence !== profileRequestSequence) {
+            return;
+        }
+
+        selectedProfileUser.value = response.data;
+        selectedProfileCanEdit.value = response.canEdit;
+        syncManagedProfileForm(response.data);
+    } catch (error) {
+        console.error(error);
+        loadError.value = t.value.common.error;
+    }
+};
+
+const closeProfile = (): void => {
+    clearManagedProfileSaveTimeout();
+    profileRequestSequence += 1;
+    selectedProfileUser.value = null;
+    selectedProfileCanEdit.value = false;
+    managedProfileSnapshot.value = null;
+    managedProfileSaveState.value = 'idle';
+    managedProfileForm.clearErrors();
 };
 
 const startConversation = async (user: ChatUserSummary): Promise<void> => {
@@ -182,7 +256,7 @@ const startConversationById = async (userId: number): Promise<void> => {
 const sendMessage = async (): Promise<void> => {
     if (
         !activeConversationId.value ||
-        draft.value.trim() === '' ||
+        (draft.value.trim() === '' && selectedAttachments.value.length === 0) ||
         sending.value
     ) {
         return;
@@ -192,15 +266,24 @@ const sendMessage = async (): Promise<void> => {
     loadError.value = null;
 
     try {
+        const formData = new FormData();
+
+        formData.append('body', draft.value);
+
+        selectedAttachments.value.forEach((attachment) => {
+            formData.append('attachments[]', attachment);
+        });
+
         await fetchSameOriginJson(
             storeMessage.url(activeConversationId.value),
             {
                 method: 'POST',
-                body: JSON.stringify({ body: draft.value }),
+                body: formData,
             },
         );
 
         draft.value = '';
+        selectedAttachments.value = [];
         await fetchSidebar();
     } catch (error) {
         console.error(error);
@@ -208,15 +291,6 @@ const sendMessage = async (): Promise<void> => {
     } finally {
         sending.value = false;
     }
-};
-
-const handleDraftKeydown = async (event: KeyboardEvent): Promise<void> => {
-    if (event.key !== 'Enter' || event.shiftKey) {
-        return;
-    }
-
-    event.preventDefault();
-    await sendMessage();
 };
 
 const formatDateTime = (value: string | null, short = false): string => {
@@ -237,6 +311,34 @@ const formatDateTime = (value: string | null, short = false): string => {
           }).format(new Date(value));
 };
 
+const formatKazakhstanPhone = (value: string | null | undefined): string => {
+    const digits = (value ?? '').replace(/\D/g, '');
+
+    if (digits === '') {
+        return defaultKazakhstanPhonePrefix;
+    }
+
+    let normalizedDigits = digits;
+
+    if (normalizedDigits.startsWith('8')) {
+        normalizedDigits = `7${normalizedDigits.slice(1)}`;
+    } else if (!normalizedDigits.startsWith('7')) {
+        normalizedDigits = `7${normalizedDigits}`;
+    }
+
+    normalizedDigits = normalizedDigits.slice(0, 11);
+
+    const localNumber = normalizedDigits.slice(1);
+    const segments = [
+        localNumber.slice(0, 3),
+        localNumber.slice(3, 6),
+        localNumber.slice(6, 8),
+        localNumber.slice(8, 10),
+    ].filter(Boolean);
+
+    return [defaultKazakhstanPhonePrefix, ...segments].join(' ').trim();
+};
+
 const avatarStyle = (
     user: ChatUserSummary | null | undefined,
 ): Record<string, string> => {
@@ -244,6 +346,109 @@ const avatarStyle = (
         objectPosition: 'center',
         transform: `scale(${user?.avatarScale ?? 1})`,
     };
+};
+
+const managedProfilePayload = (): ManagedProfilePayload => ({
+    name: managedProfileForm.name,
+    last_name: managedProfileForm.last_name,
+    email: managedProfileForm.email,
+    phone: managedProfileForm.phone,
+});
+
+const clearManagedProfileSaveTimeout = (): void => {
+    if (managedProfileSaveTimeout !== null) {
+        clearTimeout(managedProfileSaveTimeout);
+        managedProfileSaveTimeout = null;
+    }
+};
+
+const syncManagedProfileForm = (user: ManagedUserProfile | null): void => {
+    isSyncingManagedProfile.value = true;
+    clearManagedProfileSaveTimeout();
+    managedProfileForm.clearErrors();
+
+    managedProfileForm.name = user?.name ?? '';
+    managedProfileForm.last_name = user?.last_name ?? '';
+    managedProfileForm.email = user?.email ?? '';
+    managedProfileForm.phone = formatKazakhstanPhone(user?.phone);
+
+    managedProfileSnapshot.value = managedProfilePayload();
+    managedProfileSaveState.value = 'idle';
+    isSyncingManagedProfile.value = false;
+};
+
+const scheduleManagedProfileSave = (delay = 700): void => {
+    clearManagedProfileSaveTimeout();
+
+    managedProfileSaveTimeout = setTimeout(() => {
+        void submitManagedProfileUpdate();
+    }, delay);
+};
+
+const submitManagedProfileUpdate = async (): Promise<void> => {
+    const user = selectedProfileUser.value;
+    const snapshot = managedProfileSnapshot.value;
+
+    if (!user || !snapshot || !selectedProfileCanEdit.value) {
+        return;
+    }
+
+    const current = managedProfilePayload();
+
+    if (JSON.stringify(current) === JSON.stringify(snapshot)) {
+        managedProfileSaveState.value = 'idle';
+
+        return;
+    }
+
+    if (managedProfileForm.processing) {
+        scheduleManagedProfileSave(250);
+
+        return;
+    }
+
+    managedProfileSaveState.value = 'saving';
+
+    managedProfileForm.patch(updateUserProfile.url(user.id), {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => {
+            const emailChanged = current.email !== snapshot.email;
+
+            selectedProfileUser.value = {
+                ...user,
+                name: current.name,
+                last_name: current.last_name === '' ? null : current.last_name,
+                email: current.email,
+                phone: current.phone,
+                email_verified_at: emailChanged ? null : user.email_verified_at,
+            };
+            managedProfileSnapshot.value = managedProfilePayload();
+            managedProfileSaveState.value = 'saved';
+            void fetchSidebar();
+
+            window.setTimeout(() => {
+                if (managedProfileSaveState.value === 'saved') {
+                    managedProfileSaveState.value = 'idle';
+                }
+            }, 1400);
+        },
+        onError: () => {
+            managedProfileSaveState.value = 'error';
+        },
+        onFinish: () => {
+            const latest = managedProfileSnapshot.value;
+
+            if (
+                managedProfileSaveState.value !== 'error' &&
+                latest &&
+                JSON.stringify(managedProfilePayload()) !==
+                    JSON.stringify(latest)
+            ) {
+                scheduleManagedProfileSave(350);
+            }
+        },
+    });
 };
 
 const loadRequestedConversation = async (): Promise<void> => {
@@ -289,6 +494,8 @@ const stopPolling = (): void => {
 watch(
     () => props.active,
     async (isActive) => {
+        setChatCenterVisible(isActive);
+
         if (!isActive) {
             stopPolling();
 
@@ -349,8 +556,58 @@ watch(search, () => {
     }, 250);
 });
 
+watch(
+    () => selectedProfileUser.value?.id ?? null,
+    () => {
+        syncManagedProfileForm(selectedProfileUser.value);
+    },
+);
+
+watch(
+    () => managedProfileForm.phone,
+    (value) => {
+        const formatted = formatKazakhstanPhone(value);
+
+        if (value !== formatted) {
+            managedProfileForm.phone = formatted;
+        }
+    },
+);
+
+watch(
+    () => [
+        managedProfileForm.name,
+        managedProfileForm.last_name,
+        managedProfileForm.email,
+        managedProfileForm.phone,
+    ],
+    () => {
+        if (
+            !selectedProfileUser.value ||
+            !managedProfileSnapshot.value ||
+            isSyncingManagedProfile.value ||
+            !selectedProfileCanEdit.value
+        ) {
+            return;
+        }
+
+        if (
+            JSON.stringify(managedProfilePayload()) ===
+            JSON.stringify(managedProfileSnapshot.value)
+        ) {
+            managedProfileSaveState.value = 'idle';
+
+            return;
+        }
+
+        scheduleManagedProfileSave();
+    },
+);
+
 onBeforeUnmount(() => {
     stopPolling();
+    sidebarAbortController?.abort();
+    clearManagedProfileSaveTimeout();
 
     if (searchTimeout) {
         clearTimeout(searchTimeout);
@@ -418,11 +675,10 @@ onBeforeUnmount(() => {
                         </div>
 
                         <div v-else class="space-y-1.5">
-                            <button
+                            <div
                                 v-for="conversation in conversations"
                                 :key="conversation.id"
-                                type="button"
-                                class="flex w-full items-start gap-3 rounded-2xl border px-3 py-3 text-left transition hover:border-primary/40 hover:bg-background"
+                                class="flex items-start gap-3 rounded-2xl border px-3 py-3 transition hover:border-primary/40 hover:bg-background"
                                 :class="
                                     conversation.id === activeConversationId
                                         ? 'border-primary/40 bg-background shadow-sm'
@@ -430,45 +686,70 @@ onBeforeUnmount(() => {
                                 "
                                 @click="openConversation(conversation.id)"
                             >
-                                <Avatar
-                                    class="mt-0.5 size-10 rounded-2xl border border-border"
+                                <button
+                                    type="button"
+                                    class="mt-0.5 shrink-0"
+                                    :disabled="!conversation.participant"
+                                    @click="
+                                        $event.stopPropagation();
+                                        openProfile(conversation.participant)
+                                    "
                                 >
-                                    <AvatarImage
-                                        v-if="conversation.participant?.avatar"
-                                        :src="conversation.participant.avatar"
-                                        :alt="conversation.title"
-                                        :style="
-                                            avatarStyle(
-                                                conversation.participant,
-                                            )
-                                        "
-                                    />
-                                    <AvatarFallback
-                                        class="rounded-2xl bg-muted font-semibold text-foreground"
+                                    <Avatar
+                                        class="size-10 rounded-2xl border border-border transition hover:border-primary/40"
                                     >
-                                        {{ getInitials(conversation.title) }}
-                                    </AvatarFallback>
-                                </Avatar>
+                                        <AvatarImage
+                                            v-if="
+                                                conversation.participant?.avatar
+                                            "
+                                            :src="
+                                                conversation.participant.avatar
+                                            "
+                                            :alt="conversation.title"
+                                            :style="
+                                                avatarStyle(
+                                                    conversation.participant,
+                                                )
+                                            "
+                                        />
+                                        <AvatarFallback
+                                            class="rounded-2xl bg-muted font-semibold text-foreground"
+                                        >
+                                            {{
+                                                getInitials(conversation.title)
+                                            }}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                </button>
 
-                                <div class="min-w-0 flex-1 space-y-1">
-                                    <div
-                                        class="flex items-start justify-between gap-2"
-                                    >
-                                        <div class="min-w-0">
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-start gap-2">
+                                        <div class="min-w-0 flex-1 text-left">
                                             <div
                                                 class="truncate text-sm font-semibold text-foreground"
                                             >
                                                 {{ conversation.title }}
                                             </div>
                                             <div
+                                                v-if="conversation.subtitle"
                                                 class="truncate text-xs text-muted-foreground"
                                             >
                                                 {{ conversation.subtitle }}
                                             </div>
+                                            <span
+                                                class="mt-1 line-clamp-2 block text-xs text-muted-foreground transition hover:text-foreground"
+                                            >
+                                                {{
+                                                    conversation.excerpt ??
+                                                    t.chat.open_chat
+                                                }}
+                                            </span>
                                         </div>
 
-                                        <div
+                                        <button
+                                            type="button"
                                             class="flex shrink-0 flex-col items-end gap-1"
+                                            @click="$event.stopPropagation()"
                                         >
                                             <span
                                                 class="text-[11px] text-muted-foreground"
@@ -488,19 +769,10 @@ onBeforeUnmount(() => {
                                             >
                                                 {{ conversation.unreadCount }}
                                             </span>
-                                        </div>
+                                        </button>
                                     </div>
-
-                                    <p
-                                        class="line-clamp-2 text-xs text-muted-foreground"
-                                    >
-                                        {{
-                                            conversation.excerpt ??
-                                            t.chat.open_chat
-                                        }}
-                                    </p>
                                 </div>
-                            </button>
+                            </div>
                         </div>
                     </section>
 
@@ -527,21 +799,27 @@ onBeforeUnmount(() => {
                                 :key="contact.id"
                                 class="flex items-center gap-3 rounded-2xl border border-transparent px-3 py-3 transition hover:border-primary/30 hover:bg-background"
                             >
-                                <Avatar
-                                    class="size-10 rounded-2xl border border-border"
+                                <button
+                                    type="button"
+                                    class="shrink-0"
+                                    @click="openProfile(contact)"
                                 >
-                                    <AvatarImage
-                                        v-if="contact.avatar"
-                                        :src="contact.avatar"
-                                        :alt="contact.name"
-                                        :style="avatarStyle(contact)"
-                                    />
-                                    <AvatarFallback
-                                        class="rounded-2xl bg-muted font-semibold text-foreground"
+                                    <Avatar
+                                        class="size-10 rounded-2xl border border-border transition hover:border-primary/40"
                                     >
-                                        {{ getInitials(contact.name) }}
-                                    </AvatarFallback>
-                                </Avatar>
+                                        <AvatarImage
+                                            v-if="contact.avatar"
+                                            :src="contact.avatar"
+                                            :alt="contact.name"
+                                            :style="avatarStyle(contact)"
+                                        />
+                                        <AvatarFallback
+                                            class="rounded-2xl bg-muted font-semibold text-foreground"
+                                        >
+                                            {{ getInitials(contact.name) }}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                </button>
 
                                 <div class="min-w-0 flex-1">
                                     <div
@@ -575,25 +853,35 @@ onBeforeUnmount(() => {
         <div class="flex min-h-0 flex-1 flex-col bg-background">
             <div v-if="activeConversation" class="flex min-h-0 flex-1 flex-col">
                 <div class="border-b border-border px-6 py-5">
-                    <div class="flex items-center gap-3">
-                        <Avatar
-                            class="size-11 rounded-2xl border border-border"
+                    <div class="flex items-center gap-3 text-left">
+                        <button
+                            type="button"
+                            class="shrink-0"
+                            :disabled="!activeConversation.participant"
+                            @click="openProfile(activeConversation.participant)"
                         >
-                            <AvatarImage
-                                v-if="activeConversation.participant?.avatar"
-                                :src="activeConversation.participant.avatar"
-                                :alt="activeConversation.title"
-                                :style="
-                                    avatarStyle(activeConversation.participant)
-                                "
-                            />
-                            <AvatarFallback
-                                class="rounded-2xl bg-muted font-semibold text-foreground"
+                            <Avatar
+                                class="size-11 rounded-2xl border border-border transition hover:border-primary/40"
                             >
-                                {{ getInitials(activeConversation.title) }}
-                            </AvatarFallback>
-                        </Avatar>
-
+                                <AvatarImage
+                                    v-if="
+                                        activeConversation.participant?.avatar
+                                    "
+                                    :src="activeConversation.participant.avatar"
+                                    :alt="activeConversation.title"
+                                    :style="
+                                        avatarStyle(
+                                            activeConversation.participant,
+                                        )
+                                    "
+                                />
+                                <AvatarFallback
+                                    class="rounded-2xl bg-muted font-semibold text-foreground"
+                                >
+                                    {{ getInitials(activeConversation.title) }}
+                                </AvatarFallback>
+                            </Avatar>
+                        </button>
                         <div class="min-w-0">
                             <div
                                 class="truncate text-base font-semibold text-foreground"
@@ -626,7 +914,16 @@ onBeforeUnmount(() => {
                                         : 'border border-border bg-muted/35 text-foreground'
                                 "
                             >
-                                {{ message.body }}
+                                <div
+                                    v-if="message.body !== ''"
+                                    class="break-words whitespace-pre-wrap"
+                                >
+                                    {{ message.body }}
+                                </div>
+                                <ChatMessageAttachments
+                                    :attachments="message.attachments"
+                                    :own="message.isOwn"
+                                />
                             </div>
                             <div
                                 class="px-1 text-[11px] text-muted-foreground"
@@ -651,37 +948,13 @@ onBeforeUnmount(() => {
                         {{ loadError }}
                     </div>
 
-                    <div class="relative">
-                        <textarea
-                            ref="draftTextarea"
-                            v-model="draft"
-                            rows="3"
-                            class="min-h-24 w-full resize-none rounded-3xl border border-input bg-transparent px-4 py-3 pr-28 text-sm transition outline-none focus:border-ring focus:ring-[3px] focus:ring-ring/50"
-                            :placeholder="t.chat.message_placeholder"
-                            @keydown="handleDraftKeydown"
-                        ></textarea>
-
-                        <ChatEmojiPicker
-                            :disabled="sending"
-                            @select="insertEmoji"
-                        />
-
-                        <Button
-                            type="button"
-                            size="icon"
-                            class="absolute right-3 bottom-3 size-10 rounded-full"
-                            :title="sending ? t.chat.sending : t.chat.send"
-                            :aria-label="sending ? t.chat.sending : t.chat.send"
-                            :disabled="sending || draft.trim() === ''"
-                            @click="sendMessage"
-                        >
-                            <LoaderCircle
-                                v-if="sending"
-                                class="size-4 animate-spin"
-                            />
-                            <SendHorizontal v-else class="size-4" />
-                        </Button>
-                    </div>
+                    <ChatMessageComposer
+                        v-model="draft"
+                        v-model:attachments="selectedAttachments"
+                        :sending="sending"
+                        :placeholder="t.chat.message_placeholder"
+                        @submit="sendMessage"
+                    />
                 </div>
             </div>
 
@@ -708,5 +981,14 @@ onBeforeUnmount(() => {
                 </div>
             </div>
         </div>
+
+        <UserProfileSheet
+            :open="selectedProfileUser !== null"
+            :user="selectedProfileUser"
+            :can-edit="selectedProfileCanEdit"
+            :save-state="managedProfileSaveState"
+            v-model:form="managedProfileForm"
+            @update:open="(isOpen) => !isOpen && closeProfile()"
+        />
     </div>
 </template>

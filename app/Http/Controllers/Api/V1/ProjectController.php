@@ -11,6 +11,7 @@ use App\Http\Resources\ApiProjectResource;
 use App\Http\Resources\ApiProjectTaskResource;
 use App\Models\Project;
 use App\Models\ProjectTask;
+use App\Models\ProjectTaskStage;
 use App\Support\ApiRequestContext;
 use App\Support\ProjectPageData;
 use Illuminate\Http\JsonResponse;
@@ -188,7 +189,7 @@ class ProjectController extends Controller
             'complexity' => $request->validated('complexity'),
             'due_at' => $request->dueAt(),
             'due_reminder_sent_at' => null,
-            'completed_at' => $request->validated('status') === ProjectTask::STATUS_DONE ? now() : null,
+            'completed_at' => ProjectTaskStage::isCompletedSlug((string) $request->validated('status')) ? now() : null,
             'sort_order' => $request->validated('sort_order'),
             'updated_by_user_id' => $user->id,
         ]);
@@ -213,7 +214,9 @@ class ProjectController extends Controller
             'due_reminder_sent_at' => $task->dueReminderNeedsReset($dueAt, $assigneeUserId)
                 ? null
                 : $task->due_reminder_sent_at,
-            'completed_at' => $request->validated('status') === ProjectTask::STATUS_DONE ? ($task->completed_at ?? now()) : null,
+            'completed_at' => ProjectTaskStage::isCompletedSlug((string) $request->validated('status'))
+                ? ($task->completed_at ?? now())
+                : null,
             'sort_order' => $request->validated('sort_order'),
             'updated_by_user_id' => $user->id,
         ]);
@@ -241,14 +244,22 @@ class ProjectController extends Controller
 
     private function loadProject(Project $project): Project
     {
+        $completedStatuses = ProjectTaskStage::completedSlugs();
+
         return $project->load([
             'owner:id,name,last_name,email,avatar_path,avatar_scale,user_group_id',
             'members:id,name,last_name,email,avatar_path,avatar_scale,user_group_id',
         ])->loadCount([
             'members',
             'tasks',
-            'tasks as open_tasks_count' => fn ($query) => $query->where('status', '!=', ProjectTask::STATUS_DONE),
-            'tasks as completed_tasks_count' => fn ($query) => $query->where('status', ProjectTask::STATUS_DONE),
+            'tasks as open_tasks_count' => fn ($query) => $query->when(
+                $completedStatuses !== [],
+                fn ($taskQuery) => $taskQuery->whereNotIn('status', $completedStatuses),
+            ),
+            'tasks as completed_tasks_count' => fn ($query) => $query->when(
+                $completedStatuses !== [],
+                fn ($taskQuery) => $taskQuery->whereIn('status', $completedStatuses),
+            ),
         ]);
     }
 

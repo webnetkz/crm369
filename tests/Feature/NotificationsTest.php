@@ -128,6 +128,7 @@ test('notification ui renders bell trigger in both header variants and sidebar p
     $sidebarHeader = file_get_contents(resource_path('js/components/AppSidebarHeader.vue'));
     $sidebar = file_get_contents(resource_path('js/components/AppSidebar.vue'));
     $sheet = file_get_contents(resource_path('js/components/NotificationCenterSheet.vue'));
+    $page = file_get_contents(resource_path('js/pages/notifications/Index.vue'));
 
     expect($header)->toContain('NotificationCenterSheet')
         ->and($sidebarHeader)->toContain('NotificationCenterSheet')
@@ -135,8 +136,12 @@ test('notification ui renders bell trigger in both header variants and sidebar p
         ->and($sheet)->toContain('<Bell')
         ->and($sheet)->toContain('SheetContent side="right"')
         ->and($sheet)->toContain('notifications.unreadCount')
+        ->and($sheet)->toContain('usePoll')
+        ->and($sheet)->toContain("only: ['notifications']")
         ->and($sheet)->toContain('markAllAsRead')
         ->and($sheet)->toContain('@mouseenter="markAsRead(notification)"')
         ->and($sheet)->toContain('optimisticallyReadNotificationIds')
-        ->and($sheet)->toContain('open_page');
+        ->and($sheet)->toContain('open_page')
+        ->and($page)->toContain('usePoll')
+        ->and($page)->toContain("only: ['notifications', 'notificationFeed']");
 });

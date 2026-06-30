@@ -14,12 +14,20 @@ const readCookie = (name: string): string | null => {
     );
 };
 
-const buildHeaders = (headers?: HeadersInit): Headers => {
+const buildHeaders = (
+    headers?: HeadersInit,
+    options?: {
+        omitJsonContentType?: boolean;
+    },
+): Headers => {
     const mergedHeaders = new Headers({
         Accept: 'application/json',
-        'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
     });
+
+    if (!options?.omitJsonContentType) {
+        mergedHeaders.set('Content-Type', 'application/json');
+    }
 
     const csrfToken = readCookie('XSRF-TOKEN');
 
@@ -40,10 +48,15 @@ export async function fetchSameOriginJson<T>(
     url: string,
     options?: RequestInit,
 ): Promise<T> {
+    const isFormData =
+        typeof FormData !== 'undefined' && options?.body instanceof FormData;
+
     const response = await fetch(url, {
         credentials: 'same-origin',
         ...options,
-        headers: buildHeaders(options?.headers),
+        headers: buildHeaders(options?.headers, {
+            omitJsonContentType: isFormData,
+        }),
     });
 
     if (!response.ok) {
