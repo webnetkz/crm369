@@ -2,6 +2,8 @@
 
 use App\Models\Contact;
 use App\Models\PortalWebhook;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 test('webhook contacts read permission exposes contacts in the payload and endpoint list', function () {
     $webhook = PortalWebhook::factory()->create([
@@ -95,4 +97,43 @@ test('webhook contacts write permission can create update and delete contacts', 
         ->assertJsonPath('data.id', $contactId);
 
     expect(Contact::query()->whereKey($contactId)->exists())->toBeFalse();
+});
+
+test('webhook contacts write permission can upload and clean up avatars', function () {
+    Storage::fake('public');
+
+    $webhook = PortalWebhook::factory()->create([
+        'permissions' => [PortalWebhook::PERMISSION_CONTACTS_WRITE],
+    ]);
+    $webhook->issueToken('contacts-avatar-token');
+
+    $response = $this->post(
+        route('portal-webhooks.contacts.store', $webhook).'?token=contacts-avatar-token',
+        [
+            'type' => Contact::TYPE_COMPANY,
+            'name' => 'Webhook Avatar Company',
+            'avatar' => UploadedFile::fake()->image('webhook-company-avatar.png'),
+        ],
+        [
+            'Accept' => 'application/json',
+        ],
+    )->assertCreated()
+        ->assertJsonPath('data.type', Contact::TYPE_COMPANY);
+
+    $contactId = $response->json('data.id');
+    $contact = Contact::query()->findOrFail($contactId);
+
+    Storage::disk('public')->assertExists($contact->avatar_path);
+
+    expect($response->json('data.avatar'))->toBe(
+        Storage::disk('public')->url($contact->avatar_path),
+    );
+
+    $avatarPath = $contact->avatar_path;
+
+    $this->deleteJson(
+        route('portal-webhooks.contacts.destroy', [$webhook, $contactId]).'?token=contacts-avatar-token',
+    )->assertOk();
+
+    Storage::disk('public')->assertMissing($avatarPath);
 });

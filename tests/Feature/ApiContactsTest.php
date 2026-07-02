@@ -4,6 +4,8 @@ use App\Models\ApiAccessToken;
 use App\Models\Contact;
 use App\Models\User;
 use App\Models\UserGroup;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 function issueContactApiTokenFor(User $user, array $permissions): string
 {
@@ -194,4 +196,44 @@ test('api contacts validate person IIN length and uniqueness', function () {
         ]);
 
     expect($duplicateResponse->json('errors')['company_requisites.iin'][0])->toBe(__('ui.contacts.iin_unique'));
+});
+
+test('api contacts can upload avatar images', function () {
+    Storage::fake('public');
+
+    $group = UserGroup::factory()->create([
+        'permissions' => [
+            UserGroup::PERMISSION_MANAGE_USER_ACCOUNTS,
+            UserGroup::PERMISSION_ACCESS_PERSON_CONTACTS,
+        ],
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'user_group_id' => $group->id,
+    ]);
+
+    $token = issueContactApiTokenFor($user, [
+        ApiAccessToken::PERMISSION_CONTACTS_WRITE,
+    ]);
+
+    $response = $this->withHeaders(contactApiHeaders($token))
+        ->post('/api/v1/contacts', [
+            'type' => Contact::TYPE_PERSON,
+            'name' => 'Avatar API Person',
+            'avatar' => UploadedFile::fake()->image('api-person-avatar.png'),
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.type', Contact::TYPE_PERSON);
+
+    $contact = Contact::query()
+        ->where('name', 'Avatar API Person')
+        ->where('type', Contact::TYPE_PERSON)
+        ->firstOrFail();
+
+    Storage::disk('public')->assertExists($contact->avatar_path);
+
+    expect($response->json('data.avatar'))->toBe(
+        Storage::disk('public')->url($contact->avatar_path),
+    );
 });

@@ -430,6 +430,16 @@ test('super admin token can read the documented api modules', function () {
         ],
     );
 
+    MessengerIntegration::query()->updateOrCreate(
+        ['driver' => MessengerIntegration::DRIVER_TELEPHONY],
+        [
+            'name' => 'Telephony',
+            'is_active' => true,
+            'settings' => ['provider_name' => 'Binotel'],
+            'updated_by_user_id' => $superAdmin->id,
+        ],
+    );
+
     PortalWebhook::query()->create([
         'name' => 'Portal Sync',
         'token_prefix' => 'sync-prefix',
@@ -476,6 +486,29 @@ test('super admin token can read the documented api modules', function () {
     $this->withHeaders($headers)
         ->getJson('/api/v1/notifications')
         ->assertOk()
+        ->assertJsonPath('meta.status', 'all')
+        ->assertJsonPath('data.0.title', 'API ready');
+
+    $readNotification = $superAdmin->notifications()->firstOrFail();
+    $readNotification->markAsRead();
+
+    $superAdmin->notify(new SystemNotification(
+        title: 'Unread API notification',
+        message: 'Still unread.',
+    ));
+
+    $this->withHeaders($headers)
+        ->getJson('/api/v1/notifications?status=unread')
+        ->assertOk()
+        ->assertJsonPath('meta.status', 'unread')
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.title', 'Unread API notification');
+
+    $this->withHeaders($headers)
+        ->getJson('/api/v1/notifications?status=read')
+        ->assertOk()
+        ->assertJsonPath('meta.status', 'read')
+        ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.title', 'API ready');
 
     $this->withHeaders($headers)
@@ -533,7 +566,8 @@ test('super admin token can read the documented api modules', function () {
         ->assertOk();
 
     expect(collect($integrationsResponse->json('data'))->pluck('name')->all())
-        ->toContain('Telegram Bot');
+        ->toContain('Telegram Bot')
+        ->toContain('Telephony');
 
     $this->withHeaders($headers)
         ->getJson('/api/v1/webhooks')
@@ -658,6 +692,7 @@ test('super admin token can read and update user-scoped api data via the user_id
         ApiAccessToken::PERMISSION_PROFILE_READ,
         ApiAccessToken::PERMISSION_PROFILE_WRITE,
         ApiAccessToken::PERMISSION_NOTIFICATIONS_READ,
+        ApiAccessToken::PERMISSION_NOTIFICATIONS_WRITE,
         ApiAccessToken::PERMISSION_CHAT_READ,
         ApiAccessToken::PERMISSION_PROJECTS_READ,
         ApiAccessToken::PERMISSION_MENU_READ,
@@ -688,7 +723,61 @@ test('super admin token can read and update user-scoped api data via the user_id
     $this->withHeaders($headers)
         ->getJson('/api/v1/notifications'.$subjectQuery)
         ->assertOk()
+        ->assertJsonPath('meta.status', 'all')
+        ->assertJsonPath('meta.subject_user_id', $subjectUser->id)
         ->assertJsonPath('data.0.title', 'Subject notification');
+
+    $readSubjectNotification = $subjectUser->notifications()->latest('created_at')->firstOrFail();
+    $readSubjectNotification->markAsRead();
+
+    $subjectUser->notify(new SystemNotification(
+        title: 'Unread subject notification',
+        message: 'Visible only in unread filter.',
+    ));
+
+    $this->withHeaders($headers)
+        ->getJson('/api/v1/notifications'.$subjectQuery.'&status=unread')
+        ->assertOk()
+        ->assertJsonPath('meta.status', 'unread')
+        ->assertJsonPath('meta.subject_user_id', $subjectUser->id)
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.title', 'Unread subject notification');
+
+    $this->withHeaders($headers)
+        ->getJson('/api/v1/notifications'.$subjectQuery.'&status=read')
+        ->assertOk()
+        ->assertJsonPath('meta.status', 'read')
+        ->assertJsonPath('meta.subject_user_id', $subjectUser->id)
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.title', 'Subject notification');
+
+    $subjectNotification = $subjectUser->unreadNotifications()
+        ->latest('created_at')
+        ->firstOrFail();
+
+    $this->withHeaders($headers)
+        ->patchJson('/api/v1/notifications/'.$subjectNotification->id.'/read'.$subjectQuery)
+        ->assertOk()
+        ->assertJsonPath('meta.subject_user_id', $subjectUser->id)
+        ->assertJsonPath('data.title', 'Unread subject notification')
+        ->assertJsonPath('meta.unread_count', 0);
+
+    expect($subjectNotification->refresh()->read_at)->not->toBeNull()
+        ->and($superAdmin->refresh()->unreadNotifications()->count())->toBe(1);
+
+    $subjectUser->notify(new SystemNotification(
+        title: 'Second subject notification',
+        message: 'Needs bulk mark as read.',
+    ));
+
+    $this->withHeaders($headers)
+        ->patchJson('/api/v1/notifications/read-all'.$subjectQuery)
+        ->assertOk()
+        ->assertJsonPath('meta.subject_user_id', $subjectUser->id)
+        ->assertJsonPath('meta.unread_count', 0);
+
+    expect($subjectUser->refresh()->unreadNotifications()->count())->toBe(0)
+        ->and($superAdmin->refresh()->unreadNotifications()->count())->toBe(1);
 
     $this->withHeaders($headers)
         ->getJson('/api/v1/chats'.$subjectQuery.'&conversation='.$conversation->id)
@@ -773,10 +862,14 @@ test('api documentation marks which endpoints support the user_id query paramete
     $profileEndpoint = collect($sections)
         ->firstWhere('title', __('ui.api.section_profile'))['endpoints'][0];
 
+    $notificationsSection = collect($sections)
+        ->firstWhere('title', __('ui.api.section_notifications'));
+
     $usersEndpoint = collect($sections)
         ->firstWhere('title', __('ui.api.section_users'))['endpoints'][0];
 
     expect($profileEndpoint['target_user'])->toBe(__('ui.api.target_user_supported'))
+        ->and($notificationsSection['notes'])->toContain(__('ui.api.section_notifications_note'))
         ->and($usersEndpoint['target_user'])->toBe(__('ui.api.target_user_not_supported'));
 });
 
@@ -792,15 +885,18 @@ test('api token settings form keeps selected permissions in the posted payload',
         ->and($apiPage)->toContain("const tokensSectionId = 'api-tokens'")
         ->and($apiPage)->toContain("const documentationSectionId = 'api-documentation'")
         ->and($apiPage)->toContain(':href="`#${section.id}`"')
-        ->and($apiPage)->toContain('class="sticky top-24 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"')
+        ->and($apiPage)->toContain('class="rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"')
         ->and($apiPage)->toContain('{{ t.api.target_user_overview }}')
         ->and($apiPage)->toContain('{{ t.api.target_user }}')
         ->and($apiPage)->toContain('{{ endpoint.target_user }}')
+        ->and($apiPage)->toContain('v-if="section.notes.length > 0"')
+        ->and($apiPage)->toContain('v-for="note in section.notes"')
         ->and($apiPage)->toContain('const documentationSectionAnchorId = (index: number): string =>')
         ->and($apiPage)->toContain('const documentationNavigationSections = computed(() =>')
         ->and($apiPage)->toContain('class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start xl:gap-6"')
         ->and($apiPage)->toContain('class="scroll-mt-24 space-y-3 rounded-2xl border border-border p-4"')
         ->and($apiPage)->toContain('class="hidden xl:block xl:sticky xl:top-24"')
+        ->and($apiPage)->not->toContain('class="sticky top-24 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"')
         ->and($apiPage)->not->toContain('IntersectionObserver')
         ->and($apiPage)->not->toContain('v-show="documentationNavigationPinned"')
         ->and($apiPage)->not->toContain('fixed top-24 right-4 z-20 w-72')

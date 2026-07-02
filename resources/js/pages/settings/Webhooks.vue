@@ -82,6 +82,11 @@ type WebhookDocumentation = {
     contacts_store_url: string;
     contacts_update_url: string;
     contacts_destroy_url: string;
+    edo_index_url: string;
+    edo_show_url: string;
+    edo_store_url: string;
+    edo_update_url: string;
+    edo_public_link_url: string;
 };
 
 type DraftWebhook = {
@@ -174,6 +179,8 @@ const webhookHeaderValue = (token: string): string => {
 const PortalWebhookUsersReadPermission = 'users.read';
 const PortalWebhookContactsReadPermission = 'contacts.read';
 const PortalWebhookContactsWritePermission = 'contacts.write';
+const PortalWebhookEdoReadPermission = 'edo.read';
+const PortalWebhookEdoWritePermission = 'edo.write';
 const tokenQueryValue = '{token}';
 const existingSectionId = 'webhook-existing';
 const createSectionId = 'webhook-create';
@@ -250,6 +257,41 @@ const endpointExamples = computed(() => [
         title: t.value.webhooks.documentation_endpoint_contacts_destroy_title,
         description: t.value.webhooks.documentation_endpoint_contacts_destroy_description,
         permission: PortalWebhookContactsWritePermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.edo_index_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_edo_index_title,
+        description: t.value.webhooks.documentation_endpoint_edo_index_description,
+        permission: PortalWebhookEdoReadPermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.edo_show_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_edo_show_title,
+        description: t.value.webhooks.documentation_endpoint_edo_show_description,
+        permission: PortalWebhookEdoReadPermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.edo_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_edo_store_title,
+        description: t.value.webhooks.documentation_endpoint_edo_store_description,
+        permission: PortalWebhookEdoWritePermission,
+    },
+    {
+        method: 'PATCH',
+        path: `${props.documentation.edo_update_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_edo_update_title,
+        description: t.value.webhooks.documentation_endpoint_edo_update_description,
+        permission: PortalWebhookEdoWritePermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.edo_public_link_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_edo_public_link_title,
+        description: t.value.webhooks.documentation_endpoint_edo_public_link_description,
+        permission: PortalWebhookEdoWritePermission,
     },
 ]);
 

@@ -43,6 +43,7 @@ class StoreContactRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:10000'],
+            'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'company_requisites' => ['nullable', 'array'],
             'company_requisites.iin' => ['nullable', 'digits:12'],
             'company_requisites.bin' => ['nullable', 'digits:12'],

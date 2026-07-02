@@ -188,7 +188,7 @@ const buildFormDefaults = (
 };
 
 const editorMode = ref<'create' | 'edit'>(props.activeForm ? 'edit' : 'create');
-const editorSheetOpen = ref(props.activeForm !== null);
+const editorSheetOpen = ref(false);
 const openingCreateForm = ref(false);
 const form = useForm(buildFormDefaults(props.activeForm));
 
@@ -543,12 +543,17 @@ const formatDateTime = (value: string | null): string => {
                 <article
                     v-for="portalForm in props.forms"
                     :key="portalForm.id"
-                    class="rounded-2xl border p-5 transition"
+                    class="cursor-pointer rounded-2xl border p-5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     :class="
                         props.activeForm?.id === portalForm.id
                             ? 'border-primary/40 bg-primary/5'
                             : 'border-border bg-background/60 hover:border-primary/30 hover:bg-background'
                     "
+                    role="button"
+                    tabindex="0"
+                    @click="openForm(portalForm.id)"
+                    @keydown.enter.prevent="openForm(portalForm.id)"
+                    @keydown.space.prevent="openForm(portalForm.id)"
                 >
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
@@ -615,7 +620,7 @@ const formatDateTime = (value: string | null): string => {
                             type="button"
                             variant="outline"
                             size="sm"
-                            @click="copyPublicLink(portalForm.public_url)"
+                            @click.stop="copyPublicLink(portalForm.public_url)"
                         >
                             <Copy class="size-4" />
                             {{ t.forms.copy_link }}
@@ -624,7 +629,7 @@ const formatDateTime = (value: string | null): string => {
                             type="button"
                             variant="outline"
                             size="sm"
-                            @click="openForm(portalForm.id)"
+                            @click.stop="openForm(portalForm.id)"
                         >
                             <PencilLine class="size-4" />
                             {{ t.forms.edit_form }}
@@ -633,7 +638,7 @@ const formatDateTime = (value: string | null): string => {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            @click="deleteForm(portalForm.id)"
+                            @click.stop="deleteForm(portalForm.id)"
                         >
                             <Trash2 class="size-4" />
                             {{ t.forms.delete_form }}

@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\ApiAccessToken;
+use App\Models\EdoDocument;
 use App\Models\PortalForm;
 use App\Models\PortalSetting;
+use App\Models\PortalWebhook;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -56,7 +59,7 @@ test('disabled modules are hidden in shared props', function () {
     config(['admin.super_admin_email' => 'super@example.com']);
 
     PortalSetting::current()->update([
-        'disabled_modules' => ['chats', 'contacts', 'funnels', 'knowledge-bases'],
+        'disabled_modules' => ['chats', 'contacts', 'funnels', 'knowledge-bases', 'production'],
     ]);
 
     $superAdmin = User::factory()->create([
@@ -69,7 +72,8 @@ test('disabled modules are hidden in shared props', function () {
         ->toContain('chats')
         ->toContain('contacts')
         ->toContain('funnels')
-        ->toContain('knowledge-bases');
+        ->toContain('knowledge-bases')
+        ->toContain('production');
 
     expect($response->inertiaProps('auth.canAccessContacts'))->toBeFalse()
         ->and($response->inertiaProps('auth.canManageKnowledgeBases'))->toBeFalse()
@@ -100,7 +104,12 @@ test('disabled module routes return not found', function (string $module, string
     ['funnels', 'funnels.index'],
     ['forms', 'forms.index'],
     ['contacts', 'contacts.index'],
+    ['edo', 'edo.index'],
     ['files', 'files.index'],
+    ['production', 'production.index'],
+    ['api', 'settings.api.edit'],
+    ['integrations', 'settings.integrations.edit'],
+    ['webhooks', 'settings.webhooks.edit'],
 ]);
 
 test('disabled forms module also blocks public forms', function () {
@@ -112,4 +121,135 @@ test('disabled forms module also blocks public forms', function () {
 
     $this->get(route('forms.public.show', $form->public_token))
         ->assertNotFound();
+});
+
+test('disabled edo module also blocks public signing pages', function () {
+    PortalSetting::current()->update([
+        'disabled_modules' => ['edo'],
+    ]);
+
+    $document = EdoDocument::factory()->pendingSignature()->create();
+
+    $this->get(route('edo.public.show', [
+        'edoDocument' => $document->public_token,
+        'signature' => 'invalid',
+        'expires' => now()->addHours(12)->timestamp,
+    ]))->assertNotFound();
+});
+
+test('disabled api module blocks api endpoints even for valid tokens', function () {
+    config(['admin.super_admin_email' => 'super@example.com']);
+    config(['app.debug' => true]);
+
+    PortalSetting::current()->update([
+        'disabled_modules' => ['api'],
+    ]);
+
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+    ]);
+
+    $plainTextToken = ApiAccessToken::generatePlainTextToken();
+
+    ApiAccessToken::query()->create([
+        'user_id' => $superAdmin->id,
+        'name' => 'Disabled API token',
+        ...ApiAccessToken::tokenAttributes($plainTextToken),
+        'permissions' => [ApiAccessToken::PERMISSION_PROFILE_READ],
+    ]);
+
+    $this->withHeaders([
+        'Authorization' => 'Bearer '.$plainTextToken,
+        'Accept' => 'application/json',
+    ])->getJson(route('api.v1.profile.show'))
+        ->assertNotFound()
+        ->assertJsonPath('message', 'Not Found')
+        ->assertJsonMissingPath('exception')
+        ->assertJsonMissingPath('file')
+        ->assertJsonMissingPath('line')
+        ->assertJsonMissingPath('trace');
+});
+
+test('disabled api module takes precedence over token management authorization', function () {
+    PortalSetting::current()->update([
+        'disabled_modules' => ['api'],
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('settings.api.tokens.store'), [
+            'name' => 'Blocked token',
+            'permissions' => [ApiAccessToken::PERMISSION_PROFILE_READ],
+            'never_expires' => true,
+        ])
+        ->assertNotFound();
+});
+
+test('disabled integrations module blocks integrations api endpoints', function () {
+    config(['admin.super_admin_email' => 'super@example.com']);
+
+    PortalSetting::current()->update([
+        'disabled_modules' => ['integrations'],
+    ]);
+
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+    ]);
+
+    $plainTextToken = ApiAccessToken::generatePlainTextToken();
+
+    ApiAccessToken::query()->create([
+        'user_id' => $superAdmin->id,
+        'name' => 'Disabled integrations token',
+        ...ApiAccessToken::tokenAttributes($plainTextToken),
+        'permissions' => [ApiAccessToken::PERMISSION_INTEGRATIONS_READ],
+    ]);
+
+    $this->withHeaders([
+        'Authorization' => 'Bearer '.$plainTextToken,
+        'Accept' => 'application/json',
+    ])->getJson(route('api.v1.integrations.index'))
+        ->assertNotFound();
+});
+
+test('disabled webhooks module blocks webhook endpoints even for valid tokens', function () {
+    PortalSetting::current()->update([
+        'disabled_modules' => ['webhooks'],
+    ]);
+
+    $webhook = PortalWebhook::factory()->create([
+        'permissions' => [PortalWebhook::PERMISSION_USERS_READ],
+    ]);
+
+    $plainTextToken = 'disabled-webhook-token';
+    $webhook->issueToken($plainTextToken);
+
+    $this->get(route('portal-webhooks.invoke', $webhook).'?token='.$plainTextToken)
+        ->assertNotFound();
+});
+
+test('disabled webhooks module takes precedence over webhook authorization', function () {
+    PortalSetting::current()->update([
+        'disabled_modules' => ['webhooks'],
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('settings.webhooks.edit'))
+        ->assertNotFound();
+});
+
+test('module settings page uses instant switch toggles instead of checkboxes', function () {
+    $moduleSettingsPage = file_get_contents(resource_path('js/pages/settings/Modules.vue'));
+
+    expect($moduleSettingsPage)->toContain('role="switch"')
+        ->and($moduleSettingsPage)->toContain('@click="toggleModule(module.key)"')
+        ->and($moduleSettingsPage)->toContain('form.patch(update.url()')
+        ->and($moduleSettingsPage)->not->toContain('components/ui/checkbox');
 });

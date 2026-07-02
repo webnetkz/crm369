@@ -1,9 +1,12 @@
 <?php
 
 use App\Models\Contact;
+use App\Models\ContactComment;
 use App\Models\User;
 use App\Models\UserGroup;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('super admin can manage both person and company contacts', function () {
@@ -164,6 +167,109 @@ test('super admin can update company contacts with requisites', function () {
         ->and($company->email)->toBe('updated-company@example.com')
         ->and($company->company_requisites['bin'])->toBe('123456789012')
         ->and($company->company_requisites['bank_name'])->toBe('Kaspi Bank');
+});
+
+test('super admin can add contact history comments', function () {
+    config(['admin.super_admin_email' => 'super@example.com']);
+
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+    ]);
+
+    $contact = Contact::factory()->person()->create([
+        'name' => 'History Person',
+    ]);
+
+    $this->actingAs($superAdmin)
+        ->post(route('contacts.comments.store', $contact), [
+            'content' => 'Созвон: уточнили потребность и договорились вернуться с КП в пятницу.',
+        ])
+        ->assertRedirect();
+
+    $comment = ContactComment::query()
+        ->whereBelongsTo($contact)
+        ->first();
+
+    expect($comment)->not->toBeNull()
+        ->and($comment?->content)->toBe('Созвон: уточнили потребность и договорились вернуться с КП в пятницу.')
+        ->and($comment?->created_by_user_id)->toBe($superAdmin->id);
+
+    $this->actingAs($superAdmin)
+        ->get(route('contacts.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('contacts.data.0.name', 'History Person')
+            ->has('contacts.data.0.comments', 1)
+            ->where(
+                'contacts.data.0.comments.0.content',
+                'Созвон: уточнили потребность и договорились вернуться с КП в пятницу.',
+            )
+            ->where('contacts.data.0.comments.0.created_by.name', $superAdmin->name)
+        );
+});
+
+test('super admin can upload and replace contact avatars', function () {
+    Storage::fake('public');
+    config(['admin.super_admin_email' => 'super@example.com']);
+
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+    ]);
+
+    $this->actingAs($superAdmin)
+        ->post(route('contacts.store'), [
+            'type' => Contact::TYPE_PERSON,
+            'name' => 'Avatar Person',
+            'avatar' => UploadedFile::fake()->image('person-avatar.png'),
+        ])
+        ->assertRedirect();
+
+    $person = Contact::query()
+        ->where('name', 'Avatar Person')
+        ->where('type', Contact::TYPE_PERSON)
+        ->firstOrFail();
+
+    Storage::disk('public')->assertExists($person->avatar_path);
+
+    $company = Contact::factory()->company()->create([
+        'name' => 'Avatar Company',
+        'avatar_path' => 'contacts/company-existing/company-old.png',
+    ]);
+
+    Storage::disk('public')->put($company->avatar_path, 'old-avatar');
+    $oldAvatarPath = $company->avatar_path;
+
+    $this->actingAs($superAdmin)
+        ->post(route('contacts.update', $company), [
+            '_method' => 'PATCH',
+            'type' => Contact::TYPE_COMPANY,
+            'name' => 'Avatar Company',
+            'contact_person' => $company->contact_person,
+            'position' => $company->position,
+            'email' => $company->email,
+            'phone' => $company->phone,
+            'notes' => $company->notes,
+            'company_requisites' => $company->company_requisites,
+            'avatar' => UploadedFile::fake()->image('company-avatar.png'),
+        ])
+        ->assertRedirect();
+
+    $company->refresh();
+
+    Storage::disk('public')->assertMissing($oldAvatarPath);
+    Storage::disk('public')->assertExists($company->avatar_path);
+
+    expect($company->avatar_path)->not->toBe($oldAvatarPath)
+        ->and($company->avatarUrl())->toBe(Storage::disk('public')->url($company->avatar_path));
+
+    $this->actingAs($superAdmin)
+        ->get(route('contacts.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('contacts.data.0.name', 'Avatar Company')
+            ->where('contacts.data.0.avatar', Storage::disk('public')->url($company->avatar_path))
+            ->where('contacts.data.1.name', 'Avatar Person')
+            ->where('contacts.data.1.avatar', Storage::disk('public')->url($person->avatar_path))
+        );
 });
 
 test('company BIN must contain exactly 12 digits', function () {

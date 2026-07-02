@@ -19,9 +19,7 @@ class MessengerIntegrationFactory extends Factory
 
         return [
             'driver' => $driver,
-            'name' => $driver === MessengerIntegration::DRIVER_WHATSAPP_BUSINESS
-                ? 'WhatsApp Business'
-                : 'Telegram',
+            'name' => MessengerIntegration::defaultNameForDriver($driver),
             'is_active' => false,
             'settings' => MessengerIntegration::defaultSettingsForDriver($driver),
             'updated_by_user_id' => null,
@@ -32,7 +30,7 @@ class MessengerIntegrationFactory extends Factory
     {
         return $this->state(fn (): array => [
             'driver' => MessengerIntegration::DRIVER_WHATSAPP_BUSINESS,
-            'name' => 'WhatsApp Business',
+            'name' => MessengerIntegration::defaultNameForDriver(MessengerIntegration::DRIVER_WHATSAPP_BUSINESS),
             'settings' => MessengerIntegration::defaultSettingsForDriver(MessengerIntegration::DRIVER_WHATSAPP_BUSINESS),
         ]);
     }
@@ -41,8 +39,17 @@ class MessengerIntegrationFactory extends Factory
     {
         return $this->state(fn (): array => [
             'driver' => MessengerIntegration::DRIVER_TELEGRAM,
-            'name' => 'Telegram',
+            'name' => MessengerIntegration::defaultNameForDriver(MessengerIntegration::DRIVER_TELEGRAM),
             'settings' => MessengerIntegration::defaultSettingsForDriver(MessengerIntegration::DRIVER_TELEGRAM),
+        ]);
+    }
+
+    public function telephony(): static
+    {
+        return $this->state(fn (): array => [
+            'driver' => MessengerIntegration::DRIVER_TELEPHONY,
+            'name' => MessengerIntegration::defaultNameForDriver(MessengerIntegration::DRIVER_TELEPHONY),
+            'settings' => MessengerIntegration::defaultSettingsForDriver(MessengerIntegration::DRIVER_TELEPHONY),
         ]);
     }
 }

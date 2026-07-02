@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Contact;
+use App\Models\ContactComment;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,7 +22,25 @@ class ApiContactResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'notes' => $this->notes,
+            'avatar' => $this->avatarUrl(),
             'company_requisites' => $this->company_requisites,
+            'comments' => $this->relationLoaded('comments')
+                ? $this->comments
+                    ->map(fn (ContactComment $comment): array => [
+                        'id' => $comment->id,
+                        'content' => $comment->content,
+                        'created_at' => $comment->created_at?->toISOString(),
+                        'created_by' => $comment->author
+                            ? [
+                                'id' => $comment->author->id,
+                                'name' => $comment->author->name,
+                                'last_name' => $comment->author->last_name,
+                            ]
+                            : null,
+                    ])
+                    ->values()
+                    ->all()
+                : [],
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             'created_by' => $this->creator

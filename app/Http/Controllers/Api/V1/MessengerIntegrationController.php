@@ -15,6 +15,8 @@ class MessengerIntegrationController extends Controller
 {
     public function index(): JsonResponse
     {
+        MessengerIntegration::ensureDefaultIntegrationsExist();
+
         $groups = UserGroup::query()
             ->withCount('users')
             ->orderBy('name')
@@ -22,7 +24,7 @@ class MessengerIntegrationController extends Controller
 
         $integrations = MessengerIntegration::query()
             ->with('groupAccesses')
-            ->orderByRaw("case driver when 'whatsapp_business' then 1 when 'telegram' then 2 else 999 end")
+            ->orderByRaw("case driver when 'whatsapp_business' then 1 when 'telegram' then 2 when 'telephony' then 3 else 999 end")
             ->get();
 
         return response()->json([

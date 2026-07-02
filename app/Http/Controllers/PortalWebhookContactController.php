@@ -9,12 +9,15 @@ use App\Http\Requests\UpdateContactRequest;
 use App\Http\Resources\ApiContactResource;
 use App\Models\Contact;
 use App\Models\PortalWebhook;
+use App\Support\ContactAvatarManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 
 class PortalWebhookContactController extends Controller
 {
     use EnsuresContactsTableIsReady;
+
+    public function __construct(private ContactAvatarManager $contactAvatarManager) {}
 
     public function index(FilterContactsIndexRequest $request, PortalWebhook $portalWebhook): JsonResponse
     {
@@ -87,6 +90,10 @@ class PortalWebhookContactController extends Controller
 
         $contact = Contact::query()->create($request->payload());
 
+        if ($this->contactAvatarManager->sync($contact, $request->file('avatar'))) {
+            $contact->save();
+        }
+
         return response()->json([
             'webhook' => [
                 'id' => $portalWebhook->id,
@@ -105,6 +112,10 @@ class PortalWebhookContactController extends Controller
 
         $resolvedContact = Contact::query()->findOrFail($contact);
         $resolvedContact->update($request->payload());
+
+        if ($this->contactAvatarManager->sync($resolvedContact, $request->file('avatar'))) {
+            $resolvedContact->save();
+        }
 
         return response()->json([
             'webhook' => [

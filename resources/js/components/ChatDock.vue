@@ -46,9 +46,15 @@ const unreadBadge = computed(() => {
     return count > 99 ? '99+' : String(count);
 });
 
+const isChatModuleEnabled = computed(() => {
+    return page.props.portal.enabledModules.includes('chats');
+});
+
 const shouldShowDock = computed(() => {
     return (
-        page.component !== 'chats/Index' && !isAnyChatCenterVisible.value
+        isChatModuleEnabled.value &&
+        page.component !== 'chats/Index' &&
+        !isAnyChatCenterVisible.value
     );
 });
 
@@ -168,14 +174,16 @@ onBeforeUnmount(() => {
         v-if="shouldShowDock"
         class="pointer-events-none fixed right-3 bottom-5 z-30 sm:right-5"
     >
-        <div class="pointer-events-auto relative flex flex-col items-end gap-3 group/dock">
+        <div
+            class="group/dock pointer-events-auto relative flex flex-col items-end gap-3"
+        >
             <div
                 aria-hidden="true"
                 class="pointer-events-none absolute right-0 bottom-full h-5 w-20 group-focus-within/dock:pointer-events-auto group-hover/dock:pointer-events-auto"
             />
 
             <div
-                class="pointer-events-none absolute right-0 bottom-full mb-3 flex translate-y-2 flex-col items-center gap-2 rounded-3xl border border-border/70 bg-background/88 p-2 opacity-0 shadow-2xl transition-all duration-200 group-focus-within/dock:pointer-events-auto group-focus-within/dock:translate-y-0 group-focus-within/dock:opacity-100 group-hover/dock:pointer-events-auto group-hover/dock:translate-y-0 group-hover/dock:opacity-100 backdrop-blur-xl supports-[backdrop-filter]:bg-background/70"
+                class="pointer-events-none absolute right-0 bottom-full mb-3 flex translate-y-2 flex-col items-center gap-2 rounded-3xl border border-border/70 bg-background/88 p-2 opacity-0 shadow-2xl backdrop-blur-xl transition-all duration-200 group-focus-within/dock:pointer-events-auto group-focus-within/dock:translate-y-0 group-focus-within/dock:opacity-100 group-hover/dock:pointer-events-auto group-hover/dock:translate-y-0 group-hover/dock:opacity-100 supports-[backdrop-filter]:bg-background/70"
             >
                 <div
                     v-if="dockEntries.length > 0"
@@ -185,18 +193,32 @@ onBeforeUnmount(() => {
                         v-for="entry in dockEntries"
                         :key="entry.key"
                         type="button"
-                        class="group relative rounded-2xl outline-none transition hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-ring"
-                        :title="entry.subtitle ? `${entry.title} · ${entry.subtitle}` : entry.title"
-                        @click="openChatCenter('chats', entry.conversationId, entry.contactId)"
+                        class="group relative rounded-2xl transition outline-none hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-ring"
+                        :title="
+                            entry.subtitle
+                                ? `${entry.title} · ${entry.subtitle}`
+                                : entry.title
+                        "
+                        @click="
+                            openChatCenter(
+                                'chats',
+                                entry.conversationId,
+                                entry.contactId,
+                            )
+                        "
                     >
-                        <Avatar class="size-12 rounded-2xl border border-border bg-background shadow-sm transition group-hover:border-primary/40">
+                        <Avatar
+                            class="size-12 rounded-2xl border border-border bg-background shadow-sm transition group-hover:border-primary/40"
+                        >
                             <AvatarImage
                                 v-if="entry.avatar"
                                 :src="entry.avatar"
                                 :alt="entry.title"
                                 :style="avatarStyle(entry)"
                             />
-                            <AvatarFallback class="rounded-2xl bg-muted font-semibold text-foreground">
+                            <AvatarFallback
+                                class="rounded-2xl bg-muted font-semibold text-foreground"
+                            >
                                 {{ getInitials(entry.title) }}
                             </AvatarFallback>
                         </Avatar>
@@ -204,13 +226,17 @@ onBeforeUnmount(() => {
                             v-if="entry.unreadCount > 0"
                             class="absolute -top-1 -right-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground"
                         >
-                            {{ entry.unreadCount > 9 ? '9+' : entry.unreadCount }}
+                            {{
+                                entry.unreadCount > 9 ? '9+' : entry.unreadCount
+                            }}
                         </span>
                     </button>
                 </div>
             </div>
 
-            <div class="rounded-3xl border border-border/70 bg-background/88 p-2 shadow-2xl backdrop-blur-xl supports-[backdrop-filter]:bg-background/70">
+            <div
+                class="rounded-3xl border border-border/70 bg-background/88 p-2 shadow-2xl backdrop-blur-xl supports-[backdrop-filter]:bg-background/70"
+            >
                 <Button
                     type="button"
                     size="icon"

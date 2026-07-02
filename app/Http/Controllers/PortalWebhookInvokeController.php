@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Concerns\EnsuresContactsTableIsReady;
 use App\Http\Resources\ApiContactResource;
+use App\Http\Resources\ApiEdoDocumentResource;
 use App\Http\Resources\ApiUserResource;
 use App\Models\Contact;
+use App\Models\EdoDocument;
 use App\Models\PortalWebhook;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +31,7 @@ class PortalWebhookInvokeController extends Controller
             'last_used_at' => $resolvedWebhook->last_used_at?->toISOString(),
             'users' => $this->usersPayload($resolvedWebhook),
             'contacts' => $this->contactsPayload($resolvedWebhook),
+            'edo_documents' => $this->edoPayload($resolvedWebhook),
             'endpoints' => $this->availableEndpoints($resolvedWebhook, $plainTextToken),
         ]);
     }
@@ -70,6 +73,30 @@ class PortalWebhookInvokeController extends Controller
                 'destroy_template' => route('portal-webhooks.contacts.destroy', [
                     'portalWebhook' => $portalWebhook,
                     'contact' => '__CONTACT_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_EDO_READ)) {
+            $endpoints['edo'] = [
+                'index' => route('portal-webhooks.edo.index', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'show_template' => route('portal-webhooks.edo.show', [
+                    'portalWebhook' => $portalWebhook,
+                    'edoDocument' => '__EDO_DOCUMENT_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_EDO_WRITE)) {
+            $endpoints['edo_write'] = [
+                'store' => route('portal-webhooks.edo.store', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'update_template' => route('portal-webhooks.edo.update', [
+                    'portalWebhook' => $portalWebhook,
+                    'edoDocument' => '__EDO_DOCUMENT_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+                'public_link_template' => route('portal-webhooks.edo.public-link.store', [
+                    'portalWebhook' => $portalWebhook,
+                    'edoDocument' => '__EDO_DOCUMENT_ID__',
                 ]).'?token='.urlencode($plainTextToken),
             ];
         }
@@ -139,6 +166,28 @@ class PortalWebhookInvokeController extends Controller
             ->orderBy('name')
             ->get()
             ->map(fn (Contact $contact): array => (new ApiContactResource($contact))->resolve())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function edoPayload(PortalWebhook $portalWebhook): ?array
+    {
+        if (! $portalWebhook->hasPermission(PortalWebhook::PERMISSION_EDO_READ)) {
+            return null;
+        }
+
+        return EdoDocument::query()
+            ->with([
+                'creator:id,name,last_name,email,user_group_id',
+                'updater:id,name,last_name,email,user_group_id',
+            ])
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (EdoDocument $document): array => (new ApiEdoDocumentResource($document))->resolve())
             ->values()
             ->all();
     }

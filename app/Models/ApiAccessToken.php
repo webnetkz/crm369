@@ -61,6 +61,10 @@ class ApiAccessToken extends Model
 
     public const string PERMISSION_CONTACTS_WRITE = 'contacts.write';
 
+    public const string PERMISSION_EDO_READ = 'edo.read';
+
+    public const string PERMISSION_EDO_WRITE = 'edo.write';
+
     public const string PERMISSION_KNOWLEDGE_READ = 'knowledge.read';
 
     public const string PERMISSION_KNOWLEDGE_WRITE = 'knowledge.write';
@@ -152,6 +156,14 @@ class ApiAccessToken extends Model
             self::PERMISSION_CONTACTS_WRITE => [
                 'label_key' => 'ui.api.permission_contacts_write',
                 'description_key' => 'ui.api.permission_contacts_write_description',
+            ],
+            self::PERMISSION_EDO_READ => [
+                'label_key' => 'ui.api.permission_edo_read',
+                'description_key' => 'ui.api.permission_edo_read_description',
+            ],
+            self::PERMISSION_EDO_WRITE => [
+                'label_key' => 'ui.api.permission_edo_write',
+                'description_key' => 'ui.api.permission_edo_write_description',
             ],
             self::PERMISSION_KNOWLEDGE_READ => [
                 'label_key' => 'ui.api.permission_knowledge_read',

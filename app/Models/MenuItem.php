@@ -144,6 +144,18 @@ class MenuItem extends Model
                 'url' => '/contacts',
                 'sort_order' => 90,
             ],
+            'edo' => [
+                'title_key' => 'ui.edo.title',
+                'fallback_title' => 'Document signing',
+                'url' => '/edo',
+                'sort_order' => 95,
+            ],
+            'production' => [
+                'title_key' => 'ui.production.title',
+                'fallback_title' => 'Production',
+                'url' => '/production',
+                'sort_order' => 100,
+            ],
             'settings.profile' => [
                 'title_key' => 'ui.settings.profile',
                 'fallback_title' => 'Profile',
@@ -204,6 +216,12 @@ class MenuItem extends Model
                 'url' => '/settings/api',
                 'sort_order' => 177,
             ],
+            'settings.logs' => [
+                'title_key' => 'ui.settings.logs',
+                'fallback_title' => 'Logs',
+                'url' => '/settings/logs',
+                'sort_order' => 178,
+            ],
             'settings.webhooks' => [
                 'title_key' => 'ui.settings.webhooks',
                 'fallback_title' => 'Webhooks',
@@ -228,6 +246,8 @@ class MenuItem extends Model
             'funnels',
             'forms',
             'contacts',
+            'edo',
+            'production',
         ];
     }
 

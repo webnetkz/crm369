@@ -2,6 +2,7 @@ import { usePage } from '@inertiajs/vue3';
 import {
     BadgeCheck,
     Building2,
+    FileText,
     LayoutGrid,
     LockKeyhole,
     Menu,
@@ -22,6 +23,7 @@ import { edit as editSecurity } from '@/routes/security';
 import { edit as editApi } from '@/routes/settings/api';
 import { index as groupsIndex } from '@/routes/settings/groups';
 import { edit as editIntegrations } from '@/routes/settings/integrations';
+import { edit as editLogs } from '@/routes/settings/logs';
 import { edit as editMenu } from '@/routes/settings/menu';
 import { edit as editModules } from '@/routes/settings/modules';
 import { edit as editPortal } from '@/routes/settings/portal';
@@ -37,9 +39,16 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
     const hiddenMenuItems = computed(
         () => new Set(page.props.menu.hiddenItems),
     );
+    const enabledModules = computed(
+        () => new Set(page.props.portal.enabledModules),
+    );
 
     const isVisible = (key: string): boolean => {
         return !hiddenMenuItems.value.has(key);
+    };
+
+    const isModuleEnabled = (key: string): boolean => {
+        return enabledModules.value.has(key);
     };
 
     return computed<NavItem[]>(() => {
@@ -125,7 +134,8 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                   ]
                 : []),
             ...(page.props.auth.isSuperAdmin &&
-            isVisible('settings.integrations')
+            isVisible('settings.integrations') &&
+            isModuleEnabled('integrations')
                 ? [
                       {
                           key: 'settings.integrations',
@@ -135,7 +145,17 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                       },
                   ]
                 : []),
-            ...(isVisible('settings.api')
+            ...(page.props.auth.isSuperAdmin && isVisible('settings.logs')
+                ? [
+                      {
+                          key: 'settings.logs',
+                          title: t.value.settings.logs,
+                          href: editLogs(),
+                          icon: FileText,
+                      },
+                  ]
+                : []),
+            ...(isVisible('settings.api') && isModuleEnabled('api')
                 ? [
                       {
                           key: 'settings.api',
@@ -146,7 +166,8 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                   ]
                 : []),
             ...(page.props.auth.canManageWebhooks &&
-            isVisible('settings.webhooks')
+            isVisible('settings.webhooks') &&
+            isModuleEnabled('webhooks')
                 ? [
                       {
                           key: 'settings.webhooks',

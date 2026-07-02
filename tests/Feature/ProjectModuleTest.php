@@ -270,6 +270,68 @@ test('user can reorder kanban task stages', function () {
         );
 });
 
+test('updating a task writes a change log message into the task discussion', function () {
+    $creator = User::factory()->create();
+    $assignee = User::factory()->create();
+    $coAssignee = User::factory()->create();
+    $dueAt = now()->addDay()->startOfMinute();
+
+    $task = ProjectTask::factory()->standalone()->create([
+        'creator_user_id' => $creator->id,
+        'assignee_user_id' => null,
+        'updated_by_user_id' => $creator->id,
+        'title' => 'Initial brief',
+        'description' => null,
+        'status' => ProjectTask::STATUS_TODO,
+        'importance' => ProjectTask::IMPORTANCE_NORMAL,
+        'complexity' => 3,
+        'due_at' => null,
+        'sort_order' => 0,
+    ]);
+
+    $this->actingAs($creator)
+        ->patch(route('projects.workspace.tasks.update', $task), [
+            'project_id' => null,
+            'parent_task_id' => null,
+            'title' => 'Updated brief',
+            'description' => 'Scope agreed with the client.',
+            'status' => ProjectTask::STATUS_REVIEW,
+            'importance' => ProjectTask::IMPORTANCE_HIGH,
+            'complexity' => 7,
+            'due_at' => $dueAt->toISOString(),
+            'sort_order' => 4,
+            'assignee_user_id' => $assignee->id,
+            'co_assignee_user_ids' => [$coAssignee->id],
+        ])
+        ->assertRedirect(route('projects.workspace.tasks.show', $task));
+
+    $conversation = $task->fresh()->chatConversation()->with('messages')->firstOrFail();
+    $message = $conversation->messages()->latest('id')->firstOrFail();
+    $locale = $creator->resolvedLanguage();
+
+    expect($message->user_id)->toBe($creator->id)
+        ->and($message->body)->toContain(__('ui.projects.task_change_log_heading', [], $locale))
+        ->and($message->body)->toContain('- '.__('ui.projects.task_title', [], $locale).': "Initial brief" -> "Updated brief"')
+        ->and($message->body)->toContain(
+            '- '.__('ui.projects.status', [], $locale).': '
+            .__('ui.projects.status_'.ProjectTask::STATUS_TODO, [], $locale)
+            .' -> '
+            .__('ui.projects.status_'.ProjectTask::STATUS_REVIEW, [], $locale),
+        )
+        ->and($message->body)->toContain(
+            '- '.__('ui.projects.assignee', [], $locale).': '
+            .__('ui.projects.unassigned', [], $locale)
+            .' -> '
+            .trim($assignee->name.' '.($assignee->last_name ?? '')),
+        )
+        ->and($message->body)->toContain(
+            '- '.__('ui.projects.due_date', [], $locale).': '
+            .__('ui.common.not_specified', [], $locale)
+            .' -> '
+            .$dueAt->format('d.m.Y H:i'),
+        );
+});
+
 test('super admin can open any isolated project', function () {
     config(['admin.super_admin_email' => 'super@example.com']);
 
@@ -573,9 +635,14 @@ test('projects page collects deadline time and transforms it before submit', fun
         ->toContain('formatDateTime')
         ->toContain('normalizeDueAtForSubmission')
         ->toContain('.transform((data) => ({')
+        ->toContain('activeTaskForm')
+        ->toContain('scheduleActiveTaskSave')
+        ->toContain('submitActiveTaskUpdate')
+        ->toContain('task_autosave_saving')
         ->toContain('SheetContent side="right"')
         ->toContain('sm:w-[80vw]')
         ->toContain('ProjectTaskConversationPanel')
+        ->not->toContain('@click="openEditTask"')
         ->and($taskConversationPanel)->toContain('task_discussion_placeholder')
         ->and($taskConversationPanel)->toContain('showTaskConversation.url')
         ->and($taskConversationPanel)->toContain('storeMessage.url')

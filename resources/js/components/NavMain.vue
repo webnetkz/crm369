@@ -17,17 +17,17 @@ import {
     SidebarMenuSubButton,
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
+import { useSidebar } from '@/components/ui/sidebar/utils';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { useLanguage } from '@/composables/useLanguage';
-import { useSidebar } from '@/components/ui/sidebar/utils';
 import type { NavItem } from '@/types';
 
 const props = withDefaults(
     defineProps<{
-    items: NavItem[];
-    reorderable?: boolean;
-    reordering?: boolean;
-}>(),
+        items: NavItem[];
+        reorderable?: boolean;
+        reordering?: boolean;
+    }>(),
     {
         reorderable: false,
         reordering: false,
@@ -79,16 +79,14 @@ const anchorRel = (item: NavItem): string | undefined => {
 };
 
 const canReorderItem = (item: NavItem): item is NavItem & { key: string } => {
-    return (
-        props.reorderable &&
-        typeof item.key === 'string' &&
-        item.key !== ''
-    );
+    return props.reorderable && typeof item.key === 'string' && item.key !== '';
 };
 
 const orderedKeys = (): string[] => {
     return props.items.flatMap((item) => {
-        return typeof item.key === 'string' && item.key !== '' ? [item.key] : [];
+        return typeof item.key === 'string' && item.key !== ''
+            ? [item.key]
+            : [];
     });
 };
 
@@ -152,15 +150,19 @@ const isHandleVisible = (item: NavItem): boolean => {
 };
 
 const isDropBefore = (item: NavItem): boolean => {
-    return canReorderItem(item)
-        && dropTarget.value?.key === item.key
-        && dropTarget.value.position === 'before';
+    return (
+        canReorderItem(item) &&
+        dropTarget.value?.key === item.key &&
+        dropTarget.value.position === 'before'
+    );
 };
 
 const isDropAfter = (item: NavItem): boolean => {
-    return canReorderItem(item)
-        && dropTarget.value?.key === item.key
-        && dropTarget.value.position === 'after';
+    return (
+        canReorderItem(item) &&
+        dropTarget.value?.key === item.key &&
+        dropTarget.value.position === 'after'
+    );
 };
 
 const handleDragStart = (event: DragEvent, item: NavItem): void => {
@@ -187,9 +189,9 @@ const handleDragStart = (event: DragEvent, item: NavItem): void => {
 
 const handleDragOver = (event: DragEvent, item: NavItem): void => {
     if (
-        !canReorderItem(item)
-        || !dragSourceKey.value
-        || dragSourceKey.value === item.key
+        !canReorderItem(item) ||
+        !dragSourceKey.value ||
+        dragSourceKey.value === item.key
     ) {
         return;
     }
@@ -218,10 +220,10 @@ const resetDragState = (): void => {
 
 const handleDrop = (item: NavItem): void => {
     if (
-        !canReorderItem(item)
-        || !dragSourceKey.value
-        || !dropTarget.value
-        || dropTarget.value.key !== item.key
+        !canReorderItem(item) ||
+        !dragSourceKey.value ||
+        !dropTarget.value ||
+        dropTarget.value.key !== item.key
     ) {
         resetDragState();
 
@@ -232,7 +234,11 @@ const handleDrop = (item: NavItem): void => {
     const sourceIndex = keys.indexOf(dragSourceKey.value);
     const targetIndex = keys.indexOf(item.key);
 
-    if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) {
+    if (
+        sourceIndex === -1 ||
+        targetIndex === -1 ||
+        sourceIndex === targetIndex
+    ) {
         resetDragState();
 
         return;
@@ -247,9 +253,14 @@ const handleDrop = (item: NavItem): void => {
         return;
     }
 
-    const insertionIndex = dropTarget.value.position === 'after'
-        ? (sourceIndex < targetIndex ? targetIndex : targetIndex + 1)
-        : (sourceIndex < targetIndex ? targetIndex - 1 : targetIndex);
+    const insertionIndex =
+        dropTarget.value.position === 'after'
+            ? sourceIndex < targetIndex
+                ? targetIndex
+                : targetIndex + 1
+            : sourceIndex < targetIndex
+              ? targetIndex - 1
+              : targetIndex;
 
     reorderedKeys.splice(insertionIndex, 0, movedKey);
     emit('reorder', reorderedKeys);
@@ -263,7 +274,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <SidebarGroup v-if="props.items.length > 0" class="px-2 py-0">
+    <SidebarGroup v-if="props.items.length > 0" class="px-2 py-2">
         <SidebarMenu>
             <template v-for="item in props.items" :key="item.key ?? item.title">
                 <SidebarMenuItem
@@ -341,8 +352,12 @@ onBeforeUnmount(() => {
                 >
                     <SidebarMenuItem
                         :class="[
-                            isDropBefore(item) ? 'border-t-2 border-primary' : '',
-                            isDropAfter(item) ? 'border-b-2 border-primary' : '',
+                            isDropBefore(item)
+                                ? 'border-t-2 border-primary'
+                                : '',
+                            isDropAfter(item)
+                                ? 'border-b-2 border-primary'
+                                : '',
                         ]"
                         @mouseenter="revealHandleLater(item)"
                         @mouseleave="hideHandle(item)"
@@ -360,7 +375,7 @@ onBeforeUnmount(() => {
                                     item.title
                                 }}</span>
                                 <ChevronRight
-                                    class="ml-auto mr-5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+                                    class="mr-5 ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
                                 />
                             </SidebarMenuButton>
                         </CollapsibleTrigger>
@@ -417,18 +432,20 @@ onBeforeUnmount(() => {
                                                 :is="child.icon"
                                                 v-if="child.icon"
                                             />
-                                            <span class="min-w-0 flex-1 truncate">{{
-                                                child.title
-                                            }}</span>
+                                            <span
+                                                class="min-w-0 flex-1 truncate"
+                                                >{{ child.title }}</span
+                                            >
                                         </a>
                                         <Link v-else :href="child.href">
                                             <component
                                                 :is="child.icon"
                                                 v-if="child.icon"
                                             />
-                                            <span class="min-w-0 flex-1 truncate">{{
-                                                child.title
-                                            }}</span>
+                                            <span
+                                                class="min-w-0 flex-1 truncate"
+                                                >{{ child.title }}</span
+                                            >
                                         </Link>
                                     </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>

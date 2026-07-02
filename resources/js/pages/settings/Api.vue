@@ -63,6 +63,7 @@ type DocumentationEndpoint = {
 type DocumentationSection = {
     title: string;
     description: string;
+    notes: string[];
     endpoints: DocumentationEndpoint[];
 };
 
@@ -327,7 +328,7 @@ const formatDateTime = (value: string | null): string => {
 
         <nav
             aria-label="API sections"
-            class="sticky top-24 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"
+            class="rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"
         >
             <div class="flex flex-wrap gap-3">
                 <a
@@ -575,6 +576,18 @@ const formatDateTime = (value: string | null): string => {
                             <h2 class="text-base font-semibold">{{ section.title }}</h2>
                             <p class="text-sm text-muted-foreground">
                                 {{ section.description }}
+                            </p>
+                        </div>
+
+                        <div
+                            v-if="section.notes.length > 0"
+                            class="grid gap-2 rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground"
+                        >
+                            <p
+                                v-for="note in section.notes"
+                                :key="note"
+                            >
+                                {{ note }}
                             </p>
                         </div>
 

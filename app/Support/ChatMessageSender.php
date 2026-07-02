@@ -15,6 +15,30 @@ use Throwable;
 
 class ChatMessageSender
 {
+    public function sendPlainText(
+        ChatConversation $chatConversation,
+        User $user,
+        string $body,
+    ): ChatMessage {
+        return DB::transaction(function () use (
+            $chatConversation,
+            $body,
+            $user,
+        ): ChatMessage {
+            $message = $chatConversation->messages()->create([
+                'user_id' => $user->id,
+                'body' => $body,
+            ]);
+
+            $this->touchConversation($chatConversation, $message);
+
+            return $message->load([
+                'user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
+                'attachments',
+            ]);
+        });
+    }
+
     public function send(
         ChatConversation $chatConversation,
         User $user,
@@ -56,14 +80,7 @@ class ChatMessageSender
                     ]);
                 }
 
-                $chatConversation->forceFill([
-                    'last_message_at' => $message->created_at,
-                ])->save();
-
-                ChatConversationParticipant::query()
-                    ->where('chat_conversation_id', $chatConversation->id)
-                    ->where('user_id', $user->id)
-                    ->update(['last_read_at' => $message->created_at]);
+                $this->touchConversation($chatConversation, $message);
 
                 return $message->load([
                     'user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
@@ -93,5 +110,19 @@ class ChatMessageSender
             $storedFileName,
             'local',
         );
+    }
+
+    private function touchConversation(
+        ChatConversation $chatConversation,
+        ChatMessage $message,
+    ): void {
+        $chatConversation->forceFill([
+            'last_message_at' => $message->created_at,
+        ])->save();
+
+        ChatConversationParticipant::query()
+            ->where('chat_conversation_id', $chatConversation->id)
+            ->where('user_id', $message->user_id)
+            ->update(['last_read_at' => $message->created_at]);
     }
 }

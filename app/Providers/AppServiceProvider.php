@@ -48,6 +48,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-webhooks', fn (User $user): bool => $user->canManageWebhooks());
         Gate::define('access-contacts', fn (User $user): bool => $user->canAccessContacts());
         Gate::define('manage-knowledge-bases', fn (User $user): bool => $user->canManageKnowledgeBases());
+        Gate::define('manage-news', fn (User $user): bool => $user->canManageNews());
         Gate::define('manage-funnels', fn (User $user): bool => $user->canManageFunnels());
 
         Auth::viaRequest('api-token', function (Request $request): ?User {

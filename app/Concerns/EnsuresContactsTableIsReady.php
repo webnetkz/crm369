@@ -3,6 +3,7 @@
 namespace App\Concerns;
 
 use App\Models\Contact;
+use App\Models\ContactComment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Schema;
 
@@ -10,7 +11,8 @@ trait EnsuresContactsTableIsReady
 {
     protected function contactsTableExists(): bool
     {
-        return Schema::hasTable((new Contact)->getTable());
+        return Schema::hasTable((new Contact)->getTable())
+            && Schema::hasTable((new ContactComment)->getTable());
     }
 
     protected function ensureContactsTableExists(): void

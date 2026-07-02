@@ -227,21 +227,27 @@ test('knowledge base section is integrated into the sidebar and page editor file
     $treeItem = file_get_contents(resource_path('js/components/knowledge/KnowledgeTreeItem.vue'));
 
     expect($sidebar)->toContain('knowledge-bases')
-        ->and($sidebar)->toContain('page.props.menu.knowledgeBases')
-        ->and($sidebar)->toContain('showKnowledgeBase(')
-        ->and($sidebar)->toContain('t.value.knowledge.title')
-        ->and($page)->toContain('KnowledgeTreeItem')
-        ->and($page)->toContain('isKnowledgeBaseIndexPage')
-        ->and($page)->toContain('xl:grid-cols-[22rem_minmax(0,1fr)]')
-        ->and($page)->toContain('KnowledgeArticleBlocksEditor')
-        ->and($page)->toContain('sidebarCollapsed: isArticleEditorActive.value')
-        ->and($editor)->toContain('format_bold')
-        ->and($editor)->toContain('sticky bottom-4 z-20')
-        ->and($editor)->toContain('RichTextEditable')
-        ->and($richText)->toContain('contenteditable="true"')
-        ->and($treeItem)->toContain('space-y-0.5')
-        ->and($treeItem)->toContain('leading-5')
-        ->and($editor)->toContain('LocalizedFilePicker')
-        ->and($renderer)->toContain('v-html="block.content ?? \'\'"')
-        ->and($renderer)->toContain("block.type === 'image'");
+        ->toContain('Array.isArray(page.props.menu?.knowledgeBases)')
+        ->toContain('Array.isArray(page.props.menu?.customItems)')
+        ->toContain('showKnowledgeBase(')
+        ->toContain('t.value.knowledge.title');
+
+    expect($page)->toContain('KnowledgeTreeItem')
+        ->toContain('isKnowledgeBaseIndexPage')
+        ->toContain('xl:grid-cols-[22rem_minmax(0,1fr)]')
+        ->toContain('KnowledgeArticleBlocksEditor')
+        ->not->toContain('sidebarCollapsed:');
+
+    expect($editor)->toContain('format_bold')
+        ->toContain('sticky bottom-4 z-20')
+        ->toContain('RichTextEditable')
+        ->toContain('LocalizedFilePicker');
+
+    expect($richText)->toContain('contenteditable="true"');
+
+    expect($treeItem)->toContain('space-y-0.5')
+        ->toContain('leading-5');
+
+    expect($renderer)->toContain('v-html="block.content ?? \'\'"')
+        ->toContain("block.type === 'image'");
 });

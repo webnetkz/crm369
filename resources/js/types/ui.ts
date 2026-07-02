@@ -72,6 +72,25 @@ export type Menu = {
     order: string[];
 };
 
+export type NewsListItem = {
+    id: number;
+    title: string;
+    slug: string;
+    excerpt: string | null;
+    image_url: string | null;
+    is_published: boolean;
+    published_at: string | null;
+    updated_at: string | null;
+};
+
+export type NewsActiveItem = NewsListItem & {
+    content: string;
+    author: {
+        name: string;
+        last_name: string | null;
+    } | null;
+};
+
 export type PortalFormAvailableUser = {
     id: number;
     name: string;
@@ -223,6 +242,24 @@ export type FileEntryItem = {
     download_url: string;
 };
 
+export type EdoAvailableFileItem = {
+    id: number;
+    original_name: string;
+    directory_name: string | null;
+    mime_type: string | null;
+    size_bytes: number;
+    created_at: string | null;
+};
+
+export type EdoDocumentSource = 'text' | 'upload' | 'file_entry';
+
+export type EdoDocumentFile = {
+    original_name: string;
+    mime_type: string | null;
+    size_bytes: number | null;
+    download_url: string | null;
+};
+
 export type FileDirectoryPermissionItem = {
     id: number;
     access_level: 'read' | 'edit';
@@ -231,6 +268,64 @@ export type FileDirectoryPermissionItem = {
     subject_name: string | null;
     granted_by_name: string | null;
     created_at: string | null;
+};
+
+export type EdoDocumentListItem = {
+    id: number;
+    title: string;
+    external_reference: string | null;
+    counterparty_name: string;
+    counterparty_identifier: string | null;
+    content: string;
+    document_source: EdoDocumentSource;
+    source_file_entry_id: number | null;
+    document_file: EdoDocumentFile | null;
+    status: 'draft' | 'pending_signature' | 'signed' | 'cancelled';
+    public_sign_url: string | null;
+    public_sign_expires_at: string | null;
+    has_active_public_link: boolean;
+    signature_subject: string | null;
+    signature_serial_number: string | null;
+    signature_algorithm: string | null;
+    signed_payload_hash: string | null;
+    signature_metadata: Record<string, unknown> | null;
+    signed_at: string | null;
+    metadata: Record<string, unknown> | null;
+    created_at: string | null;
+    updated_at: string | null;
+    creator: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+    updater: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+};
+
+export type EdoDocumentActiveItem = EdoDocumentListItem;
+
+export type EdoDocumentPublicItem = {
+    id: number;
+    title: string;
+    external_reference: string | null;
+    counterparty_name: string;
+    counterparty_identifier: string | null;
+    content: string;
+    document_source: EdoDocumentSource;
+    document_file: Omit<EdoDocumentFile, 'download_url'> | null;
+    document_file_download_url: string | null;
+    status: 'draft' | 'pending_signature' | 'signed' | 'cancelled';
+    public_link_expires_at: string | null;
+    signed_at: string | null;
+    signature_subject: string | null;
+    signature_algorithm: string | null;
+    signed_payload_hash: string;
+    sign_payload_xml: string;
+    submit_url: string | null;
+    state: 'ready' | 'expired' | 'signed';
 };
 
 export type FileActiveDirectory = {

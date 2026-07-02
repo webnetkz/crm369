@@ -32,6 +32,7 @@ return [
     'portal' => 'Портал',
     'modules' => 'Модули',
     'integrations' => 'Интеграции',
+    'logs' => 'Логи',
     'api' => 'API',
     'webhooks' => 'Веб-хуки',
 ];

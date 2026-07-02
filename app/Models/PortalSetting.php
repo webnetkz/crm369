@@ -74,9 +74,29 @@ class PortalSetting extends Model
                 'title_key' => 'ui.contacts.title',
                 'description_key' => 'ui.contacts.description',
             ],
+            'edo' => [
+                'title_key' => 'ui.edo.title',
+                'description_key' => 'ui.edo.description',
+            ],
             'files' => [
                 'title_key' => 'ui.files.title',
                 'description_key' => 'ui.files.description',
+            ],
+            'production' => [
+                'title_key' => 'ui.production.title',
+                'description_key' => 'ui.production.description',
+            ],
+            'api' => [
+                'title_key' => 'ui.api.title',
+                'description_key' => 'ui.api.description',
+            ],
+            'webhooks' => [
+                'title_key' => 'ui.webhooks.title',
+                'description_key' => 'ui.webhooks.description',
+            ],
+            'integrations' => [
+                'title_key' => 'ui.integrations.title',
+                'description_key' => 'ui.integrations.description',
             ],
         ];
     }

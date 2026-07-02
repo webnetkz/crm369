@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\ApiController;
 use App\Http\Controllers\Settings\AppearanceController;
+use App\Http\Controllers\Settings\LogController;
 use App\Http\Controllers\Settings\MenuController;
 use App\Http\Controllers\Settings\MessengerIntegrationController;
 use App\Http\Controllers\Settings\ModuleController;
@@ -35,7 +36,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('settings/appearance', [AppearanceController::class, 'edit'])->name('appearance.edit');
     Route::post('settings/appearance', [AppearanceController::class, 'update'])->name('appearance.update');
+});
+
+Route::middleware(['auth', 'verified', 'module.enabled:api'])->group(function () {
     Route::get('settings/api', [ApiController::class, 'edit'])->name('settings.api.edit');
+
+    Route::middleware('can:manage-user-accounts')->group(function () {
+        Route::post('settings/api/tokens', [ApiController::class, 'store'])
+            ->middleware('throttle:api-tokens')
+            ->name('settings.api.tokens.store');
+        Route::delete('settings/api/tokens/{apiAccessToken}', [ApiController::class, 'destroy'])
+            ->name('settings.api.tokens.destroy');
+    });
 });
 
 Route::middleware(['auth', 'verified', 'can:view-users'])->group(function () {
@@ -47,10 +59,6 @@ Route::middleware(['auth', 'verified', 'can:manage-user-accounts'])->group(funct
     Route::post('settings/users', [UserController::class, 'store'])->name('settings.users.store');
     Route::patch('settings/users/{user}/profile', [UserController::class, 'updateProfile'])->name('settings.users.profile.update');
     Route::patch('settings/users/{user}/password', [UserController::class, 'resetPassword'])->name('settings.users.password.reset');
-    Route::post('settings/api/tokens', [ApiController::class, 'store'])
-        ->middleware('throttle:api-tokens')
-        ->name('settings.api.tokens.store');
-    Route::delete('settings/api/tokens/{apiAccessToken}', [ApiController::class, 'destroy'])->name('settings.api.tokens.destroy');
 });
 
 Route::middleware(['auth', 'verified', 'can:impersonate-users'])->group(function () {
@@ -83,12 +91,17 @@ Route::middleware(['auth', 'verified', 'can:manage-users'])->group(function () {
     Route::post('settings/portal', [PortalController::class, 'update'])->name('settings.portal.update');
     Route::get('settings/modules', [ModuleController::class, 'edit'])->name('settings.modules.edit');
     Route::patch('settings/modules', [ModuleController::class, 'update'])->name('settings.modules.update');
+    Route::get('settings/logs', [LogController::class, 'edit'])->name('settings.logs.edit');
 
-    Route::get('settings/integrations', [MessengerIntegrationController::class, 'edit'])->name('settings.integrations.edit');
-    Route::patch('settings/integrations/{messengerIntegration}', [MessengerIntegrationController::class, 'update'])->name('settings.integrations.update');
+    Route::get('settings/integrations', [MessengerIntegrationController::class, 'edit'])
+        ->middleware('module.enabled:integrations')
+        ->name('settings.integrations.edit');
+    Route::patch('settings/integrations/{messengerIntegration}', [MessengerIntegrationController::class, 'update'])
+        ->middleware('module.enabled:integrations')
+        ->name('settings.integrations.update');
 });
 
-Route::middleware(['auth', 'verified', 'can:manage-webhooks'])->group(function () {
+Route::middleware(['auth', 'verified', 'module.enabled:webhooks', 'can:manage-webhooks'])->group(function () {
     Route::get('settings/webhooks', [WebhookController::class, 'edit'])->name('settings.webhooks.edit');
     Route::post('settings/webhooks', [WebhookController::class, 'store'])->name('settings.webhooks.store');
     Route::patch('settings/webhooks/{portalWebhook}', [WebhookController::class, 'update'])->name('settings.webhooks.update');

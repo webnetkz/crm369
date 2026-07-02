@@ -57,8 +57,12 @@ class HandleInertiaRequests extends Middleware
                 'isSuperAdmin' => $request->user()?->isSuperAdmin() ?? false,
                 'canViewUsers' => $request->user()?->canViewUsers() ?? false,
                 'canImpersonateUsers' => $request->user()?->canImpersonateUsers() ?? false,
-                'canManageApiTokens' => $request->user()?->canManageApiTokens() ?? false,
-                'canManageWebhooks' => $request->user()?->canManageWebhooks() ?? false,
+                'canManageApiTokens' => $this->moduleEnabled('api')
+                    ? ($request->user()?->canManageApiTokens() ?? false)
+                    : false,
+                'canManageWebhooks' => $this->moduleEnabled('webhooks')
+                    ? ($request->user()?->canManageWebhooks() ?? false)
+                    : false,
                 'canAccessContacts' => $this->moduleEnabled('contacts')
                     ? ($request->user()?->canAccessContacts() ?? false)
                     : false,
@@ -70,6 +74,9 @@ class HandleInertiaRequests extends Middleware
                     : false,
                 'canManageKnowledgeBases' => $this->moduleEnabled('knowledge-bases')
                     ? ($request->user()?->canManageKnowledgeBases() ?? false)
+                    : false,
+                'canManageNews' => $this->moduleEnabled('news')
+                    ? ($request->user()?->canManageNews() ?? false)
                     : false,
                 'canAccessFunnels' => $this->moduleEnabled('funnels') && $this->crmFunnelsEnabled()
                     ? ($request->user()?->canAccessFunnels() ?? false)

@@ -2,6 +2,7 @@
 
 return [
     'common' => require __DIR__.'/ui/common.php',
+    'dashboard' => require __DIR__.'/ui/dashboard.php',
     'auth' => require __DIR__.'/ui/auth.php',
     'settings' => require __DIR__.'/ui/settings.php',
     'admin' => require __DIR__.'/ui/admin.php',
@@ -12,7 +13,9 @@ return [
     'funnels' => require __DIR__.'/ui/funnels.php',
     'forms' => require __DIR__.'/ui/forms.php',
     'contacts' => require __DIR__.'/ui/contacts.php',
+    'edo' => require __DIR__.'/ui/edo.php',
     'files' => require __DIR__.'/ui/files.php',
+    'production' => require __DIR__.'/ui/production.php',
     'news' => require __DIR__.'/ui/news.php',
     'projects' => require __DIR__.'/ui/projects.php',
     'chat' => require __DIR__.'/ui/chat.php',

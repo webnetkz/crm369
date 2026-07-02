@@ -31,6 +31,11 @@ class WebhookController extends Controller
                 'contacts_store_url' => url('/portal-webhooks').'/{webhook_id}/contacts',
                 'contacts_update_url' => url('/portal-webhooks').'/{webhook_id}/contacts/{contact_id}',
                 'contacts_destroy_url' => url('/portal-webhooks').'/{webhook_id}/contacts/{contact_id}',
+                'edo_index_url' => url('/portal-webhooks').'/{webhook_id}/edo/documents',
+                'edo_show_url' => url('/portal-webhooks').'/{webhook_id}/edo/documents/{edo_document_id}',
+                'edo_store_url' => url('/portal-webhooks').'/{webhook_id}/edo/documents',
+                'edo_update_url' => url('/portal-webhooks').'/{webhook_id}/edo/documents/{edo_document_id}',
+                'edo_public_link_url' => url('/portal-webhooks').'/{webhook_id}/edo/documents/{edo_document_id}/public-link',
             ],
             'availablePermissions' => collect(PortalWebhook::permissionDefinitions())
                 ->map(fn (array $definition, string $key): array => [

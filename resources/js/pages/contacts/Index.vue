@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { Head, router, setLayoutProps, useForm } from '@inertiajs/vue3';
 import { Building2, Pencil, Plus, Search, Trash2, UserRound } from '@lucide/vue';
-import { computed, ref, watch, watchEffect } from 'vue';
+import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
 import {
     destroy,
     store,
     update,
 } from '@/actions/App/Http/Controllers/ContactController';
+import { store as storeComment } from '@/actions/App/Http/Controllers/ContactCommentController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import LocalizedFilePicker from '@/components/LocalizedFilePicker.vue';
 import PaginationControls from '@/components/PaginationControls.vue';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -22,6 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getInitials } from '@/composables/useInitials';
 import { useLanguage } from '@/composables/useLanguage';
 import { index } from '@/routes/contacts';
 import type { PaginatedCollection } from '@/types/ui';
@@ -33,6 +37,13 @@ type ContactActor = {
     name: string;
     last_name: string | null;
 } | null;
+
+type ContactCommentRow = {
+    id: number;
+    content: string;
+    created_at: string | null;
+    created_by: ContactActor;
+};
 
 type ContactRequisitesKey =
     | 'iin'
@@ -57,7 +68,9 @@ type ContactRow = {
     email: string | null;
     phone: string | null;
     notes: string | null;
+    avatar: string | null;
     company_requisites: ContactRequisitesRow;
+    comments: ContactCommentRow[];
     created_at: string | null;
     updated_at: string | null;
     created_by: ContactActor;
@@ -90,6 +103,11 @@ const { language, t } = useLanguage();
 const dialogOpen = ref(false);
 const requisitesDialogOpen = ref(false);
 const editingContactId = ref<number | null>(null);
+const localAvatarUrl = ref<string | null>(null);
+const persistedAvatarUrl = ref<string | null>(null);
+const commentErrorContactId = ref<number | null>(null);
+const commentProcessingContactId = ref<number | null>(null);
+const commentDrafts = ref<Record<number, string>>({});
 
 const emptyContactRequisites = (): ContactRequisitesForm => ({
     iin: '',
@@ -109,6 +127,7 @@ const filtersForm = useForm<Filters>({
 });
 
 const contactForm = useForm({
+    _method: '' as '' | 'patch',
     type: (props.availableTypes[0]?.value ?? 'person') as ContactType,
     name: '',
     contact_person: '',
@@ -116,7 +135,12 @@ const contactForm = useForm({
     email: '',
     phone: '',
     notes: '',
+    avatar: null as File | null,
     company_requisites: emptyContactRequisites(),
+});
+
+const commentForm = useForm({
+    content: '',
 });
 
 const canCreateAny = computed(() => {
@@ -171,6 +195,10 @@ const contactRequisitesFilledCount = computed(() => {
 
 const hasContactRequisites = computed(() => {
     return contactRequisitesFilledCount.value > 0;
+});
+
+const avatarPreviewUrl = computed(() => {
+    return localAvatarUrl.value ?? persistedAvatarUrl.value;
 });
 
 watchEffect(() => {
@@ -248,12 +276,30 @@ const contactHasRequisites = (contact: ContactRow): boolean => {
     );
 };
 
+const clearLocalAvatarUrl = (): void => {
+    if (localAvatarUrl.value) {
+        URL.revokeObjectURL(localAvatarUrl.value);
+        localAvatarUrl.value = null;
+    }
+};
+
+const selectAvatar = (file: File | null): void => {
+    clearLocalAvatarUrl();
+    contactForm.avatar = file;
+
+    if (file) {
+        localAvatarUrl.value = URL.createObjectURL(file);
+    }
+};
+
 const resetContactForm = (): void => {
+    clearLocalAvatarUrl();
     contactForm.reset();
     contactForm.clearErrors();
     editingContactId.value = null;
     contactForm.type = (props.availableTypes[0]?.value ?? 'person') as ContactType;
     contactForm.company_requisites = emptyContactRequisites();
+    persistedAvatarUrl.value = null;
     requisitesDialogOpen.value = false;
 };
 
@@ -264,8 +310,10 @@ const openCreateDialog = (type: ContactType): void => {
 };
 
 const openEditDialog = (contact: ContactRow): void => {
+    clearLocalAvatarUrl();
     editingContactId.value = contact.id;
     contactForm.clearErrors();
+    contactForm._method = '';
     contactForm.type = contact.type;
     contactForm.name = contact.name;
     contactForm.contact_person = contact.contact_person ?? '';
@@ -273,7 +321,9 @@ const openEditDialog = (contact: ContactRow): void => {
     contactForm.email = contact.email ?? '';
     contactForm.phone = contact.phone ?? '';
     contactForm.notes = contact.notes ?? '';
+    contactForm.avatar = null;
     assignContactRequisites(contact.company_requisites);
+    persistedAvatarUrl.value = contact.avatar;
     dialogOpen.value = true;
 };
 
@@ -348,6 +398,7 @@ const updatePerPage = (value: number): void => {
 const submitContact = (): void => {
     if (editingContactId.value === null) {
         contactForm.post(store.url(), {
+            forceFormData: contactForm.avatar !== null,
             preserveScroll: true,
             onSuccess: () => closeDialog(),
         });
@@ -355,9 +406,49 @@ const submitContact = (): void => {
         return;
     }
 
-    contactForm.patch(update.url(editingContactId.value), {
+    contactForm._method = 'patch';
+
+    contactForm.post(update.url(editingContactId.value), {
+        forceFormData: true,
         preserveScroll: true,
         onSuccess: () => closeDialog(),
+    });
+};
+
+const updateCommentDraft = (contactId: number, value: string): void => {
+    commentDrafts.value = {
+        ...commentDrafts.value,
+        [contactId]: value,
+    };
+
+    if (commentErrorContactId.value === contactId) {
+        commentForm.clearErrors('content');
+    }
+};
+
+const canSubmitComment = (contactId: number): boolean => {
+    return (commentDrafts.value[contactId] ?? '').trim() !== '';
+};
+
+const submitComment = (contact: ContactRow): void => {
+    commentErrorContactId.value = contact.id;
+    commentProcessingContactId.value = contact.id;
+    commentForm.content = (commentDrafts.value[contact.id] ?? '').trim();
+
+    commentForm.post(storeComment.url(contact.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            commentDrafts.value = {
+                ...commentDrafts.value,
+                [contact.id]: '',
+            };
+            commentForm.reset('content');
+            commentForm.clearErrors();
+            commentErrorContactId.value = null;
+        },
+        onFinish: () => {
+            commentProcessingContactId.value = null;
+        },
     });
 };
 
@@ -382,6 +473,8 @@ const actorName = (actor: ContactActor): string => {
 
     return [actor.name, actor.last_name].filter(Boolean).join(' ');
 };
+
+onBeforeUnmount(clearLocalAvatarUrl);
 </script>
 
 <template>
@@ -488,22 +581,35 @@ const actorName = (actor: ContactActor): string => {
                 >
                     <div class="min-w-0 space-y-3">
                         <div class="flex flex-wrap items-center gap-3">
-                            <div
-                                class="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary"
-                            >
-                                <Building2
-                                    v-if="contact.type === 'company'"
-                                    class="size-5"
+                            <Avatar class="size-14 border border-border/70">
+                                <AvatarImage
+                                    v-if="contact.avatar"
+                                    :src="contact.avatar"
+                                    :alt="contact.name"
+                                    class="object-cover"
                                 />
-                                <UserRound v-else class="size-5" />
-                            </div>
+                                <AvatarFallback
+                                    class="bg-primary/10 text-sm font-semibold text-primary"
+                                >
+                                    {{ getInitials(contact.name) }}
+                                </AvatarFallback>
+                            </Avatar>
 
                             <div class="space-y-1">
-                                <h2 class="text-lg font-semibold">
-                                    {{ contact.name }}
-                                </h2>
-                                <div class="text-sm text-muted-foreground">
-                                    {{ contact.type_label }}
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h2 class="text-lg font-semibold">
+                                        {{ contact.name }}
+                                    </h2>
+                                    <span
+                                        class="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
+                                    >
+                                        <Building2
+                                            v-if="contact.type === 'company'"
+                                            class="size-3.5"
+                                        />
+                                        <UserRound v-else class="size-3.5" />
+                                        {{ contact.type_label }}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -543,6 +649,94 @@ const actorName = (actor: ContactActor): string => {
                         >
                             {{ contact.notes }}
                         </p>
+
+                        <div class="space-y-4 rounded-2xl border border-border/60 bg-background p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <div class="text-sm font-medium text-foreground">
+                                        {{ t.contacts.history_title }}
+                                    </div>
+                                    <div class="text-xs text-muted-foreground">
+                                        {{
+                                            t.contacts.history_count.replace(
+                                                ':count',
+                                                String(contact.comments.length),
+                                            )
+                                        }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                v-if="contact.comments.length > 0"
+                                class="space-y-3"
+                            >
+                                <div
+                                    v-for="comment in contact.comments"
+                                    :key="comment.id"
+                                    class="rounded-2xl bg-muted/30 px-4 py-3"
+                                >
+                                    <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                        <span class="font-medium text-foreground">
+                                            {{
+                                                actorName(comment.created_by)
+                                                || '—'
+                                            }}
+                                        </span>
+                                        <span>•</span>
+                                        <span>{{ formatDateTime(comment.created_at) }}</span>
+                                    </div>
+                                    <p class="mt-2 whitespace-pre-line text-sm text-foreground/90">
+                                        {{ comment.content }}
+                                    </p>
+                                </div>
+                            </div>
+                            <p
+                                v-else
+                                class="rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground"
+                            >
+                                {{ t.contacts.history_empty }}
+                            </p>
+
+                            <div class="space-y-3 rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4">
+                                <Label :for="`contact-comment-${contact.id}`">
+                                    {{ t.contacts.comment_add }}
+                                </Label>
+                                <textarea
+                                    :id="`contact-comment-${contact.id}`"
+                                    :value="commentDrafts[contact.id] ?? ''"
+                                    class="min-h-24 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                    :placeholder="t.contacts.comment_placeholder"
+                                    @input="
+                                        updateCommentDraft(
+                                            contact.id,
+                                            ($event.target as HTMLTextAreaElement).value,
+                                        )
+                                    "
+                                ></textarea>
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                    <InputError
+                                        :message="
+                                            commentErrorContactId === contact.id
+                                                ? commentForm.errors.content
+                                                : undefined
+                                        "
+                                    />
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        class="ml-auto"
+                                        :disabled="
+                                            commentProcessingContactId === contact.id
+                                            || !canSubmitComment(contact.id)
+                                        "
+                                        @click="submitComment(contact)"
+                                    >
+                                        {{ t.contacts.comment_add }}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
 
                         <div
                             v-if="
@@ -647,6 +841,42 @@ const actorName = (actor: ContactActor): string => {
                     </div>
 
                     <div class="grid gap-4 md:grid-cols-2">
+                        <div
+                            class="grid gap-4 rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 md:col-span-2 md:grid-cols-[auto_1fr]"
+                        >
+                            <div class="flex justify-center md:justify-start">
+                                <Avatar class="size-24 border border-border/70">
+                                    <AvatarImage
+                                        v-if="avatarPreviewUrl"
+                                        :src="avatarPreviewUrl"
+                                        :alt="contactForm.name || t.contacts.avatar"
+                                        class="object-cover"
+                                    />
+                                    <AvatarFallback
+                                        class="bg-primary/10 text-xl font-semibold text-primary"
+                                    >
+                                        {{ getInitials(contactForm.name) }}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </div>
+
+                            <div class="grid gap-2">
+                                <Label for="contact-avatar">
+                                    {{ t.contacts.avatar }}
+                                </Label>
+                                <LocalizedFilePicker
+                                    id="contact-avatar"
+                                    v-model="contactForm.avatar"
+                                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                                    @change="selectAvatar"
+                                />
+                                <p class="text-sm text-muted-foreground">
+                                    {{ t.contacts.avatar_help }}
+                                </p>
+                                <InputError :message="contactForm.errors.avatar" />
+                            </div>
+                        </div>
+
                         <div class="space-y-2 md:col-span-2">
                             <Label for="contact-name">{{ t.contacts.name }}</Label>
                             <Input

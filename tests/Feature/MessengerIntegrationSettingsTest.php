@@ -31,10 +31,33 @@ test('only super admin can open messenger integrations settings', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/Integrations')
             ->has('groups')
-            ->has('integrations', 2)
+            ->has('integrations', 3)
             ->has('accessLevels', 3)
             ->where('superAdminAccessLevel', MessengerIntegration::ACCESS_FULL)
         );
+});
+
+test('settings page recreates missing default telephony integration automatically', function () {
+    config(['admin.super_admin_email' => 'super@example.com']);
+
+    MessengerIntegration::query()
+        ->where('driver', MessengerIntegration::DRIVER_TELEPHONY)
+        ->delete();
+
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+    ]);
+
+    $this->actingAs($superAdmin)
+        ->get(route('settings.integrations.edit'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('integrations', 3)
+        );
+
+    expect(MessengerIntegration::query()
+        ->where('driver', MessengerIntegration::DRIVER_TELEPHONY)
+        ->exists())->toBeTrue();
 });
 
 test('super admin can update messenger integration settings and group access', function () {
@@ -131,13 +154,91 @@ test('reply access is limited to the user who owns the messenger conversation wh
         ->and($integration->canUserReply($superAdmin, $user->id))->toBeTrue();
 });
 
-test('integrations settings page separates whatsapp and telegram into subsection anchors', function () {
+test('super admin can update telephony integration settings', function () {
+    config(['admin.super_admin_email' => 'super@example.com']);
+
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+    ]);
+
+    $group = UserGroup::factory()->create([
+        'name' => 'Call Center',
+    ]);
+
+    $integration = MessengerIntegration::query()
+        ->where('driver', MessengerIntegration::DRIVER_TELEPHONY)
+        ->firstOrFail();
+
+    $this->actingAs($superAdmin)
+        ->patch(route('settings.integrations.update', $integration), [
+            'name' => 'Main Telephony',
+            'is_active' => true,
+            'settings' => [
+                'provider_name' => 'Binotel',
+                'api_url' => 'https://pbx.example.test',
+                'account_id' => 'line-01',
+                'phone_number' => '+77010002030',
+                'extension_number' => '101',
+                'api_token' => 'telephony-secret',
+                'webhook_url' => 'https://crm369.test/api/telephony/webhook',
+                'webhook_secret' => 'webhook-secret',
+                'default_line' => 'Support queue',
+                'outbound_caller_id' => '+77010002030',
+                'responsible_mode' => 'call_receiver',
+                'missed_call_mode' => 'create_activity',
+                'recording_mode' => 'all_calls',
+                'create_contact_for_unknown_calls' => true,
+                'create_activity_for_missed_calls' => true,
+                'log_incoming_calls' => true,
+                'log_outgoing_calls' => true,
+            ],
+            'group_accesses' => [
+                [
+                    'user_group_id' => $group->id,
+                    'access_level' => MessengerIntegration::ACCESS_REPLY,
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    $integration->refresh();
+
+    expect($integration->name)->toBe('Main Telephony')
+        ->and($integration->is_active)->toBeTrue()
+        ->and($integration->settings)->toMatchArray([
+            'provider_name' => 'Binotel',
+            'api_url' => 'https://pbx.example.test',
+            'account_id' => 'line-01',
+            'phone_number' => '+77010002030',
+            'extension_number' => '101',
+            'api_token' => 'telephony-secret',
+            'webhook_url' => 'https://crm369.test/api/telephony/webhook',
+            'webhook_secret' => 'webhook-secret',
+            'default_line' => 'Support queue',
+            'outbound_caller_id' => '+77010002030',
+            'responsible_mode' => 'call_receiver',
+            'missed_call_mode' => 'create_activity',
+            'recording_mode' => 'all_calls',
+            'create_contact_for_unknown_calls' => true,
+            'create_activity_for_missed_calls' => true,
+            'log_incoming_calls' => true,
+            'log_outgoing_calls' => true,
+        ])
+        ->and($integration->updated_by_user_id)->toBe($superAdmin->id);
+});
+
+test('integrations settings page uses a sidebar editor with a list overview', function () {
     $page = file_get_contents(resource_path('js/pages/settings/Integrations.vue'));
 
-    expect($page)->toContain('integrationSectionId')
-        ->and($page)->toContain('integration-section-${driver}')
-        ->and($page)->toContain(':href="`#${integrationSectionId(integration.driver)}`"')
-        ->and($page)->toContain(':id="integrationSectionId(integration.driver)"')
-        ->and($page)->toContain("driver === 'whatsapp_business'")
-        ->and($page)->toContain('integrationSectionTitle(integration.driver)');
+    expect($page)->toContain('const editorOpen = ref(false);')
+        ->and($page)->toContain('const selectedIntegrationId = ref<number | null>(null);')
+        ->and($page)->toContain('const openEditor = (integrationId: number): void => {')
+        ->and($page)->toContain('<Sheet :open="editorOpen"')
+        ->and($page)->toContain('t.integrations.list_title')
+        ->and($page)->toContain('t.integrations.edit_sidebar')
+        ->and($page)->toContain('telephony_connection_title')
+        ->and($page)->toContain('telephony_routing_title')
+        ->and($page)->toContain('telephony_automation_title')
+        ->and($page)->toContain('t.value.integrations.telephony')
+        ->and($page)->not->toContain('integrationSectionId');
 });

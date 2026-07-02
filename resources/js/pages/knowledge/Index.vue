@@ -126,10 +126,6 @@ const isKnowledgeBaseIndexPage = computed(() => {
     return page.url === knowledgeBaseIndex().url;
 });
 
-const isArticleEditorActive = computed(() => {
-    return articleEditorMode.value !== 'idle';
-});
-
 watchEffect(() => {
     const breadcrumbs = [
         {
@@ -155,11 +151,10 @@ watchEffect(() => {
         });
     }
 
-    setLayoutProps({
-        breadcrumbs,
-        sidebarCollapsed: isArticleEditorActive.value,
+        setLayoutProps({
+            breadcrumbs,
+        });
     });
-});
 
 const resetBaseForm = (): void => {
     baseForm.reset();

@@ -199,6 +199,11 @@ class User extends Authenticatable implements PasskeyUser
         return $this->isSuperAdmin();
     }
 
+    public function canManageNews(): bool
+    {
+        return $this->isSuperAdmin();
+    }
+
     public function canManageApiTokens(): bool
     {
         return $this->isSuperAdmin() || $this->canManageUserAccounts();

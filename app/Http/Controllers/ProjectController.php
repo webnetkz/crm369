@@ -15,6 +15,7 @@ use App\Models\ProjectTask;
 use App\Models\ProjectTaskStage;
 use App\Support\ProjectPageData;
 use App\Support\ProjectTaskAssignmentNotifier;
+use App\Support\ProjectTaskChangeLogger;
 use App\Support\TaskConversationManager;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
@@ -179,15 +180,16 @@ class ProjectController extends Controller
         UpdateProjectTaskRequest $request,
         Project $project,
         ProjectTask $projectTask,
-        TaskConversationManager $taskConversationManager,
+        ProjectTaskChangeLogger $taskChangeLogger,
     ): RedirectResponse {
         $visibleProject = $this->visibleProject($request, $project);
         $visibleTask = $this->visibleTaskInProject($visibleProject, $projectTask);
         abort_unless($request->user()->canWorkOnProject($visibleProject), 403);
 
+        $beforeState = $taskChangeLogger->snapshot($visibleTask);
         $this->fillTask($visibleTask, $request, $visibleProject);
         $visibleTask->coAssignees()->sync($request->coAssigneeUserIds());
-        $taskConversationManager->ensureForTask($visibleTask, $request->user());
+        $taskChangeLogger->syncConversationAndLogChanges($beforeState, $visibleTask, $request->user());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.projects.task_updated_success')]);
 
@@ -197,7 +199,7 @@ class ProjectController extends Controller
     public function updateWorkspaceTask(
         UpdateProjectTaskRequest $request,
         ProjectTask $projectTask,
-        TaskConversationManager $taskConversationManager,
+        ProjectTaskChangeLogger $taskChangeLogger,
     ): RedirectResponse {
         $visibleTask = $this->visibleTask($request, $projectTask);
         abort_unless($request->user()->canManageTask($visibleTask), 403);
@@ -213,25 +215,31 @@ class ProjectController extends Controller
             abort_unless($request->user()->canWorkOnProject($targetProject), 403);
         }
 
+        $beforeState = $taskChangeLogger->snapshot($visibleTask);
         $this->fillTask($visibleTask, $request, $targetProject);
         $visibleTask->coAssignees()->sync($request->coAssigneeUserIds());
-        $taskConversationManager->ensureForTask($visibleTask, $request->user());
+        $taskChangeLogger->syncConversationAndLogChanges($beforeState, $visibleTask, $request->user());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.projects.task_updated_success')]);
 
         return $this->redirectForTask($request, $visibleTask->fresh(['project']));
     }
 
-    public function moveWorkspaceTask(MoveProjectTaskRequest $request, ProjectTask $projectTask): RedirectResponse
-    {
+    public function moveWorkspaceTask(
+        MoveProjectTaskRequest $request,
+        ProjectTask $projectTask,
+        ProjectTaskChangeLogger $taskChangeLogger,
+    ): RedirectResponse {
         $visibleTask = $this->visibleTask($request, $projectTask);
         abort_unless($request->user()->canManageTask($visibleTask), 403);
 
+        $beforeState = $taskChangeLogger->snapshot($visibleTask);
         $visibleTask->update([
             'status' => $request->status(),
             'completed_at' => $this->completedAtForStatus($visibleTask, $request->status()),
             'updated_by_user_id' => $request->user()->id,
         ]);
+        $taskChangeLogger->syncConversationAndLogChanges($beforeState, $visibleTask, $request->user());
 
         return back();
     }

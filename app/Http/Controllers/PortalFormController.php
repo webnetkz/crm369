@@ -24,7 +24,6 @@ class PortalFormController extends Controller
         $requestedFormId = $request->integer('form');
         /** @var PortalForm|null $activeForm */
         $activeForm = $requestedFormId > 0 ? $forms->firstWhere('id', $requestedFormId) : null;
-        $activeForm ??= $forms->first();
 
         if ($activeForm) {
             $activeForm->setRelation(

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\FilterApiNotificationsIndexRequest;
 use App\Support\ApiRequestContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -9,12 +10,22 @@ use Illuminate\Notifications\DatabaseNotification;
 
 class NotificationController
 {
-    public function index(Request $request): JsonResponse
+    public function index(FilterApiNotificationsIndexRequest $request): JsonResponse
     {
         $user = ApiRequestContext::subject($request);
+        $filters = $request->filters();
         $notifications = $user->notifications()
+            ->when(
+                $filters['status'] === 'unread',
+                fn ($query) => $query->whereNull('read_at'),
+            )
+            ->when(
+                $filters['status'] === 'read',
+                fn ($query) => $query->whereNotNull('read_at'),
+            )
             ->latest()
-            ->paginate((int) min(max($request->integer('per_page', 20), 1), 100));
+            ->paginate($filters['per_page'])
+            ->withQueryString();
 
         return response()->json([
             'data' => collect($notifications->items())
@@ -26,6 +37,8 @@ class NotificationController
                 'last_page' => $notifications->lastPage(),
                 'per_page' => $notifications->perPage(),
                 'total' => $notifications->total(),
+                'status' => $filters['status'],
+                'subject_user_id' => $user->id,
                 'unread_count' => $user->unreadNotifications()->count(),
             ],
         ]);
@@ -46,6 +59,7 @@ class NotificationController
             'message' => __('ui.notifications.marked_as_read'),
             'data' => $this->serializeNotification($databaseNotification->fresh()),
             'meta' => [
+                'subject_user_id' => $user->id,
                 'unread_count' => $user->unreadNotifications()->count(),
             ],
         ]);
@@ -62,6 +76,7 @@ class NotificationController
         return response()->json([
             'message' => __('ui.notifications.all_marked_as_read'),
             'meta' => [
+                'subject_user_id' => $user->id,
                 'unread_count' => 0,
             ],
         ]);

@@ -4,6 +4,8 @@ import {
     BellRing,
     BookOpenText,
     ClipboardList,
+    FileText,
+    Factory,
     LayoutGrid,
     LayoutDashboard,
     MessageSquareMore,
@@ -37,14 +39,19 @@ import { fetchSameOriginJson } from '@/lib/sameOriginJson';
 import { dashboard } from '@/routes';
 import { index as chatsIndex } from '@/routes/chats';
 import { index as contactsIndex } from '@/routes/contacts';
+import { index as edoIndex } from '@/routes/edo';
 import { index as formsIndex } from '@/routes/forms';
 import { index as newsIndex } from '@/routes/news';
 import { index as notificationsIndex } from '@/routes/notifications';
+import {
+    index as productionIndex,
+    show as showProductionSection,
+} from '@/routes/production';
 import { index as projectsIndex } from '@/routes/projects';
 import { edit as editMenu } from '@/routes/settings/menu';
 import { update as updateMenuOrder } from '@/routes/settings/menu/order';
 import { index as tasksIndex } from '@/routes/tasks';
-import type { Menu as MenuState, NavItem } from '@/types';
+import type { MenuCustomItem, MenuKnowledgeBaseItem, NavItem } from '@/types';
 
 const page = usePage();
 const { t } = useLanguage();
@@ -52,9 +59,28 @@ const settingsNavItems = useSettingsNavigation();
 const savingMenuOrder = ref(false);
 let menuOrderRequestId = 0;
 
-const hiddenMenuItems = computed(() => new Set(page.props.menu.hiddenItems));
+const hiddenMenuItems = computed(() => {
+    const hiddenItems = Array.isArray(page.props.menu?.hiddenItems)
+        ? page.props.menu.hiddenItems
+        : [];
+
+    return new Set(hiddenItems);
+});
+
+const knowledgeBaseMenuItems = computed<MenuKnowledgeBaseItem[]>(() => {
+    return Array.isArray(page.props.menu?.knowledgeBases)
+        ? page.props.menu.knowledgeBases
+        : [];
+});
+
+const customMenuItems = computed<MenuCustomItem[]>(() => {
+    return Array.isArray(page.props.menu?.customItems)
+        ? page.props.menu.customItems
+        : [];
+});
+
 const menuOrder = computed<string[]>(() => {
-    return Array.isArray(page.props.menu.order) ? page.props.menu.order : [];
+    return Array.isArray(page.props.menu?.order) ? page.props.menu.order : [];
 });
 
 const isMenuItemVisible = (key: string): boolean => {
@@ -131,8 +157,8 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                       href: knowledgeBasesIndex(),
                       icon: BookOpenText,
                       items:
-                          page.props.menu.knowledgeBases.length > 0
-                              ? page.props.menu.knowledgeBases.map(
+                          knowledgeBaseMenuItems.value.length > 0
+                              ? knowledgeBaseMenuItems.value.map(
                                     (knowledgeBase) => ({
                                         title: knowledgeBase.title,
                                         href: showKnowledgeBase(
@@ -174,7 +200,71 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...page.props.menu.customItems.map((item) => ({
+        ...(isMenuItemVisible('edo')
+            ? [
+                  {
+                      key: 'edo',
+                      title: t.value.edo.title,
+                      href: edoIndex(),
+                      icon: FileText,
+                  },
+              ]
+            : []),
+        ...(isMenuItemVisible('production')
+            ? [
+                  {
+                      key: 'production',
+                      title: t.value.production.title,
+                      href: productionIndex(),
+                      icon: Factory,
+                      items: [
+                          {
+                              title: t.value.production.sections.overview.title,
+                              href: productionIndex(),
+                          },
+                          {
+                              title: t.value.production.sections.warehouses
+                                  .title,
+                              href: showProductionSection('warehouses'),
+                          },
+                          {
+                              title: t.value.production.sections.workshops
+                                  .title,
+                              href: showProductionSection('workshops'),
+                          },
+                          {
+                              title: t.value.production.sections.machines.title,
+                              href: showProductionSection('machines'),
+                          },
+                          {
+                              title: t.value.production.sections[
+                                  'raw-materials'
+                              ].title,
+                              href: showProductionSection('raw-materials'),
+                          },
+                          {
+                              title: t.value.production.sections[
+                                  'finished-products'
+                              ].title,
+                              href: showProductionSection('finished-products'),
+                          },
+                          {
+                              title: t.value.production.sections[
+                                  'production-orders'
+                              ].title,
+                              href: showProductionSection('production-orders'),
+                          },
+                          {
+                              title: t.value.production.sections[
+                                  'quality-control'
+                              ].title,
+                              href: showProductionSection('quality-control'),
+                          },
+                      ],
+                  },
+              ]
+            : []),
+        ...customMenuItems.value.map((item) => ({
             key: `custom:${item.id}`,
             title: item.title,
             href: item.url,

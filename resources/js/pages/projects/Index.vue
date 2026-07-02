@@ -18,7 +18,7 @@ import {
     UserRound,
     UsersRound,
 } from '@lucide/vue';
-import { computed, ref, watch, watchEffect } from 'vue';
+import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
 import {
     destroy as destroyProject,
     destroyWorkspaceTask,
@@ -66,6 +66,22 @@ type ParentTaskOption = {
 type FlattenedTaskItem = ProjectTaskListItem & {
     level: number;
 };
+
+type TaskFormData = {
+    project_id: number | string;
+    parent_task_id: number | string;
+    title: string;
+    description: string;
+    status: string;
+    importance: string;
+    complexity: number;
+    due_at: string;
+    sort_order: number;
+    assignee_user_id: number | string;
+    co_assignee_user_ids: number[];
+};
+
+type TaskSaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 type Props = {
     pageMode: ProjectPageMode;
@@ -135,6 +151,10 @@ const dragOverTaskStatus = ref<string | null>(null);
 const dragOverStageId = ref<number | null>(null);
 const movingTaskId = ref<number | null>(null);
 const editingTaskStageId = ref<number | null>(null);
+const activeTaskSaveState = ref<TaskSaveState>('idle');
+const isSyncingActiveTask = ref(false);
+const savedTaskStateResetDelay = 1400;
+let activeTaskSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const projectForm = useForm({
     name: '',
@@ -144,9 +164,9 @@ const projectForm = useForm({
     member_user_ids: [] as number[],
 });
 
-const taskForm = useForm({
-    project_id: '' as number | string,
-    parent_task_id: '' as number | string,
+const defaultTaskForm = (): TaskFormData => ({
+    project_id: '',
+    parent_task_id: '',
     title: '',
     description: '',
     status: 'todo',
@@ -154,9 +174,12 @@ const taskForm = useForm({
     complexity: 5,
     due_at: '',
     sort_order: 0,
-    assignee_user_id: '' as number | string,
-    co_assignee_user_ids: [] as number[],
+    assignee_user_id: '',
+    co_assignee_user_ids: [],
 });
+
+const taskForm = useForm<TaskFormData>(defaultTaskForm());
+const activeTaskForm = useForm<TaskFormData>(defaultTaskForm());
 
 const taskStageForm = useForm({
     name: '',
@@ -313,6 +336,10 @@ const selectedTaskProjectId = computed<number | null>(() => {
     return taskForm.project_id === '' ? null : Number(taskForm.project_id);
 });
 
+const selectedActiveTaskProjectId = computed<number | null>(() => {
+    return activeTaskForm.project_id === '' ? null : Number(activeTaskForm.project_id);
+});
+
 const taskSheetOpen = computed<boolean>(() => {
     return taskEditorMode.value !== 'idle' || props.activeTask !== null;
 });
@@ -323,18 +350,6 @@ const taskSheetBaseRoute = computed(() => {
     }
 
     return props.activeProject ? show(props.activeProject.id) : projectsIndex();
-});
-
-const selectedProjectOption = computed<ProjectOption | null>(() => {
-    if (selectedTaskProjectId.value === null) {
-        return null;
-    }
-
-    return props.availableProjects.find((project) => project.id === selectedTaskProjectId.value) ?? null;
-});
-
-const taskMemberOptions = computed(() => {
-    return selectedProjectOption.value?.members ?? props.availableUsers;
 });
 
 const standaloneTaskGroup = computed(() => {
@@ -376,12 +391,40 @@ const kanbanColumns = computed(() => {
     }));
 });
 
-const selectedParentTaskTree = computed<ProjectTaskListItem[]>(() => {
-    if (selectedTaskProjectId.value === null) {
+const taskTreeForProject = (projectId: number | null): ProjectTaskListItem[] => {
+    if (projectId === null) {
         return standaloneTaskGroup.value?.tasks ?? [];
     }
 
-    return props.taskGroups.find((group) => group.project?.id === selectedTaskProjectId.value)?.tasks ?? [];
+    return props.taskGroups.find((group) => group.project?.id === projectId)?.tasks ?? [];
+};
+
+const selectedParentTaskTree = computed<ProjectTaskListItem[]>(() => {
+    return taskTreeForProject(selectedTaskProjectId.value);
+});
+
+const selectedActiveParentTaskTree = computed<ProjectTaskListItem[]>(() => {
+    return taskTreeForProject(selectedActiveTaskProjectId.value);
+});
+
+const projectOptionFor = (projectId: number | null): ProjectOption | null => {
+    if (projectId === null) {
+        return null;
+    }
+
+    return props.availableProjects.find((project) => project.id === projectId) ?? null;
+};
+
+const taskMemberOptionsFor = (projectId: number | null): ProjectUserSummary[] => {
+    return projectOptionFor(projectId)?.members ?? props.availableUsers;
+};
+
+const taskMemberOptions = computed(() => {
+    return taskMemberOptionsFor(selectedTaskProjectId.value);
+});
+
+const activeTaskMemberOptions = computed(() => {
+    return taskMemberOptionsFor(selectedActiveTaskProjectId.value);
 });
 
 const flattenTaskTree = (tasks: ProjectTaskListItem[], level = 0): Array<ProjectTaskListItem & { level: number }> => {
@@ -531,25 +574,39 @@ const collectDescendantIds = (task: ProjectTaskListItem): number[] => {
     return task.subtasks.flatMap((subtask) => [subtask.id, ...collectDescendantIds(subtask)]);
 };
 
-const parentTaskOptions = computed<ParentTaskOption[]>(() => {
+const buildParentTaskOptions = (
+    tasks: ProjectTaskListItem[],
+    excludeTaskId: number | null = null,
+): ParentTaskOption[] => {
     const excludedIds = new Set<number>();
 
-    if (taskEditorMode.value === 'edit' && props.activeTask) {
-        excludedIds.add(props.activeTask.id);
+    if (excludeTaskId !== null) {
+        excludedIds.add(excludeTaskId);
 
-        const currentTaskTree = findTaskInTree(selectedParentTaskTree.value, props.activeTask.id);
+        const currentTaskTree = findTaskInTree(tasks, excludeTaskId);
 
         if (currentTaskTree) {
             collectDescendantIds(currentTaskTree).forEach((taskId) => excludedIds.add(taskId));
         }
     }
 
-    return flattenTaskTree(selectedParentTaskTree.value)
+    return flattenTaskTree(tasks)
         .filter((task) => !excludedIds.has(task.id))
         .map((task) => ({
             id: task.id,
             label: `${'— '.repeat(task.level)}${task.title}`,
         }));
+};
+
+const parentTaskOptions = computed<ParentTaskOption[]>(() => {
+    return buildParentTaskOptions(selectedParentTaskTree.value);
+});
+
+const activeParentTaskOptions = computed<ParentTaskOption[]>(() => {
+    return buildParentTaskOptions(
+        selectedActiveParentTaskTree.value,
+        props.activeTask?.id ?? null,
+    );
 });
 
 watch(parentTaskOptions, (options) => {
@@ -561,6 +618,18 @@ watch(parentTaskOptions, (options) => {
 
     if (!hasCurrentParent) {
         taskForm.parent_task_id = '';
+    }
+});
+
+watch(activeParentTaskOptions, (options) => {
+    if (activeTaskForm.parent_task_id === '') {
+        return;
+    }
+
+    const hasCurrentParent = options.some((option) => option.id === Number(activeTaskForm.parent_task_id));
+
+    if (!hasCurrentParent) {
+        activeTaskForm.parent_task_id = '';
     }
 });
 
@@ -724,6 +793,80 @@ const resetTaskForm = (): void => {
     taskEditorMode.value = 'idle';
 };
 
+const taskPayload = (form: TaskFormData): TaskFormData => ({
+    project_id: form.project_id,
+    parent_task_id: form.parent_task_id,
+    title: form.title,
+    description: form.description,
+    status: form.status,
+    importance: form.importance,
+    complexity: form.complexity,
+    due_at: form.due_at,
+    sort_order: form.sort_order,
+    assignee_user_id: form.assignee_user_id,
+    co_assignee_user_ids: [...form.co_assignee_user_ids],
+});
+
+const taskPayloadFromActiveTask = (task: ProjectActiveTask | null): TaskFormData => ({
+    project_id: task?.project_id ?? '',
+    parent_task_id: task?.parent_task_id ?? '',
+    title: task?.title ?? '',
+    description: task?.description ?? '',
+    status: task?.status ?? defaultTaskStatus(),
+    importance: task?.importance ?? 'normal',
+    complexity: task?.complexity ?? 5,
+    due_at: toDateTimeLocalValue(task?.due_at ?? null),
+    sort_order: task?.sort_order ?? 0,
+    assignee_user_id: task?.assignee?.id ?? '',
+    co_assignee_user_ids: task?.co_assignees.map((user) => user.id) ?? [],
+});
+
+const clearActiveTaskSaveTimeout = (): void => {
+    if (activeTaskSaveTimeout !== null) {
+        clearTimeout(activeTaskSaveTimeout);
+        activeTaskSaveTimeout = null;
+    }
+};
+
+const syncActiveTaskForm = (task: ProjectActiveTask | null): void => {
+    isSyncingActiveTask.value = true;
+    clearActiveTaskSaveTimeout();
+    activeTaskForm.clearErrors();
+
+    const payload = taskPayloadFromActiveTask(task);
+
+    activeTaskForm.project_id = payload.project_id;
+    activeTaskForm.parent_task_id = payload.parent_task_id;
+    activeTaskForm.title = payload.title;
+    activeTaskForm.description = payload.description;
+    activeTaskForm.status = payload.status;
+    activeTaskForm.importance = payload.importance;
+    activeTaskForm.complexity = payload.complexity;
+    activeTaskForm.due_at = payload.due_at;
+    activeTaskForm.sort_order = payload.sort_order;
+    activeTaskForm.assignee_user_id = payload.assignee_user_id;
+    activeTaskForm.co_assignee_user_ids = payload.co_assignee_user_ids;
+    activeTaskSaveState.value = 'idle';
+
+    isSyncingActiveTask.value = false;
+};
+
+const scheduleActiveTaskSave = (delay = 500): void => {
+    clearActiveTaskSaveTimeout();
+
+    activeTaskSaveTimeout = setTimeout(() => {
+        submitActiveTaskUpdate();
+    }, delay);
+};
+
+const handleActiveTaskFieldChange = (): void => {
+    if (!props.activeTask || !props.can.manageTask || isSyncingActiveTask.value) {
+        return;
+    }
+
+    scheduleActiveTaskSave();
+};
+
 const openCreateTask = (
     projectId: number | null = isTasksPage.value
         ? null
@@ -748,26 +891,6 @@ const openCreateSubtaskFromActiveTask = (): void => {
     taskForm.parent_task_id = props.activeTask.id;
 };
 
-const openEditTask = (): void => {
-    if (!props.activeTask) {
-        return;
-    }
-
-    taskForm.project_id = props.activeTask.project_id ?? '';
-    taskForm.parent_task_id = props.activeTask.parent_task_id ?? '';
-    taskForm.title = props.activeTask.title;
-    taskForm.description = props.activeTask.description ?? '';
-    taskForm.status = props.activeTask.status;
-    taskForm.importance = props.activeTask.importance;
-    taskForm.complexity = props.activeTask.complexity;
-    taskForm.due_at = toDateTimeLocalValue(props.activeTask.due_at);
-    taskForm.sort_order = props.activeTask.sort_order;
-    taskForm.assignee_user_id = props.activeTask.assignee?.id ?? '';
-    taskForm.co_assignee_user_ids = props.activeTask.co_assignees.map((user) => user.id);
-    taskForm.clearErrors();
-    taskEditorMode.value = 'edit';
-};
-
 const toggleCoAssignee = (
     userId: number,
     checked: boolean | 'indeterminate' | null | undefined,
@@ -790,24 +913,6 @@ const taskCoAssigneeHandler = (userId: number) => {
 };
 
 const submitTask = (): void => {
-    if (taskEditorMode.value === 'edit' && props.activeTask) {
-        taskForm
-            .transform((data) => ({
-                ...data,
-                due_at: normalizeDueAtForSubmission(data.due_at),
-            }))
-            .patch(updateWorkspaceTask.url(props.activeTask.id, taskMutationQuery.value ? {
-                query: taskMutationQuery.value,
-            } : undefined), {
-                preserveScroll: true,
-                onSuccess: () => {
-                    taskEditorMode.value = 'idle';
-                },
-            });
-
-        return;
-    }
-
     taskForm
         .transform((data) => ({
             ...data,
@@ -822,6 +927,114 @@ const submitTask = (): void => {
             },
         });
 };
+
+const toggleActiveTaskCoAssignee = (
+    userId: number,
+    checked: boolean | 'indeterminate' | null | undefined,
+): void => {
+    if (checked === true) {
+        activeTaskForm.co_assignee_user_ids = [...new Set([...activeTaskForm.co_assignee_user_ids, userId])];
+    } else {
+        activeTaskForm.co_assignee_user_ids = activeTaskForm.co_assignee_user_ids.filter((value) => value !== userId);
+    }
+
+    handleActiveTaskFieldChange();
+};
+
+const activeTaskCoAssigneeHandler = (userId: number) => {
+    return (
+        checked: boolean | 'indeterminate' | null | undefined,
+    ): void => {
+        toggleActiveTaskCoAssignee(userId, checked);
+    };
+};
+
+const submitActiveTaskUpdate = (): void => {
+    if (!props.activeTask || !props.can.manageTask) {
+        return;
+    }
+
+    if (JSON.stringify(taskPayload(activeTaskForm)) === JSON.stringify(taskPayloadFromActiveTask(props.activeTask))) {
+        activeTaskSaveState.value = 'idle';
+
+        return;
+    }
+
+    if (activeTaskForm.processing) {
+        scheduleActiveTaskSave(250);
+
+        return;
+    }
+
+    activeTaskSaveState.value = 'saving';
+
+    activeTaskForm
+        .transform((data) => ({
+            ...data,
+            due_at: normalizeDueAtForSubmission(data.due_at),
+        }))
+        .patch(updateWorkspaceTask.url(props.activeTask.id, taskMutationQuery.value ? {
+            query: taskMutationQuery.value,
+        } : undefined), {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+            onSuccess: () => {
+                activeTaskSaveState.value = 'saved';
+
+                window.setTimeout(() => {
+                    if (activeTaskSaveState.value === 'saved') {
+                        activeTaskSaveState.value = 'idle';
+                    }
+                }, savedTaskStateResetDelay);
+            },
+            onError: () => {
+                activeTaskSaveState.value = 'error';
+            },
+        });
+};
+
+watch(
+    () => props.activeTask ? `${props.activeTask.id}:${props.activeTask.updated_at}` : null,
+    () => {
+        syncActiveTaskForm(props.activeTask);
+    },
+    {
+        immediate: true,
+    },
+);
+
+watch(selectedActiveTaskProjectId, () => {
+    const allowedMemberIds = new Set(activeTaskMemberOptions.value.map((member) => member.id));
+
+    if (
+        activeTaskForm.assignee_user_id !== ''
+        && !allowedMemberIds.has(Number(activeTaskForm.assignee_user_id))
+    ) {
+        activeTaskForm.assignee_user_id = '';
+    }
+
+    activeTaskForm.co_assignee_user_ids = activeTaskForm.co_assignee_user_ids.filter((userId) => {
+        return allowedMemberIds.has(userId);
+    });
+});
+
+watch(
+    () => activeTaskForm.assignee_user_id,
+    (value) => {
+        if (value === '') {
+            return;
+        }
+
+        activeTaskForm.co_assignee_user_ids = activeTaskForm.co_assignee_user_ids.filter((userId) => {
+            return userId !== Number(value);
+        });
+    },
+);
+
+onBeforeUnmount(() => {
+    clearActiveTaskSaveTimeout();
+});
 
 const deleteCurrentTask = (): void => {
     if (!props.activeTask || !window.confirm(t.value.projects.delete_task_confirm)) {
@@ -1987,58 +2200,218 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                 class="grid h-full min-h-0 bg-background xl:grid-cols-[minmax(0,1fr)_24rem] 2xl:grid-cols-[minmax(0,1fr)_28rem]"
             >
                 <div class="min-h-0 overflow-y-auto p-5 sm:p-8">
-                    <div class="space-y-5">
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="space-y-3">
-                                <div class="flex items-center gap-2">
+                    <div class="space-y-6">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="text-xs text-muted-foreground">
+                                <span v-if="props.can.manageTask && activeTaskSaveState === 'saving'">
+                                    {{ t.projects.task_autosave_saving }}
+                                </span>
+                                <span
+                                    v-else-if="props.can.manageTask && activeTaskSaveState === 'saved'"
+                                    class="text-emerald-600 dark:text-emerald-400"
+                                >
+                                    {{ t.projects.task_autosave_saved }}
+                                </span>
+                            </div>
+
+                            <Button
+                                v-if="props.can.manageTask"
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                @click="deleteCurrentTask"
+                            >
+                                <Trash2 class="size-4" />
+                                {{ t.projects.delete_task }}
+                            </Button>
+                        </div>
+
+                        <div class="rounded-3xl border border-border bg-card p-5 shadow-sm">
+                            <div class="space-y-4">
+                                <div class="flex items-center gap-3">
                                     <ClipboardList class="size-5 text-muted-foreground" />
-                                    <h2 class="text-lg font-semibold">{{ props.activeTask.title }}</h2>
+                                    <Input
+                                        id="active-task-title"
+                                        v-model="activeTaskForm.title"
+                                        class="h-12 border-0 px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
+                                        :disabled="!props.can.manageTask"
+                                        @change="handleActiveTaskFieldChange"
+                                    />
                                 </div>
+                                <InputError :message="activeTaskForm.errors.title" />
 
                                 <div class="flex flex-wrap gap-2 text-xs">
                                     <span
                                         class="rounded-full border px-2 py-1 font-medium"
-                                        :style="taskStageBadgeStyle(props.activeTask.status)"
+                                        :style="taskStageBadgeStyle(activeTaskForm.status)"
                                     >
-                                        {{ optionLabel(props.taskOptions.statuses, props.activeTask.status) }}
+                                        {{ optionLabel(props.taskOptions.statuses, activeTaskForm.status) }}
                                     </span>
                                     <span
                                         class="rounded-full px-2 py-1 font-medium"
-                                        :class="importanceClass(props.activeTask.importance)"
+                                        :class="importanceClass(activeTaskForm.importance)"
                                     >
-                                        {{ optionLabel(props.taskOptions.importances, props.activeTask.importance) }}
+                                        {{ optionLabel(props.taskOptions.importances, activeTaskForm.importance) }}
                                     </span>
                                     <span class="rounded-full bg-background px-2 py-1 text-muted-foreground">
-                                        {{ t.projects.complexity }}: {{ props.activeTask.complexity }}/10
+                                        {{ t.projects.complexity }}: {{ activeTaskForm.complexity }}/10
                                     </span>
-                                    <span
-                                        v-if="props.activeTask.project_name"
-                                        class="rounded-full bg-background px-2 py-1 text-muted-foreground"
-                                    >
-                                        {{ props.activeTask.project_name }}
+                                    <span class="rounded-full bg-background px-2 py-1 text-muted-foreground">
+                                        {{
+                                            projectOptionFor(selectedActiveTaskProjectId)?.name
+                                                ?? t.projects.standalone_task
+                                        }}
                                     </span>
                                 </div>
                             </div>
-
-                            <div v-if="props.can.manageTask" class="flex flex-wrap gap-2">
-                                <Button type="button" size="sm" variant="outline" @click="openEditTask">
-                                    <PencilLine class="size-4" />
-                                    {{ t.projects.edit_task }}
-                                </Button>
-                                <Button type="button" size="sm" variant="destructive" @click="deleteCurrentTask">
-                                    <Trash2 class="size-4" />
-                                    {{ t.projects.delete_task }}
-                                </Button>
-                            </div>
                         </div>
 
-                        <div class="grid gap-4 md:grid-cols-2">
+                        <div class="grid gap-4 xl:grid-cols-2">
+                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                                <Label for="active-task-project" class="mb-2 block text-sm font-medium">
+                                    {{ t.projects.task_location }}
+                                </Label>
+                                <select
+                                    id="active-task-project"
+                                    v-model="activeTaskForm.project_id"
+                                    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    :disabled="!props.can.manageTask"
+                                    @change="handleActiveTaskFieldChange"
+                                >
+                                    <option value="">{{ t.projects.standalone_task }}</option>
+                                    <option
+                                        v-for="project in props.availableProjects"
+                                        :key="project.id"
+                                        :value="project.id"
+                                    >
+                                        {{ project.name }}
+                                    </option>
+                                </select>
+                                <InputError class="mt-2" :message="activeTaskForm.errors.project_id" />
+                            </div>
+
+                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                                <Label for="active-task-parent" class="mb-2 block text-sm font-medium">
+                                    {{ t.projects.parent_task }}
+                                </Label>
+                                <select
+                                    id="active-task-parent"
+                                    v-model="activeTaskForm.parent_task_id"
+                                    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    :disabled="!props.can.manageTask"
+                                    @change="handleActiveTaskFieldChange"
+                                >
+                                    <option value="">{{ t.projects.no_parent_task }}</option>
+                                    <option
+                                        v-for="taskOption in activeParentTaskOptions"
+                                        :key="taskOption.id"
+                                        :value="taskOption.id"
+                                    >
+                                        {{ taskOption.label }}
+                                    </option>
+                                </select>
+                                <InputError class="mt-2" :message="activeTaskForm.errors.parent_task_id" />
+                            </div>
+
+                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                                <Label for="active-task-status" class="mb-2 block text-sm font-medium">
+                                    {{ t.projects.status }}
+                                </Label>
+                                <select
+                                    id="active-task-status"
+                                    v-model="activeTaskForm.status"
+                                    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    :disabled="!props.can.manageTask"
+                                    @change="handleActiveTaskFieldChange"
+                                >
+                                    <option
+                                        v-for="statusOption in props.taskOptions.statuses"
+                                        :key="statusOption.value"
+                                        :value="statusOption.value"
+                                    >
+                                        {{ statusOption.label }}
+                                    </option>
+                                </select>
+                                <InputError class="mt-2" :message="activeTaskForm.errors.status" />
+                            </div>
+
+                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                                <Label for="active-task-importance" class="mb-2 block text-sm font-medium">
+                                    {{ t.projects.importance }}
+                                </Label>
+                                <select
+                                    id="active-task-importance"
+                                    v-model="activeTaskForm.importance"
+                                    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    :disabled="!props.can.manageTask"
+                                    @change="handleActiveTaskFieldChange"
+                                >
+                                    <option
+                                        v-for="importanceOption in props.taskOptions.importances"
+                                        :key="importanceOption.value"
+                                        :value="importanceOption.value"
+                                    >
+                                        {{ importanceOption.label }}
+                                    </option>
+                                </select>
+                                <InputError class="mt-2" :message="activeTaskForm.errors.importance" />
+                            </div>
+
+                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                                <Label for="active-task-due" class="mb-2 block text-sm font-medium">
+                                    {{ t.projects.due_date }}
+                                </Label>
+                                <Input
+                                    id="active-task-due"
+                                    v-model="activeTaskForm.due_at"
+                                    type="datetime-local"
+                                    step="60"
+                                    :disabled="!props.can.manageTask"
+                                    @change="handleActiveTaskFieldChange"
+                                />
+                                <div class="mt-2 text-xs text-muted-foreground">
+                                    {{ formatDateTime(props.activeTask.due_at) }}
+                                </div>
+                                <InputError class="mt-2" :message="activeTaskForm.errors.due_at" />
+                            </div>
+
+                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                                <Label for="active-task-sort-order" class="mb-2 block text-sm font-medium">
+                                    {{ t.projects.sort_order }}
+                                </Label>
+                                <Input
+                                    id="active-task-sort-order"
+                                    v-model.number="activeTaskForm.sort_order"
+                                    type="number"
+                                    min="0"
+                                    :disabled="!props.can.manageTask"
+                                    @change="handleActiveTaskFieldChange"
+                                />
+                                <InputError class="mt-2" :message="activeTaskForm.errors.sort_order" />
+                            </div>
+
                             <div class="rounded-2xl border border-border bg-muted/15 p-4">
                                 <div class="mb-1 flex items-center gap-2 text-sm font-medium">
                                     <UserRound class="size-4 text-muted-foreground" />
                                     {{ t.projects.assignee }}
                                 </div>
-                                <div class="text-sm text-muted-foreground">{{ fullName(props.activeTask.assignee) }}</div>
+                                <select
+                                    id="active-task-assignee"
+                                    v-model="activeTaskForm.assignee_user_id"
+                                    class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    :disabled="!props.can.manageTask"
+                                    @change="handleActiveTaskFieldChange"
+                                >
+                                    <option value="">{{ t.projects.unassigned }}</option>
+                                    <option
+                                        v-for="member in activeTaskMemberOptions"
+                                        :key="member.id"
+                                        :value="member.id"
+                                    >
+                                        {{ fullName(member) }}
+                                    </option>
+                                </select>
+                                <InputError class="mt-2" :message="activeTaskForm.errors.assignee_user_id" />
                             </div>
 
                             <div class="rounded-2xl border border-border bg-muted/15 p-4">
@@ -2046,66 +2419,76 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     <Shield class="size-4 text-muted-foreground" />
                                     {{ t.projects.creator }}
                                 </div>
-                                <div class="text-sm text-muted-foreground">{{ fullName(props.activeTask.creator) }}</div>
-                            </div>
-
-                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                                <div class="mb-1 flex items-center gap-2 text-sm font-medium">
-                                    <CalendarClock class="size-4 text-muted-foreground" />
-                                    {{ t.projects.due_date }}
-                                </div>
-                                <div class="text-sm text-muted-foreground">{{ formatDateTime(props.activeTask.due_at) }}</div>
-                            </div>
-
-                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                                <div class="mb-1 flex items-center gap-2 text-sm font-medium">
-                                    <GitBranchPlus class="size-4 text-muted-foreground" />
-                                    {{ t.projects.parent_task }}
-                                </div>
-                                <div class="text-sm text-muted-foreground">
-                                    <Link
-                                        v-if="props.activeTask.parent_task"
-                                        :href="
-                                            isTasksPage
-                                                ? taskRoute(props.activeTask.parent_task.id)
-                                                : showWorkspaceTask(props.activeTask.parent_task.id)
-                                        "
-                                        class="hover:underline"
-                                    >
-                                        {{ props.activeTask.parent_task.title }}
-                                    </Link>
-                                    <span v-else>{{ t.projects.no_parent_task }}</span>
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-border bg-muted/15 p-4 md:col-span-2">
-                                <div class="mb-1 flex items-center gap-2 text-sm font-medium">
-                                    <UsersRound class="size-4 text-muted-foreground" />
-                                    {{ t.projects.co_assignees }}
-                                </div>
-                                <div class="flex flex-wrap gap-2">
-                                    <span
-                                        v-for="member in props.activeTask.co_assignees"
-                                        :key="member.id"
-                                        class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground"
-                                    >
-                                        {{ fullName(member) }}
-                                    </span>
-                                    <span
-                                        v-if="props.activeTask.co_assignees.length === 0"
-                                        class="text-sm text-muted-foreground"
-                                    >
-                                        {{ t.projects.no_co_assignees }}
-                                    </span>
+                                <div class="mt-2 text-sm text-muted-foreground">
+                                    {{ fullName(props.activeTask.creator) }}
                                 </div>
                             </div>
                         </div>
 
                         <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                            <div class="mb-2 text-sm font-medium">{{ t.projects.description_label }}</div>
-                            <p class="whitespace-pre-line text-sm text-muted-foreground">
-                                {{ props.activeTask.description || t.projects.empty_task_description }}
+                            <div class="mb-2 flex items-center justify-between gap-3">
+                                <Label for="active-task-complexity" class="text-sm font-medium">
+                                    {{ t.projects.complexity }}
+                                </Label>
+                                <span class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground">
+                                    {{ activeTaskForm.complexity }}/10
+                                </span>
+                            </div>
+                            <input
+                                id="active-task-complexity"
+                                v-model.number="activeTaskForm.complexity"
+                                type="range"
+                                min="1"
+                                max="10"
+                                class="w-full accent-primary"
+                                :disabled="!props.can.manageTask"
+                                @change="handleActiveTaskFieldChange"
+                            />
+                            <InputError class="mt-2" :message="activeTaskForm.errors.complexity" />
+                        </div>
+
+                        <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                            <Label for="active-task-description" class="mb-2 block text-sm font-medium">
+                                {{ t.projects.description_label }}
+                            </Label>
+                            <textarea
+                                id="active-task-description"
+                                v-model="activeTaskForm.description"
+                                rows="6"
+                                class="min-h-32 w-full rounded-2xl border border-input bg-background px-3 py-3 text-sm shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                :disabled="!props.can.manageTask"
+                                @change="handleActiveTaskFieldChange"
+                            ></textarea>
+                            <InputError class="mt-2" :message="activeTaskForm.errors.description" />
+                        </div>
+
+                        <div class="rounded-2xl border border-border bg-muted/15 p-4">
+                            <div class="mb-3 flex items-center gap-2 text-sm font-medium">
+                                <UsersRound class="size-4 text-muted-foreground" />
+                                {{ t.projects.co_assignees }}
+                            </div>
+                            <p class="mb-3 text-sm text-muted-foreground">
+                                {{ t.projects.co_assignees_help }}
                             </p>
+
+                            <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
+                                <label
+                                    v-for="member in activeTaskMemberOptions"
+                                    :key="member.id"
+                                    class="flex items-start gap-3 rounded-2xl border border-border bg-background/70 p-3"
+                                >
+                                    <Checkbox
+                                        :checked="activeTaskForm.co_assignee_user_ids.includes(member.id)"
+                                        :disabled="!props.can.manageTask"
+                                        @update:checked="activeTaskCoAssigneeHandler(member.id)"
+                                    />
+                                    <div class="min-w-0 flex-1">
+                                        <div class="truncate text-sm font-medium">{{ fullName(member) }}</div>
+                                        <div class="truncate text-xs text-muted-foreground">{{ member.email }}</div>
+                                    </div>
+                                </label>
+                            </div>
+                            <InputError class="mt-2" :message="activeTaskForm.errors.co_assignee_user_ids" />
                         </div>
 
                         <div class="rounded-2xl border border-border bg-muted/15 p-4">

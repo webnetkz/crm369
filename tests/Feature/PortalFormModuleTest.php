@@ -237,6 +237,47 @@ test('authenticated user can update and delete a form from forms workspace', fun
     expect(PortalForm::query()->find($form->id))->toBeNull();
 });
 
+test('forms workspace keeps the sidebar closed until a form is selected', function () {
+    $owner = User::factory()->create();
+    $target = User::factory()->create();
+
+    $form = PortalForm::factory()->create([
+        'owner_user_id' => $owner->id,
+        'target_user_id' => $target->id,
+        'name' => 'Website brief',
+        'submission_mode' => PortalForm::SUBMISSION_MODE_TASK,
+        'is_active' => true,
+    ]);
+
+    $form->fields()->create([
+        'key' => 'company_name',
+        'label' => 'Company name',
+        'type' => 'text',
+        'placeholder' => 'Acme LLC',
+        'is_required' => true,
+        'sort_order' => 10,
+    ]);
+
+    $this->actingAs($owner)
+        ->get(route('forms.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('forms/Index')
+            ->has('forms', 1)
+            ->where('forms.0.name', 'Website brief')
+            ->where('activeForm', null)
+            ->where('can.manageActive', false));
+
+    $this->actingAs($owner)
+        ->get(route('forms.index', ['form' => $form->id]))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('activeForm.id', $form->id)
+            ->where('activeForm.name', 'Website brief')
+            ->has('activeForm.fields', 1)
+            ->where('can.manageActive', true));
+});
+
 test('redirect completion action requires a redirect url', function () {
     $owner = User::factory()->create();
     $target = User::factory()->create();

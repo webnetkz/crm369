@@ -43,6 +43,7 @@ export type Auth = {
     canAccessPersonContacts: boolean;
     canAccessCompanyContacts: boolean;
     canManageKnowledgeBases: boolean;
+    canManageNews: boolean;
     canAccessFunnels: boolean;
     canManageFunnels: boolean;
     isImpersonating: boolean;

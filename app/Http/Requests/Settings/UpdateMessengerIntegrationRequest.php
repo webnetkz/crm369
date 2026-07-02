@@ -10,6 +10,66 @@ use Illuminate\Validation\Rule;
 
 class UpdateMessengerIntegrationRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $settings = $this->input('settings');
+
+        if (! is_array($settings)) {
+            return;
+        }
+
+        $this->merge([
+            'settings' => collect($settings)
+                ->map(function (mixed $value): mixed {
+                    if (! is_string($value)) {
+                        return $value;
+                    }
+
+                    $trimmed = trim($value);
+
+                    return $trimmed !== '' ? $trimmed : null;
+                })
+                ->all(),
+        ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function telephonyResponsibleModes(): array
+    {
+        return [
+            'call_receiver',
+            'last_contact_owner',
+            'round_robin_queue',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function telephonyMissedCallModes(): array
+    {
+        return [
+            'notify_only',
+            'create_activity',
+            'create_contact_and_activity',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function telephonyRecordingModes(): array
+    {
+        return [
+            'disabled',
+            'incoming_only',
+            'outgoing_only',
+            'all_calls',
+        ];
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -33,9 +93,22 @@ class UpdateMessengerIntegrationRequest extends FormRequest
             'settings.channel_id' => ['nullable', 'string', 'max:255'],
             'settings.phone_number' => ['nullable', 'string', 'max:255'],
             'settings.api_token' => ['nullable', 'string', 'max:2048'],
+            'settings.provider_name' => ['nullable', 'string', 'max:255'],
+            'settings.account_id' => ['nullable', 'string', 'max:255'],
+            'settings.extension_number' => ['nullable', 'string', 'max:255'],
             'settings.bot_username' => ['nullable', 'string', 'max:255'],
             'settings.bot_token' => ['nullable', 'string', 'max:2048'],
             'settings.webhook_secret' => ['nullable', 'string', 'max:2048'],
+            'settings.webhook_url' => ['nullable', 'string', 'max:2048'],
+            'settings.default_line' => ['nullable', 'string', 'max:255'],
+            'settings.outbound_caller_id' => ['nullable', 'string', 'max:255'],
+            'settings.responsible_mode' => ['nullable', 'string', Rule::in($this->telephonyResponsibleModes())],
+            'settings.missed_call_mode' => ['nullable', 'string', Rule::in($this->telephonyMissedCallModes())],
+            'settings.recording_mode' => ['nullable', 'string', Rule::in($this->telephonyRecordingModes())],
+            'settings.create_contact_for_unknown_calls' => ['sometimes', 'boolean'],
+            'settings.create_activity_for_missed_calls' => ['sometimes', 'boolean'],
+            'settings.log_incoming_calls' => ['sometimes', 'boolean'],
+            'settings.log_outgoing_calls' => ['sometimes', 'boolean'],
             'group_accesses' => ['required', 'array'],
             'group_accesses.*.user_group_id' => ['required', 'integer', Rule::exists('user_groups', 'id')],
             'group_accesses.*.access_level' => ['required', 'string', Rule::in(MessengerIntegrationGroupAccess::assignableAccessLevels())],
@@ -43,20 +116,26 @@ class UpdateMessengerIntegrationRequest extends FormRequest
     }
 
     /**
-     * @return array<string, string|null>
+     * @return array<string, bool|string|null>
      */
     public function settings(MessengerIntegration $messengerIntegration): array
     {
         $settings = collect($this->validated('settings', []));
 
         return collect(array_keys(MessengerIntegration::defaultSettingsForDriver($messengerIntegration->driver)))
-            ->mapWithKeys(function (string $key) use ($settings): array {
+            ->mapWithKeys(function (string $key) use ($settings, $messengerIntegration): array {
                 $value = $settings->get($key);
+                $defaultValue = MessengerIntegration::defaultSettingsForDriver($messengerIntegration->driver)[$key] ?? null;
+
+                if (is_bool($defaultValue)) {
+                    return [$key => (bool) $value];
+                }
+
                 $trimmed = is_string($value) ? trim($value) : null;
 
                 return [$key => $trimmed !== '' ? $trimmed : null];
             })
-            ->filter(fn (?string $value): bool => $value !== null)
+            ->filter(fn (mixed $value): bool => $value !== null && $value !== false)
             ->all();
     }
 

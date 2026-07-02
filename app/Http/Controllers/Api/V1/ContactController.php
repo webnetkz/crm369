@@ -10,6 +10,7 @@ use App\Http\Requests\UpdateContactRequest;
 use App\Http\Resources\ApiContactResource;
 use App\Models\Contact;
 use App\Models\User;
+use App\Support\ContactAvatarManager;
 use App\Support\PerPageOptions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,8 @@ use Illuminate\Http\JsonResponse;
 class ContactController extends Controller
 {
     use EnsuresContactsTableIsReady;
+
+    public function __construct(private ContactAvatarManager $contactAvatarManager) {}
 
     public function index(FilterContactsIndexRequest $request): JsonResponse
     {
@@ -106,6 +109,10 @@ class ContactController extends Controller
             'updated_by_user_id' => $user->id,
         ]);
 
+        if ($this->contactAvatarManager->sync($contact, $request->file('avatar'))) {
+            $contact->save();
+        }
+
         return response()->json([
             'message' => __('ui.contacts.created_success'),
             'data' => (new ApiContactResource($contact->load([
@@ -134,6 +141,10 @@ class ContactController extends Controller
             ...$request->payload(),
             'updated_by_user_id' => $user->id,
         ]);
+
+        if ($this->contactAvatarManager->sync($visibleContact, $request->file('avatar'))) {
+            $visibleContact->save();
+        }
 
         return response()->json([
             'message' => __('ui.contacts.updated_success'),

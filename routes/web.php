@@ -3,19 +3,26 @@
 use App\Http\Controllers\ChatMessageController;
 use App\Http\Controllers\ChatPageController;
 use App\Http\Controllers\ChatSidebarController;
+use App\Http\Controllers\ContactCommentController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CrmFunnelController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EdoDocumentController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\KnowledgeBaseController;
 use App\Http\Controllers\LanguageController;
+use App\Http\Controllers\NewsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationPageController;
 use App\Http\Controllers\PortalFormController;
 use App\Http\Controllers\PortalWebhookContactController;
+use App\Http\Controllers\PortalWebhookEdoController;
 use App\Http\Controllers\PortalWebhookInvokeController;
 use App\Http\Controllers\PortalWebhookUserController;
+use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectTaskConversationController;
+use App\Http\Controllers\PublicEdoSigningController;
 use App\Http\Controllers\PublicPortalFormController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -28,29 +35,44 @@ Route::get('/', fn (Request $request) => Inertia::render('auth/Login', [
 ]))->middleware('guest')->name('home');
 
 Route::match(['GET', 'POST'], 'portal-webhooks/{portalWebhook}', PortalWebhookInvokeController::class)
-    ->middleware(['throttle:30,1', 'portal.webhook'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook'])
     ->name('portal-webhooks.invoke');
 Route::get('portal-webhooks/{portalWebhook}/users', [PortalWebhookUserController::class, 'index'])
-    ->middleware(['throttle:30,1', 'portal.webhook:users.read'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:users.read'])
     ->name('portal-webhooks.users.index');
 Route::get('portal-webhooks/{portalWebhook}/users/{user}', [PortalWebhookUserController::class, 'show'])
-    ->middleware(['throttle:30,1', 'portal.webhook:users.read'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:users.read'])
     ->name('portal-webhooks.users.show');
 Route::get('portal-webhooks/{portalWebhook}/contacts', [PortalWebhookContactController::class, 'index'])
-    ->middleware(['throttle:30,1', 'portal.webhook:contacts.read', 'module.enabled:contacts'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:contacts.read', 'module.enabled:contacts'])
     ->name('portal-webhooks.contacts.index');
 Route::get('portal-webhooks/{portalWebhook}/contacts/{contact}', [PortalWebhookContactController::class, 'show'])
-    ->middleware(['throttle:30,1', 'portal.webhook:contacts.read', 'module.enabled:contacts'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:contacts.read', 'module.enabled:contacts'])
     ->name('portal-webhooks.contacts.show');
 Route::post('portal-webhooks/{portalWebhook}/contacts', [PortalWebhookContactController::class, 'store'])
-    ->middleware(['throttle:30,1', 'portal.webhook:contacts.write', 'module.enabled:contacts'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:contacts.write', 'module.enabled:contacts'])
     ->name('portal-webhooks.contacts.store');
 Route::patch('portal-webhooks/{portalWebhook}/contacts/{contact}', [PortalWebhookContactController::class, 'update'])
-    ->middleware(['throttle:30,1', 'portal.webhook:contacts.write', 'module.enabled:contacts'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:contacts.write', 'module.enabled:contacts'])
     ->name('portal-webhooks.contacts.update');
 Route::delete('portal-webhooks/{portalWebhook}/contacts/{contact}', [PortalWebhookContactController::class, 'destroy'])
-    ->middleware(['throttle:30,1', 'portal.webhook:contacts.write', 'module.enabled:contacts'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:contacts.write', 'module.enabled:contacts'])
     ->name('portal-webhooks.contacts.destroy');
+Route::get('portal-webhooks/{portalWebhook}/edo/documents', [PortalWebhookEdoController::class, 'index'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:edo.read', 'module.enabled:edo'])
+    ->name('portal-webhooks.edo.index');
+Route::get('portal-webhooks/{portalWebhook}/edo/documents/{edoDocument}', [PortalWebhookEdoController::class, 'show'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:edo.read', 'module.enabled:edo'])
+    ->name('portal-webhooks.edo.show');
+Route::post('portal-webhooks/{portalWebhook}/edo/documents', [PortalWebhookEdoController::class, 'store'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:edo.write', 'module.enabled:edo'])
+    ->name('portal-webhooks.edo.store');
+Route::patch('portal-webhooks/{portalWebhook}/edo/documents/{edoDocument}', [PortalWebhookEdoController::class, 'update'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:edo.write', 'module.enabled:edo'])
+    ->name('portal-webhooks.edo.update');
+Route::post('portal-webhooks/{portalWebhook}/edo/documents/{edoDocument}/public-link', [PortalWebhookEdoController::class, 'issuePublicLink'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:edo.write', 'module.enabled:edo'])
+    ->name('portal-webhooks.edo.public-link.store');
 
 Route::get('forms/public/{portalForm:public_token}', [PublicPortalFormController::class, 'show'])
     ->middleware('module.enabled:forms')
@@ -58,6 +80,15 @@ Route::get('forms/public/{portalForm:public_token}', [PublicPortalFormController
 Route::post('forms/public/{portalForm:public_token}', [PublicPortalFormController::class, 'submit'])
     ->middleware(['throttle:20,1', 'module.enabled:forms'])
     ->name('forms.public.submit');
+Route::get('edo/public/{edoDocument:public_token}', [PublicEdoSigningController::class, 'show'])
+    ->middleware('module.enabled:edo')
+    ->name('edo.public.show');
+Route::post('edo/public/{edoDocument:public_token}', [PublicEdoSigningController::class, 'sign'])
+    ->middleware(['throttle:20,1', 'module.enabled:edo'])
+    ->name('edo.public.sign');
+Route::get('edo/public/{edoDocument:public_token}/download', [PublicEdoSigningController::class, 'download'])
+    ->middleware('module.enabled:edo')
+    ->name('edo.public.download');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('notifications', NotificationPageController::class)->name('notifications.index');
@@ -67,7 +98,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+    Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::middleware('module.enabled:forms')->group(function () {
         Route::get('forms', [PortalFormController::class, 'index'])->name('forms.index');
         Route::post('forms', [PortalFormController::class, 'store'])->name('forms.store');
@@ -82,6 +113,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('contacts', [ContactController::class, 'store'])
             ->middleware('can:access-contacts')
             ->name('contacts.store');
+        Route::post('contacts/{contact}/comments', [ContactCommentController::class, 'store'])
+            ->middleware('can:access-contacts')
+            ->name('contacts.comments.store');
         Route::patch('contacts/{contact}', [ContactController::class, 'update'])
             ->middleware('can:access-contacts')
             ->name('contacts.update');
@@ -101,9 +135,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('files/directories/{fileDirectory}/permissions/{fileDirectoryPermission}', [FileController::class, 'destroyPermission'])->name('files.directories.permissions.destroy');
     });
 
-    Route::inertia('news', 'news/Index')
-        ->middleware('module.enabled:news')
-        ->name('news.index');
+    Route::middleware('module.enabled:edo')->group(function () {
+        Route::get('edo', [EdoDocumentController::class, 'index'])->name('edo.index');
+        Route::post('edo', [EdoDocumentController::class, 'store'])->name('edo.store');
+        Route::patch('edo/{edoDocument}', [EdoDocumentController::class, 'update'])->name('edo.update');
+        Route::delete('edo/{edoDocument}', [EdoDocumentController::class, 'destroy'])->name('edo.destroy');
+        Route::get('edo/{edoDocument}/file', [EdoDocumentController::class, 'downloadDocumentFile'])->name('edo.file.download');
+        Route::post('edo/{edoDocument}/public-link', [EdoDocumentController::class, 'issuePublicLink'])->name('edo.public-link.store');
+    });
+
+    Route::middleware('module.enabled:news')->group(function () {
+        Route::get('news', [NewsController::class, 'index'])->name('news.index');
+        Route::get('news/{news}', [NewsController::class, 'show'])->name('news.show');
+    });
 
     Route::middleware('module.enabled:chats')->group(function () {
         Route::get('chats', ChatPageController::class)->name('chats.index');
@@ -162,6 +206,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('projects/{project}/tasks/{projectTask}', [ProjectController::class, 'updateTask'])->name('projects.tasks.update');
         Route::delete('projects/{project}/tasks/{projectTask}', [ProjectController::class, 'destroyTask'])->name('projects.tasks.destroy');
     });
+
+    Route::middleware('module.enabled:production')->group(function () {
+        Route::get('production', [ProductionController::class, 'index'])->name('production.index');
+        Route::get('production/{section}', [ProductionController::class, 'show'])->name('production.show');
+    });
 });
 
 Route::middleware(['auth', 'verified', 'can:manage-knowledge-bases', 'module.enabled:knowledge-bases'])->group(function () {
@@ -171,6 +220,12 @@ Route::middleware(['auth', 'verified', 'can:manage-knowledge-bases', 'module.ena
     Route::post('knowledge-bases/{knowledgeBase}/articles', [KnowledgeBaseController::class, 'storeArticle'])->name('knowledge-bases.articles.store');
     Route::patch('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'updateArticle'])->name('knowledge-bases.articles.update');
     Route::delete('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'destroyArticle'])->name('knowledge-bases.articles.destroy');
+});
+
+Route::middleware(['auth', 'verified', 'can:manage-news', 'module.enabled:news'])->group(function () {
+    Route::post('news', [NewsController::class, 'store'])->name('news.store');
+    Route::patch('news/{news}', [NewsController::class, 'update'])->name('news.update');
+    Route::delete('news/{news}', [NewsController::class, 'destroy'])->name('news.destroy');
 });
 
 require __DIR__.'/settings.php';

@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateContactRequest;
 use App\Http\Resources\ApiContactResource;
 use App\Models\Contact;
 use App\Models\User;
+use App\Support\ContactAvatarManager;
 use App\Support\PaginationData;
 use App\Support\PerPageOptions;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +20,8 @@ use Inertia\Response;
 class ContactController extends Controller
 {
     use EnsuresContactsTableIsReady;
+
+    public function __construct(private ContactAvatarManager $contactAvatarManager) {}
 
     public function index(FilterContactsIndexRequest $request): Response
     {
@@ -34,6 +37,7 @@ class ContactController extends Controller
             ->with([
                 'creator:id,name,last_name',
                 'updater:id,name,last_name',
+                'comments.author:id,name,last_name',
             ])
             ->visibleTo($user)
             ->when($filters['search'] !== '', fn (Builder $query) => $this->applySearch($query, $filters['search']))
@@ -66,11 +70,15 @@ class ContactController extends Controller
         $user = $request->user();
         abort_unless($user !== null, 403);
 
-        Contact::query()->create([
+        $contact = Contact::query()->create([
             ...$request->payload(),
             'created_by_user_id' => $user->id,
             'updated_by_user_id' => $user->id,
         ]);
+
+        if ($this->contactAvatarManager->sync($contact, $request->file('avatar'))) {
+            $contact->save();
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.contacts.created_success')]);
 
@@ -94,6 +102,10 @@ class ContactController extends Controller
             ...$request->payload(),
             'updated_by_user_id' => $user->id,
         ]);
+
+        if ($this->contactAvatarManager->sync($visibleContact, $request->file('avatar'))) {
+            $visibleContact->save();
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.contacts.updated_success')]);
 

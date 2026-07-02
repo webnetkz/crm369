@@ -15,7 +15,7 @@ use Illuminate\Support\Carbon;
  * @property string $driver
  * @property string $name
  * @property bool $is_active
- * @property array<string, string>|null $settings
+ * @property array<string, mixed>|null $settings
  * @property int|null $updated_by_user_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -26,6 +26,8 @@ class MessengerIntegration extends Model
     public const string DRIVER_WHATSAPP_BUSINESS = 'whatsapp_business';
 
     public const string DRIVER_TELEGRAM = 'telegram';
+
+    public const string DRIVER_TELEPHONY = 'telephony';
 
     public const string ACCESS_NONE = 'none';
 
@@ -58,7 +60,32 @@ class MessengerIntegration extends Model
         return [
             self::DRIVER_WHATSAPP_BUSINESS,
             self::DRIVER_TELEGRAM,
+            self::DRIVER_TELEPHONY,
         ];
+    }
+
+    public static function defaultNameForDriver(string $driver): string
+    {
+        return match ($driver) {
+            self::DRIVER_WHATSAPP_BUSINESS => 'WhatsApp Business',
+            self::DRIVER_TELEGRAM => 'Telegram',
+            self::DRIVER_TELEPHONY => 'Telephony',
+            default => 'Integration',
+        };
+    }
+
+    public static function ensureDefaultIntegrationsExist(): void
+    {
+        foreach (self::drivers() as $driver) {
+            self::query()->firstOrCreate(
+                ['driver' => $driver],
+                [
+                    'name' => self::defaultNameForDriver($driver),
+                    'is_active' => false,
+                    'settings' => [],
+                ],
+            );
+        }
     }
 
     /**
@@ -75,11 +102,15 @@ class MessengerIntegration extends Model
                 'label_key' => 'ui.integrations.telegram',
                 'description_key' => 'ui.integrations.telegram_description',
             ],
+            self::DRIVER_TELEPHONY => [
+                'label_key' => 'ui.integrations.telephony',
+                'description_key' => 'ui.integrations.telephony_description',
+            ],
         ];
     }
 
     /**
-     * @return array<string, string|null>
+     * @return array<string, bool|string|null>
      */
     public static function defaultSettingsForDriver(string $driver): array
     {
@@ -94,6 +125,25 @@ class MessengerIntegration extends Model
                 'bot_username' => null,
                 'bot_token' => null,
                 'webhook_secret' => null,
+            ],
+            self::DRIVER_TELEPHONY => [
+                'provider_name' => null,
+                'api_url' => null,
+                'account_id' => null,
+                'phone_number' => null,
+                'extension_number' => null,
+                'api_token' => null,
+                'webhook_url' => null,
+                'webhook_secret' => null,
+                'default_line' => null,
+                'outbound_caller_id' => null,
+                'responsible_mode' => null,
+                'missed_call_mode' => null,
+                'recording_mode' => null,
+                'create_contact_for_unknown_calls' => false,
+                'create_activity_for_missed_calls' => false,
+                'log_incoming_calls' => false,
+                'log_outgoing_calls' => false,
             ],
             default => [],
         };
@@ -117,7 +167,7 @@ class MessengerIntegration extends Model
     }
 
     /**
-     * @return array<string, string|null>
+     * @return array<string, bool|string|null>
      */
     public function normalizedSettings(): array
     {
@@ -126,6 +176,20 @@ class MessengerIntegration extends Model
         return collect(self::defaultSettingsForDriver($this->driver))
             ->mapWithKeys(function (mixed $defaultValue, string $key) use ($settings): array {
                 $value = $settings[$key] ?? $defaultValue;
+
+                if (is_bool($defaultValue)) {
+                    if (is_bool($value)) {
+                        return [$key => $value];
+                    }
+
+                    if (is_string($value)) {
+                        $normalized = filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+
+                        return [$key => $normalized ?? $defaultValue];
+                    }
+
+                    return [$key => $defaultValue];
+                }
 
                 if (! is_string($value)) {
                     return [$key => null];

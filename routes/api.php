@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\ContactController;
+use App\Http\Controllers\Api\V1\EdoDocumentController as ApiEdoDocumentController;
 use App\Http\Controllers\Api\V1\KnowledgeBaseController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\MessengerIntegrationController;
@@ -15,7 +16,7 @@ use App\Http\Controllers\Api\V1\UserGroupController;
 use App\Http\Middleware\ResolveApiSubjectUser;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->middleware(['auth:api', ResolveApiSubjectUser::class, 'throttle:api'])->group(function (): void {
+Route::prefix('v1')->middleware(['module.enabled:api', 'auth:api', ResolveApiSubjectUser::class, 'throttle:api'])->group(function (): void {
     Route::get('profile', [ProfileController::class, 'show'])
         ->middleware('api.token:profile.read')
         ->name('api.v1.profile.show');
@@ -67,6 +68,27 @@ Route::prefix('v1')->middleware(['auth:api', ResolveApiSubjectUser::class, 'thro
         Route::delete('contacts/{contact}', [ContactController::class, 'destroy'])
             ->middleware('api.token:contacts.write')
             ->name('api.v1.contacts.destroy');
+    });
+
+    Route::middleware('module.enabled:edo')->group(function (): void {
+        Route::get('edo/documents', [ApiEdoDocumentController::class, 'index'])
+            ->middleware('api.token:edo.read')
+            ->name('api.v1.edo.index');
+        Route::get('edo/documents/{edoDocument}', [ApiEdoDocumentController::class, 'show'])
+            ->middleware('api.token:edo.read')
+            ->name('api.v1.edo.show');
+        Route::post('edo/documents', [ApiEdoDocumentController::class, 'store'])
+            ->middleware('api.token:edo.write')
+            ->name('api.v1.edo.store');
+        Route::patch('edo/documents/{edoDocument}', [ApiEdoDocumentController::class, 'update'])
+            ->middleware('api.token:edo.write')
+            ->name('api.v1.edo.update');
+        Route::delete('edo/documents/{edoDocument}', [ApiEdoDocumentController::class, 'destroy'])
+            ->middleware('api.token:edo.write')
+            ->name('api.v1.edo.destroy');
+        Route::post('edo/documents/{edoDocument}/public-link', [ApiEdoDocumentController::class, 'issuePublicLink'])
+            ->middleware('api.token:edo.write')
+            ->name('api.v1.edo.public-link.store');
     });
 
     Route::middleware('module.enabled:knowledge-bases')->group(function (): void {
@@ -188,26 +210,30 @@ Route::prefix('v1')->middleware(['auth:api', ResolveApiSubjectUser::class, 'thro
         ->middleware(['api.token:portal.write', 'can:manage-users'])
         ->name('api.v1.portal.update');
 
-    Route::get('integrations', [MessengerIntegrationController::class, 'index'])
-        ->middleware(['api.token:integrations.read', 'can:manage-messenger-integrations'])
-        ->name('api.v1.integrations.index');
-    Route::patch('integrations/{messengerIntegration}', [MessengerIntegrationController::class, 'update'])
-        ->middleware(['api.token:integrations.write', 'can:manage-messenger-integrations'])
-        ->name('api.v1.integrations.update');
+    Route::middleware('module.enabled:integrations')->group(function (): void {
+        Route::get('integrations', [MessengerIntegrationController::class, 'index'])
+            ->middleware(['api.token:integrations.read', 'can:manage-messenger-integrations'])
+            ->name('api.v1.integrations.index');
+        Route::patch('integrations/{messengerIntegration}', [MessengerIntegrationController::class, 'update'])
+            ->middleware(['api.token:integrations.write', 'can:manage-messenger-integrations'])
+            ->name('api.v1.integrations.update');
+    });
 
-    Route::get('webhooks', [PortalWebhookController::class, 'index'])
-        ->middleware(['api.token:webhooks.read', 'can:manage-webhooks'])
-        ->name('api.v1.webhooks.index');
-    Route::post('webhooks', [PortalWebhookController::class, 'store'])
-        ->middleware(['api.token:webhooks.write', 'can:manage-webhooks'])
-        ->name('api.v1.webhooks.store');
-    Route::patch('webhooks/{portalWebhook}', [PortalWebhookController::class, 'update'])
-        ->middleware(['api.token:webhooks.write', 'can:manage-webhooks'])
-        ->name('api.v1.webhooks.update');
-    Route::post('webhooks/{portalWebhook}/regenerate', [PortalWebhookController::class, 'regenerate'])
-        ->middleware(['api.token:webhooks.write', 'can:manage-webhooks'])
-        ->name('api.v1.webhooks.regenerate');
-    Route::delete('webhooks/{portalWebhook}', [PortalWebhookController::class, 'destroy'])
-        ->middleware(['api.token:webhooks.write', 'can:manage-webhooks'])
-        ->name('api.v1.webhooks.destroy');
+    Route::middleware('module.enabled:webhooks')->group(function (): void {
+        Route::get('webhooks', [PortalWebhookController::class, 'index'])
+            ->middleware(['api.token:webhooks.read', 'can:manage-webhooks'])
+            ->name('api.v1.webhooks.index');
+        Route::post('webhooks', [PortalWebhookController::class, 'store'])
+            ->middleware(['api.token:webhooks.write', 'can:manage-webhooks'])
+            ->name('api.v1.webhooks.store');
+        Route::patch('webhooks/{portalWebhook}', [PortalWebhookController::class, 'update'])
+            ->middleware(['api.token:webhooks.write', 'can:manage-webhooks'])
+            ->name('api.v1.webhooks.update');
+        Route::post('webhooks/{portalWebhook}/regenerate', [PortalWebhookController::class, 'regenerate'])
+            ->middleware(['api.token:webhooks.write', 'can:manage-webhooks'])
+            ->name('api.v1.webhooks.regenerate');
+        Route::delete('webhooks/{portalWebhook}', [PortalWebhookController::class, 'destroy'])
+            ->middleware(['api.token:webhooks.write', 'can:manage-webhooks'])
+            ->name('api.v1.webhooks.destroy');
+    });
 });

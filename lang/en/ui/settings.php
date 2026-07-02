@@ -32,6 +32,7 @@ return [
     'portal' => 'Portal',
     'modules' => 'Modules',
     'integrations' => 'Integrations',
+    'logs' => 'Logs',
     'api' => 'API',
     'webhooks' => 'Webhooks',
 ];
