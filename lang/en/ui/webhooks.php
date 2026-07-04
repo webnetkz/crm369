@@ -27,7 +27,7 @@ return [
     'documentation_endpoint_users_show_title' => 'User profile',
     'documentation_endpoint_users_show_description' => 'Returns a single user by its `user_id`.',
     'documentation_endpoint_contacts_index_title' => 'Contacts list',
-    'documentation_endpoint_contacts_index_description' => 'Returns the contacts directory. Supports search, type, and `per_page` filters.',
+    'documentation_endpoint_contacts_index_description' => 'Returns the contacts directory. Supports search, type, blacklist, and `per_page` filters.',
     'documentation_endpoint_contacts_show_title' => 'Contact card',
     'documentation_endpoint_contacts_show_description' => 'Returns a single contact by its `contact_id`.',
     'documentation_endpoint_contacts_store_title' => 'Create contact',

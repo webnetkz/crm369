@@ -98,6 +98,10 @@ class PortalSetting extends Model
                 'title_key' => 'ui.integrations.title',
                 'description_key' => 'ui.integrations.description',
             ],
+            'business-processes' => [
+                'title_key' => 'ui.business_processes.title',
+                'description_key' => 'ui.business_processes.description',
+            ],
         ];
     }
 

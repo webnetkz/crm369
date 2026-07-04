@@ -186,6 +186,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('module.enabled:projects')->group(function () {
         Route::get('tasks', [ProjectController::class, 'tasksIndex'])->name('tasks.index');
+        Route::get('tasks/export', [ProjectController::class, 'exportStandaloneTasks'])->name('tasks.export');
+        Route::post('tasks/import', [ProjectController::class, 'importStandaloneTasks'])->name('tasks.import');
         Route::get('tasks/{projectTask}', [ProjectController::class, 'showStandaloneTask'])->name('tasks.show');
         Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
         Route::post('projects/task-stages', [ProjectController::class, 'storeTaskStage'])->name('projects.task-stages.store');
@@ -198,6 +200,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('projects/tasks/{projectTask}', [ProjectController::class, 'updateWorkspaceTask'])->name('projects.workspace.tasks.update');
         Route::delete('projects/tasks/{projectTask}', [ProjectController::class, 'destroyWorkspaceTask'])->name('projects.workspace.tasks.destroy');
         Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+        Route::get('projects/{project}/tasks/export', [ProjectController::class, 'exportProjectTasks'])->name('projects.tasks.export');
+        Route::post('projects/{project}/tasks/import', [ProjectController::class, 'importProjectTasks'])->name('projects.tasks.import');
         Route::get('projects/{project}/tasks/{projectTask}', [ProjectController::class, 'task'])->name('projects.tasks.show');
         Route::post('projects', [ProjectController::class, 'store'])->name('projects.store');
         Route::patch('projects/{project}', [ProjectController::class, 'update'])->name('projects.update');

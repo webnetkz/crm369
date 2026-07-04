@@ -27,7 +27,7 @@ return [
     'documentation_endpoint_users_show_title' => 'Профиль пользователя',
     'documentation_endpoint_users_show_description' => 'Возвращает одного пользователя по его `user_id`.',
     'documentation_endpoint_contacts_index_title' => 'Список контактов',
-    'documentation_endpoint_contacts_index_description' => 'Возвращает справочник контактов. Поддерживает фильтры поиска, типа и пагинацию по `per_page`.',
+    'documentation_endpoint_contacts_index_description' => 'Возвращает справочник контактов. Поддерживает фильтры поиска, типа, blacklist и пагинацию по `per_page`.',
     'documentation_endpoint_contacts_show_title' => 'Карточка контакта',
     'documentation_endpoint_contacts_show_description' => 'Возвращает один контакт по его `contact_id`.',
     'documentation_endpoint_contacts_store_title' => 'Создание контакта',

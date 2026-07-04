@@ -32,6 +32,9 @@ class UpdateContactRequest extends FormRequest
             'email' => $this->normalizeNullableString($this->input('email')),
             'phone' => $this->normalizeNullableString($this->input('phone')),
             'notes' => $this->normalizeNullableString($this->input('notes')),
+            'is_blacklisted' => $this->has('is_blacklisted')
+                ? $this->boolean('is_blacklisted')
+                : ($this->currentContact()?->is_blacklisted ?? false),
             'company_requisites' => $this->normalizeContactRequisites($this->input('company_requisites'), $this->inputType()),
         ]);
     }
@@ -46,6 +49,7 @@ class UpdateContactRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:10000'],
+            'is_blacklisted' => ['required', 'boolean'],
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'company_requisites' => ['nullable', 'array'],
             'company_requisites.iin' => ['nullable', 'digits:12'],
@@ -85,6 +89,7 @@ class UpdateContactRequest extends FormRequest
      *     email: ?string,
      *     phone: ?string,
      *     notes: ?string,
+     *     is_blacklisted: bool,
      *     company_requisites: array{
      *         iin: ?string,
      *         bin: ?string,
@@ -107,6 +112,7 @@ class UpdateContactRequest extends FormRequest
             'email' => $this->validated('email'),
             'phone' => $this->validated('phone'),
             'notes' => $this->validated('notes'),
+            'is_blacklisted' => (bool) $this->validated('is_blacklisted'),
             'company_requisites' => $this->validated('company_requisites'),
         ];
     }

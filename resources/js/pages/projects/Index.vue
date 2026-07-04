@@ -5,6 +5,7 @@ import {
     BriefcaseBusiness,
     CalendarClock,
     ClipboardList,
+    Download,
     FolderKanban,
     GitBranchPlus,
     GripVertical,
@@ -15,6 +16,7 @@ import {
     Settings2,
     Shield,
     Trash2,
+    Upload,
     UserRound,
     UsersRound,
 } from '@lucide/vue';
@@ -22,6 +24,10 @@ import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
 import {
     destroy as destroyProject,
     destroyWorkspaceTask,
+    exportProjectTasks,
+    exportStandaloneTasks,
+    importProjectTasks,
+    importStandaloneTasks,
     moveWorkspaceTask,
     moveTaskStages,
     show,
@@ -82,6 +88,7 @@ type TaskFormData = {
 };
 
 type TaskSaveState = 'idle' | 'saving' | 'saved' | 'error';
+type TaskCsvImportContext = number | 'standalone' | null;
 
 type Props = {
     pageMode: ProjectPageMode;
@@ -116,7 +123,9 @@ const props = defineProps<Props>();
 const { language, t } = useLanguage();
 const isTasksPage = computed(() => props.pageMode === 'tasks');
 
-const taskIndexRoute = (view: ProjectTaskDisplayMode = props.taskDisplayMode) => {
+const taskIndexRoute = (
+    view: ProjectTaskDisplayMode = props.taskDisplayMode,
+) => {
     return tasksIndex({
         query: {
             view,
@@ -185,8 +194,15 @@ const taskStageForm = useForm({
     name: '',
     color: '#64748B',
 });
+const taskCsvImportForm = useForm({
+    file: null as File | null,
+});
 
-const activeProjectOwnerId = computed(() => props.activeProject?.owner?.id ?? null);
+const activeProjectOwnerId = computed(
+    () => props.activeProject?.owner?.id ?? null,
+);
+const taskCsvImportInput = ref<HTMLInputElement | null>(null);
+const taskCsvImportContext = ref<TaskCsvImportContext>(null);
 
 watchEffect(() => {
     const breadcrumbs: Array<{
@@ -194,7 +210,9 @@ watchEffect(() => {
         href: NonNullable<InertiaLinkProps['href']>;
     }> = [
         {
-            title: isTasksPage.value ? t.value.projects.tasks : t.value.projects.title,
+            title: isTasksPage.value
+                ? t.value.projects.tasks
+                : t.value.projects.title,
             href: isTasksPage.value ? taskIndexRoute() : projectsIndex(),
         },
     ];
@@ -270,7 +288,10 @@ const projectStatusClass = (project: ProjectListItem): string => {
 };
 
 const findTaskStage = (status: string): ProjectTaskStageOption | null => {
-    return props.taskOptions.statuses.find((option) => option.value === status) ?? null;
+    return (
+        props.taskOptions.statuses.find((option) => option.value === status) ??
+        null
+    );
 };
 
 const taskStageBadgeStyle = (status: string): Record<string, string> => {
@@ -314,12 +335,14 @@ const taskStageColumnStyle = (status: string): Record<string, string> => {
 };
 
 const importanceClass = (importance: string): string => {
-    return {
-        low: 'bg-muted text-muted-foreground',
-        normal: 'bg-primary/10 text-primary',
-        high: 'bg-orange-500/10 text-orange-700 dark:text-orange-300',
-        critical: 'bg-rose-500/10 text-rose-700 dark:text-rose-300',
-    }[importance] ?? 'bg-muted text-muted-foreground';
+    return (
+        {
+            low: 'bg-muted text-muted-foreground',
+            normal: 'bg-primary/10 text-primary',
+            high: 'bg-orange-500/10 text-orange-700 dark:text-orange-300',
+            critical: 'bg-rose-500/10 text-rose-700 dark:text-rose-300',
+        }[importance] ?? 'bg-muted text-muted-foreground'
+    );
 };
 
 const optionLabel = (options: ProjectTaskOption[], value: string): string => {
@@ -327,9 +350,12 @@ const optionLabel = (options: ProjectTaskOption[], value: string): string => {
 };
 
 const defaultTaskStatus = (): string => {
-    return props.taskOptions.statuses.find((option) => !option.is_completed)?.value
-        ?? props.taskOptions.statuses[0]?.value
-        ?? 'todo';
+    return (
+        props.taskOptions.statuses.find((option) => !option.is_completed)
+            ?.value ??
+        props.taskOptions.statuses[0]?.value ??
+        'todo'
+    );
 };
 
 const selectedTaskProjectId = computed<number | null>(() => {
@@ -337,7 +363,9 @@ const selectedTaskProjectId = computed<number | null>(() => {
 });
 
 const selectedActiveTaskProjectId = computed<number | null>(() => {
-    return activeTaskForm.project_id === '' ? null : Number(activeTaskForm.project_id);
+    return activeTaskForm.project_id === ''
+        ? null
+        : Number(activeTaskForm.project_id);
 });
 
 const taskSheetOpen = computed<boolean>(() => {
@@ -353,10 +381,24 @@ const taskSheetBaseRoute = computed(() => {
 });
 
 const standaloneTaskGroup = computed(() => {
-    return props.taskGroups.find((group) => group.kind === 'standalone') ?? null;
+    return (
+        props.taskGroups.find((group) => group.kind === 'standalone') ?? null
+    );
 });
 
 const taskStages = computed(() => props.taskOptions.statuses);
+const standaloneTaskImportError = computed(() => {
+    return taskCsvImportContext.value === 'standalone'
+        ? taskCsvImportForm.errors.file
+        : '';
+});
+
+const activeProjectTaskImportError = computed(() => {
+    return props.activeProject !== null &&
+        taskCsvImportContext.value === props.activeProject.id
+        ? taskCsvImportForm.errors.file
+        : '';
+});
 
 const flattenedStandaloneTasks = computed<FlattenedTaskItem[]>(() => {
     return flattenTaskTree(standaloneTaskGroup.value?.tasks ?? []);
@@ -391,12 +433,17 @@ const kanbanColumns = computed(() => {
     }));
 });
 
-const taskTreeForProject = (projectId: number | null): ProjectTaskListItem[] => {
+const taskTreeForProject = (
+    projectId: number | null,
+): ProjectTaskListItem[] => {
     if (projectId === null) {
         return standaloneTaskGroup.value?.tasks ?? [];
     }
 
-    return props.taskGroups.find((group) => group.project?.id === projectId)?.tasks ?? [];
+    return (
+        props.taskGroups.find((group) => group.project?.id === projectId)
+            ?.tasks ?? []
+    );
 };
 
 const selectedParentTaskTree = computed<ProjectTaskListItem[]>(() => {
@@ -412,10 +459,15 @@ const projectOptionFor = (projectId: number | null): ProjectOption | null => {
         return null;
     }
 
-    return props.availableProjects.find((project) => project.id === projectId) ?? null;
+    return (
+        props.availableProjects.find((project) => project.id === projectId) ??
+        null
+    );
 };
 
-const taskMemberOptionsFor = (projectId: number | null): ProjectUserSummary[] => {
+const taskMemberOptionsFor = (
+    projectId: number | null,
+): ProjectUserSummary[] => {
     return projectOptionFor(projectId)?.members ?? props.availableUsers;
 };
 
@@ -427,7 +479,10 @@ const activeTaskMemberOptions = computed(() => {
     return taskMemberOptionsFor(selectedActiveTaskProjectId.value);
 });
 
-const flattenTaskTree = (tasks: ProjectTaskListItem[], level = 0): Array<ProjectTaskListItem & { level: number }> => {
+const flattenTaskTree = (
+    tasks: ProjectTaskListItem[],
+    level = 0,
+): Array<ProjectTaskListItem & { level: number }> => {
     return tasks.flatMap((task) => [
         { ...task, level },
         ...flattenTaskTree(task.subtasks, level + 1),
@@ -460,7 +515,8 @@ const ganttTasks = computed(() => {
     return flattenedStandaloneTasks.value
         .filter((task) => task.due_at !== null)
         .map((task) => {
-            const fallbackStart = task.created_at ?? task.updated_at ?? task.due_at!;
+            const fallbackStart =
+                task.created_at ?? task.updated_at ?? task.due_at!;
             const start = startOfDay(fallbackStart);
             const dueAt = startOfDay(task.due_at ?? fallbackStart);
             const end = dueAt.getTime() < start.getTime() ? start : dueAt;
@@ -471,11 +527,15 @@ const ganttTasks = computed(() => {
                 end,
             };
         })
-        .sort((first, second) => first.start.getTime() - second.start.getTime());
+        .sort(
+            (first, second) => first.start.getTime() - second.start.getTime(),
+        );
 });
 
 const ganttTasksWithoutDueDate = computed(() => {
-    return flattenedStandaloneTasks.value.filter((task) => task.due_at === null);
+    return flattenedStandaloneTasks.value.filter(
+        (task) => task.due_at === null,
+    );
 });
 
 const ganttStartDate = computed<Date | null>(() => {
@@ -527,12 +587,15 @@ const ganttRows = computed(() => {
 
     return ganttTasks.value.map((task) => {
         const offset = Math.floor(
-            (task.start.getTime() - ganttStartDate.value!.getTime())
-                / DAY_IN_MILLISECONDS,
+            (task.start.getTime() - ganttStartDate.value!.getTime()) /
+                DAY_IN_MILLISECONDS,
         );
         const span = Math.max(
             1,
-            Math.floor((task.end.getTime() - task.start.getTime()) / DAY_IN_MILLISECONDS) + 1,
+            Math.floor(
+                (task.end.getTime() - task.start.getTime()) /
+                    DAY_IN_MILLISECONDS,
+            ) + 1,
         );
 
         return {
@@ -554,7 +617,10 @@ const taskMutationQuery = computed<Record<string, string> | undefined>(() => {
     };
 });
 
-const findTaskInTree = (tasks: ProjectTaskListItem[], taskId: number): ProjectTaskListItem | null => {
+const findTaskInTree = (
+    tasks: ProjectTaskListItem[],
+    taskId: number,
+): ProjectTaskListItem | null => {
     for (const task of tasks) {
         if (task.id === taskId) {
             return task;
@@ -571,7 +637,10 @@ const findTaskInTree = (tasks: ProjectTaskListItem[], taskId: number): ProjectTa
 };
 
 const collectDescendantIds = (task: ProjectTaskListItem): number[] => {
-    return task.subtasks.flatMap((subtask) => [subtask.id, ...collectDescendantIds(subtask)]);
+    return task.subtasks.flatMap((subtask) => [
+        subtask.id,
+        ...collectDescendantIds(subtask),
+    ]);
 };
 
 const buildParentTaskOptions = (
@@ -586,7 +655,9 @@ const buildParentTaskOptions = (
         const currentTaskTree = findTaskInTree(tasks, excludeTaskId);
 
         if (currentTaskTree) {
-            collectDescendantIds(currentTaskTree).forEach((taskId) => excludedIds.add(taskId));
+            collectDescendantIds(currentTaskTree).forEach((taskId) =>
+                excludedIds.add(taskId),
+            );
         }
     }
 
@@ -614,7 +685,9 @@ watch(parentTaskOptions, (options) => {
         return;
     }
 
-    const hasCurrentParent = options.some((option) => option.id === Number(taskForm.parent_task_id));
+    const hasCurrentParent = options.some(
+        (option) => option.id === Number(taskForm.parent_task_id),
+    );
 
     if (!hasCurrentParent) {
         taskForm.parent_task_id = '';
@@ -626,7 +699,9 @@ watch(activeParentTaskOptions, (options) => {
         return;
     }
 
-    const hasCurrentParent = options.some((option) => option.id === Number(activeTaskForm.parent_task_id));
+    const hasCurrentParent = options.some(
+        (option) => option.id === Number(activeTaskForm.parent_task_id),
+    );
 
     if (!hasCurrentParent) {
         activeTaskForm.parent_task_id = '';
@@ -655,7 +730,9 @@ const openEditProject = (): void => {
     projectForm.slug = props.activeProject.slug;
     projectForm.description = props.activeProject.description ?? '';
     projectForm.is_archived = props.activeProject.is_archived;
-    projectForm.member_user_ids = props.activeProject.members.map((user) => user.id);
+    projectForm.member_user_ids = props.activeProject.members.map(
+        (user) => user.id,
+    );
     projectForm.clearErrors();
     projectEditorMode.value = 'edit';
 };
@@ -665,12 +742,16 @@ const toggleProjectMember = (
     checked: boolean | 'indeterminate' | null | undefined,
 ): void => {
     if (checked === true) {
-        projectForm.member_user_ids = [...new Set([...projectForm.member_user_ids, userId])];
+        projectForm.member_user_ids = [
+            ...new Set([...projectForm.member_user_ids, userId]),
+        ];
 
         return;
     }
 
-    projectForm.member_user_ids = projectForm.member_user_ids.filter((value) => value !== userId);
+    projectForm.member_user_ids = projectForm.member_user_ids.filter(
+        (value) => value !== userId,
+    );
 };
 
 const setProjectArchived = (
@@ -680,9 +761,7 @@ const setProjectArchived = (
 };
 
 const projectMemberHandler = (userId: number) => {
-    return (
-        checked: boolean | 'indeterminate' | null | undefined,
-    ): void => {
+    return (checked: boolean | 'indeterminate' | null | undefined): void => {
         toggleProjectMember(userId, checked);
     };
 };
@@ -705,8 +784,71 @@ const submitProject = (): void => {
     });
 };
 
+const downloadTaskCsv = (projectId: number | null): void => {
+    window.location.assign(
+        projectId === null
+            ? exportStandaloneTasks.url()
+            : exportProjectTasks.url(projectId),
+    );
+};
+
+const openTaskCsvImport = (projectId: number | null): void => {
+    taskCsvImportContext.value = projectId === null ? 'standalone' : projectId;
+    taskCsvImportForm.clearErrors();
+    taskCsvImportForm.file = null;
+
+    if (taskCsvImportInput.value) {
+        taskCsvImportInput.value.value = '';
+        taskCsvImportInput.value.click();
+    }
+};
+
+const submitTaskCsvImport = (projectId: number | null): void => {
+    if (taskCsvImportForm.file === null) {
+        return;
+    }
+
+    taskCsvImportForm.post(
+        projectId === null
+            ? importStandaloneTasks.url()
+            : importProjectTasks.url(projectId),
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                taskCsvImportForm.reset();
+                taskCsvImportContext.value = null;
+            },
+            onFinish: () => {
+                if (taskCsvImportInput.value) {
+                    taskCsvImportInput.value.value = '';
+                }
+            },
+        },
+    );
+};
+
+const handleTaskCsvFileChange = (event: Event): void => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+
+    if (file === null || taskCsvImportContext.value === null) {
+        return;
+    }
+
+    taskCsvImportForm.file = file;
+
+    submitTaskCsvImport(
+        taskCsvImportContext.value === 'standalone'
+            ? null
+            : taskCsvImportContext.value,
+    );
+};
+
 const deleteCurrentProject = (): void => {
-    if (!props.activeProject || !window.confirm(t.value.projects.delete_project_confirm)) {
+    if (
+        !props.activeProject ||
+        !window.confirm(t.value.projects.delete_project_confirm)
+    ) {
         return;
     }
 
@@ -731,7 +873,9 @@ const openTaskStageManager = (): void => {
 
 const openCreateTaskStage = (): void => {
     resetTaskStageForm();
-    taskStageForm.color = taskStages.value.find((option) => !option.is_completed)?.color ?? '#64748B';
+    taskStageForm.color =
+        taskStages.value.find((option) => !option.is_completed)?.color ??
+        '#64748B';
     taskStageSheetMode.value = 'create';
     taskStageSheetOpen.value = true;
 };
@@ -780,7 +924,9 @@ const resetKanbanStageDragState = (): void => {
 
 const resetTaskForm = (): void => {
     taskForm.reset();
-    taskForm.project_id = isTasksPage.value ? '' : (props.activeProject?.id ?? '');
+    taskForm.project_id = isTasksPage.value
+        ? ''
+        : (props.activeProject?.id ?? '');
     taskForm.parent_task_id = '';
     taskForm.status = defaultTaskStatus();
     taskForm.importance = 'normal';
@@ -807,7 +953,9 @@ const taskPayload = (form: TaskFormData): TaskFormData => ({
     co_assignee_user_ids: [...form.co_assignee_user_ids],
 });
 
-const taskPayloadFromActiveTask = (task: ProjectActiveTask | null): TaskFormData => ({
+const taskPayloadFromActiveTask = (
+    task: ProjectActiveTask | null,
+): TaskFormData => ({
     project_id: task?.project_id ?? '',
     parent_task_id: task?.parent_task_id ?? '',
     title: task?.title ?? '',
@@ -860,7 +1008,11 @@ const scheduleActiveTaskSave = (delay = 500): void => {
 };
 
 const handleActiveTaskFieldChange = (): void => {
-    if (!props.activeTask || !props.can.manageTask || isSyncingActiveTask.value) {
+    if (
+        !props.activeTask ||
+        !props.can.manageTask ||
+        isSyncingActiveTask.value
+    ) {
         return;
     }
 
@@ -896,18 +1048,20 @@ const toggleCoAssignee = (
     checked: boolean | 'indeterminate' | null | undefined,
 ): void => {
     if (checked === true) {
-        taskForm.co_assignee_user_ids = [...new Set([...taskForm.co_assignee_user_ids, userId])];
+        taskForm.co_assignee_user_ids = [
+            ...new Set([...taskForm.co_assignee_user_ids, userId]),
+        ];
 
         return;
     }
 
-    taskForm.co_assignee_user_ids = taskForm.co_assignee_user_ids.filter((value) => value !== userId);
+    taskForm.co_assignee_user_ids = taskForm.co_assignee_user_ids.filter(
+        (value) => value !== userId,
+    );
 };
 
 const taskCoAssigneeHandler = (userId: number) => {
-    return (
-        checked: boolean | 'indeterminate' | null | undefined,
-    ): void => {
+    return (checked: boolean | 'indeterminate' | null | undefined): void => {
         toggleCoAssignee(userId, checked);
     };
 };
@@ -918,14 +1072,21 @@ const submitTask = (): void => {
             ...data,
             due_at: normalizeDueAtForSubmission(data.due_at),
         }))
-        .post(storeWorkspaceTask.url(taskMutationQuery.value ? {
-            query: taskMutationQuery.value,
-        } : undefined), {
-            preserveScroll: true,
-            onSuccess: () => {
-                taskEditorMode.value = 'idle';
+        .post(
+            storeWorkspaceTask.url(
+                taskMutationQuery.value
+                    ? {
+                          query: taskMutationQuery.value,
+                      }
+                    : undefined,
+            ),
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    taskEditorMode.value = 'idle';
+                },
             },
-        });
+        );
 };
 
 const toggleActiveTaskCoAssignee = (
@@ -933,18 +1094,21 @@ const toggleActiveTaskCoAssignee = (
     checked: boolean | 'indeterminate' | null | undefined,
 ): void => {
     if (checked === true) {
-        activeTaskForm.co_assignee_user_ids = [...new Set([...activeTaskForm.co_assignee_user_ids, userId])];
+        activeTaskForm.co_assignee_user_ids = [
+            ...new Set([...activeTaskForm.co_assignee_user_ids, userId]),
+        ];
     } else {
-        activeTaskForm.co_assignee_user_ids = activeTaskForm.co_assignee_user_ids.filter((value) => value !== userId);
+        activeTaskForm.co_assignee_user_ids =
+            activeTaskForm.co_assignee_user_ids.filter(
+                (value) => value !== userId,
+            );
     }
 
     handleActiveTaskFieldChange();
 };
 
 const activeTaskCoAssigneeHandler = (userId: number) => {
-    return (
-        checked: boolean | 'indeterminate' | null | undefined,
-    ): void => {
+    return (checked: boolean | 'indeterminate' | null | undefined): void => {
         toggleActiveTaskCoAssignee(userId, checked);
     };
 };
@@ -954,7 +1118,10 @@ const submitActiveTaskUpdate = (): void => {
         return;
     }
 
-    if (JSON.stringify(taskPayload(activeTaskForm)) === JSON.stringify(taskPayloadFromActiveTask(props.activeTask))) {
+    if (
+        JSON.stringify(taskPayload(activeTaskForm)) ===
+        JSON.stringify(taskPayloadFromActiveTask(props.activeTask))
+    ) {
         activeTaskSaveState.value = 'idle';
 
         return;
@@ -973,29 +1140,40 @@ const submitActiveTaskUpdate = (): void => {
             ...data,
             due_at: normalizeDueAtForSubmission(data.due_at),
         }))
-        .patch(updateWorkspaceTask.url(props.activeTask.id, taskMutationQuery.value ? {
-            query: taskMutationQuery.value,
-        } : undefined), {
-            preserveScroll: true,
-            preserveState: true,
-            replace: true,
-            onSuccess: () => {
-                activeTaskSaveState.value = 'saved';
+        .patch(
+            updateWorkspaceTask.url(
+                props.activeTask.id,
+                taskMutationQuery.value
+                    ? {
+                          query: taskMutationQuery.value,
+                      }
+                    : undefined,
+            ),
+            {
+                preserveScroll: true,
+                preserveState: true,
+                replace: true,
+                onSuccess: () => {
+                    activeTaskSaveState.value = 'saved';
 
-                window.setTimeout(() => {
-                    if (activeTaskSaveState.value === 'saved') {
-                        activeTaskSaveState.value = 'idle';
-                    }
-                }, savedTaskStateResetDelay);
+                    window.setTimeout(() => {
+                        if (activeTaskSaveState.value === 'saved') {
+                            activeTaskSaveState.value = 'idle';
+                        }
+                    }, savedTaskStateResetDelay);
+                },
+                onError: () => {
+                    activeTaskSaveState.value = 'error';
+                },
             },
-            onError: () => {
-                activeTaskSaveState.value = 'error';
-            },
-        });
+        );
 };
 
 watch(
-    () => props.activeTask ? `${props.activeTask.id}:${props.activeTask.updated_at}` : null,
+    () =>
+        props.activeTask
+            ? `${props.activeTask.id}:${props.activeTask.updated_at}`
+            : null,
     () => {
         syncActiveTaskForm(props.activeTask);
     },
@@ -1005,18 +1183,21 @@ watch(
 );
 
 watch(selectedActiveTaskProjectId, () => {
-    const allowedMemberIds = new Set(activeTaskMemberOptions.value.map((member) => member.id));
+    const allowedMemberIds = new Set(
+        activeTaskMemberOptions.value.map((member) => member.id),
+    );
 
     if (
-        activeTaskForm.assignee_user_id !== ''
-        && !allowedMemberIds.has(Number(activeTaskForm.assignee_user_id))
+        activeTaskForm.assignee_user_id !== '' &&
+        !allowedMemberIds.has(Number(activeTaskForm.assignee_user_id))
     ) {
         activeTaskForm.assignee_user_id = '';
     }
 
-    activeTaskForm.co_assignee_user_ids = activeTaskForm.co_assignee_user_ids.filter((userId) => {
-        return allowedMemberIds.has(userId);
-    });
+    activeTaskForm.co_assignee_user_ids =
+        activeTaskForm.co_assignee_user_ids.filter((userId) => {
+            return allowedMemberIds.has(userId);
+        });
 });
 
 watch(
@@ -1026,9 +1207,10 @@ watch(
             return;
         }
 
-        activeTaskForm.co_assignee_user_ids = activeTaskForm.co_assignee_user_ids.filter((userId) => {
-            return userId !== Number(value);
-        });
+        activeTaskForm.co_assignee_user_ids =
+            activeTaskForm.co_assignee_user_ids.filter((userId) => {
+                return userId !== Number(value);
+            });
     },
 );
 
@@ -1037,15 +1219,26 @@ onBeforeUnmount(() => {
 });
 
 const deleteCurrentTask = (): void => {
-    if (!props.activeTask || !window.confirm(t.value.projects.delete_task_confirm)) {
+    if (
+        !props.activeTask ||
+        !window.confirm(t.value.projects.delete_task_confirm)
+    ) {
         return;
     }
 
-    router.delete(destroyWorkspaceTask.url(props.activeTask.id, taskMutationQuery.value ? {
-        query: taskMutationQuery.value,
-    } : undefined), {
-        preserveScroll: true,
-    });
+    router.delete(
+        destroyWorkspaceTask.url(
+            props.activeTask.id,
+            taskMutationQuery.value
+                ? {
+                      query: taskMutationQuery.value,
+                  }
+                : undefined,
+        ),
+        {
+            preserveScroll: true,
+        },
+    );
 };
 
 const resetKanbanDragState = (): void => {
@@ -1103,7 +1296,11 @@ const reorderDraggedStage = (targetStageId: number | null): void => {
     const sourceIndex = orderedStageIds.indexOf(draggedStageId.value);
     const targetIndex = orderedStageIds.indexOf(targetStageId);
 
-    if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) {
+    if (
+        sourceIndex === -1 ||
+        targetIndex === -1 ||
+        sourceIndex === targetIndex
+    ) {
         resetKanbanStageDragState();
 
         return;
@@ -1152,7 +1349,9 @@ const moveDraggedTask = (status: string): void => {
         return;
     }
 
-    const task = flattenedStandaloneTasks.value.find((item) => item.id === draggedTaskId.value);
+    const task = flattenedStandaloneTasks.value.find(
+        (item) => item.id === draggedTaskId.value,
+    );
 
     if (!task || task.status === status) {
         resetKanbanDragState();
@@ -1163,9 +1362,14 @@ const moveDraggedTask = (status: string): void => {
     movingTaskId.value = task.id;
 
     router.patch(
-        moveWorkspaceTask.url(task.id, taskMutationQuery.value ? {
-            query: taskMutationQuery.value,
-        } : undefined),
+        moveWorkspaceTask.url(
+            task.id,
+            taskMutationQuery.value
+                ? {
+                      query: taskMutationQuery.value,
+                  }
+                : undefined,
+        ),
         { status },
         {
             preserveScroll: true,
@@ -1182,11 +1386,15 @@ const closeTaskSheet = (): void => {
         return;
     }
 
-    router.get(taskSheetBaseRoute.value.url, {}, {
-        preserveScroll: true,
-        preserveState: true,
-        replace: true,
-    });
+    router.get(
+        taskSheetBaseRoute.value.url,
+        {},
+        {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        },
+    );
 };
 
 const handleTaskSheetOpenChange = (open: boolean): void => {
@@ -1212,30 +1420,47 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
 <template>
     <Head :title="isTasksPage ? t.projects.tasks : t.projects.title" />
 
+    <input
+        ref="taskCsvImportInput"
+        type="file"
+        accept=".csv,text/csv"
+        class="hidden"
+        @change="handleTaskCsvFileChange"
+    />
+
     <div
         class="gap-6"
         :class="
-            isTasksPage
-                ? 'grid'
-                : 'grid xl:grid-cols-[320px_minmax(0,1fr)]'
+            isTasksPage ? 'grid' : 'grid xl:grid-cols-[320px_minmax(0,1fr)]'
         "
     >
         <section v-if="!isTasksPage" class="space-y-4">
             <div class="rounded-3xl border border-border bg-card p-5 shadow-sm">
                 <div class="space-y-4">
                     <div>
-                        <h1 class="text-lg font-semibold">{{ t.projects.title }}</h1>
+                        <h1 class="text-lg font-semibold">
+                            {{ t.projects.title }}
+                        </h1>
                         <p class="text-sm text-muted-foreground">
                             {{ t.projects.description }}
                         </p>
                     </div>
 
                     <div class="flex flex-wrap gap-2">
-                        <Button type="button" size="sm" @click="openCreateTask()">
+                        <Button
+                            type="button"
+                            size="sm"
+                            @click="openCreateTask()"
+                        >
                             <Plus class="size-4" />
                             {{ t.projects.create_task }}
                         </Button>
-                        <Button type="button" size="sm" variant="outline" @click="openCreateProject">
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            @click="openCreateProject"
+                        >
                             <FolderKanban class="size-4" />
                             {{ t.projects.create_project }}
                         </Button>
@@ -1246,25 +1471,35 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
             <Link
                 :href="projectsIndex()"
                 class="block rounded-3xl border px-4 py-4 transition hover:border-primary/40 hover:bg-background"
-                :class="!props.activeProject ? 'border-primary/50 bg-background' : 'border-border bg-card'"
+                :class="
+                    !props.activeProject
+                        ? 'border-primary/50 bg-background'
+                        : 'border-border bg-card'
+                "
             >
                 <div class="flex items-start justify-between gap-3">
                     <div class="space-y-2">
                         <div class="flex items-center gap-2">
                             <Layers3 class="size-4 text-muted-foreground" />
-                            <span class="font-medium">{{ t.projects.workspace_overview }}</span>
+                            <span class="font-medium">{{
+                                t.projects.workspace_overview
+                            }}</span>
                         </div>
                         <p class="text-sm text-muted-foreground">
                             {{ t.projects.workspace_overview_description }}
                         </p>
                     </div>
 
-                    <span class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground">
+                    <span
+                        class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground"
+                    >
                         {{ props.workspaceSummary.standalone_tasks_count }}
                     </span>
                 </div>
 
-                <div class="mt-4 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                <div
+                    class="mt-4 grid grid-cols-3 gap-2 text-xs text-muted-foreground"
+                >
                     <div>
                         <div class="font-medium text-foreground">
                             {{ props.workspaceSummary.standalone_tasks_count }}
@@ -1273,13 +1508,19 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                     </div>
                     <div>
                         <div class="font-medium text-foreground">
-                            {{ props.workspaceSummary.standalone_open_tasks_count }}
+                            {{
+                                props.workspaceSummary
+                                    .standalone_open_tasks_count
+                            }}
                         </div>
                         <div>{{ t.projects.open_tasks }}</div>
                     </div>
                     <div>
                         <div class="font-medium text-foreground">
-                            {{ props.workspaceSummary.standalone_completed_tasks_count }}
+                            {{
+                                props.workspaceSummary
+                                    .standalone_completed_tasks_count
+                            }}
                         </div>
                         <div>{{ t.projects.done_tasks }}</div>
                     </div>
@@ -1301,30 +1542,52 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0 space-y-2">
                             <div class="flex items-center gap-2">
-                                <FolderKanban class="size-4 text-muted-foreground" />
-                                <span class="truncate font-medium">{{ project.name }}</span>
+                                <FolderKanban
+                                    class="size-4 text-muted-foreground"
+                                />
+                                <span class="truncate font-medium">{{
+                                    project.name
+                                }}</span>
                             </div>
-                            <p v-if="project.description" class="line-clamp-2 text-sm text-muted-foreground">
+                            <p
+                                v-if="project.description"
+                                class="line-clamp-2 text-sm text-muted-foreground"
+                            >
                                 {{ project.description }}
                             </p>
                         </div>
 
-                        <span class="rounded-full px-2 py-1 text-xs font-medium" :class="projectStatusClass(project)">
-                            {{ project.is_archived ? t.projects.archived : t.projects.active }}
+                        <span
+                            class="rounded-full px-2 py-1 text-xs font-medium"
+                            :class="projectStatusClass(project)"
+                        >
+                            {{
+                                project.is_archived
+                                    ? t.projects.archived
+                                    : t.projects.active
+                            }}
                         </span>
                     </div>
 
-                    <div class="mt-4 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                    <div
+                        class="mt-4 grid grid-cols-3 gap-2 text-xs text-muted-foreground"
+                    >
                         <div>
-                            <div class="font-medium text-foreground">{{ project.members_count }}</div>
+                            <div class="font-medium text-foreground">
+                                {{ project.members_count }}
+                            </div>
                             <div>{{ t.projects.members }}</div>
                         </div>
                         <div>
-                            <div class="font-medium text-foreground">{{ project.open_tasks_count }}</div>
+                            <div class="font-medium text-foreground">
+                                {{ project.open_tasks_count }}
+                            </div>
                             <div>{{ t.projects.open_tasks }}</div>
                         </div>
                         <div>
-                            <div class="font-medium text-foreground">{{ project.completed_tasks_count }}</div>
+                            <div class="font-medium text-foreground">
+                                {{ project.completed_tasks_count }}
+                            </div>
                             <div>{{ t.projects.done_tasks }}</div>
                         </div>
                     </div>
@@ -1337,50 +1600,78 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
             >
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <h2 class="text-base font-semibold">
-                        {{ projectEditorMode === 'create' ? t.projects.create_project : t.projects.edit_project }}
+                        {{
+                            projectEditorMode === 'create'
+                                ? t.projects.create_project
+                                : t.projects.edit_project
+                        }}
                     </h2>
 
-                    <Button type="button" variant="ghost" size="sm" @click="resetProjectForm">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        @click="resetProjectForm"
+                    >
                         {{ t.common.cancel }}
                     </Button>
                 </div>
 
                 <form class="space-y-4" @submit.prevent="submitProject">
                     <div class="space-y-2">
-                        <Label for="project-name">{{ t.projects.project_name }}</Label>
+                        <Label for="project-name">{{
+                            t.projects.project_name
+                        }}</Label>
                         <Input id="project-name" v-model="projectForm.name" />
                         <InputError :message="projectForm.errors.name" />
                     </div>
 
                     <div class="space-y-2">
-                        <Label for="project-slug">{{ t.projects.project_slug }}</Label>
+                        <Label for="project-slug">{{
+                            t.projects.project_slug
+                        }}</Label>
                         <Input id="project-slug" v-model="projectForm.slug" />
                         <InputError :message="projectForm.errors.slug" />
                     </div>
 
                     <div class="space-y-2">
-                        <Label for="project-description">{{ t.projects.description_label }}</Label>
+                        <Label for="project-description">{{
+                            t.projects.description_label
+                        }}</Label>
                         <textarea
                             id="project-description"
                             v-model="projectForm.description"
                             rows="4"
-                            class="min-h-28 w-full rounded-2xl border border-input bg-background px-3 py-3 text-sm shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                            class="min-h-28 w-full rounded-2xl border border-input bg-background px-3 py-3 text-sm shadow-xs transition outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                         ></textarea>
                         <InputError :message="projectForm.errors.description" />
                     </div>
 
-                    <label class="flex items-start gap-3 rounded-2xl border border-border bg-background/70 p-3">
-                        <Checkbox :checked="projectForm.is_archived" @update:checked="setProjectArchived" />
+                    <label
+                        class="flex items-start gap-3 rounded-2xl border border-border bg-background/70 p-3"
+                    >
+                        <Checkbox
+                            :checked="projectForm.is_archived"
+                            @update:checked="setProjectArchived"
+                        />
                         <div>
-                            <div class="text-sm font-medium">{{ t.projects.archive_project }}</div>
-                            <p class="text-sm text-muted-foreground">{{ t.projects.archive_project_help }}</p>
+                            <div class="text-sm font-medium">
+                                {{ t.projects.archive_project }}
+                            </div>
+                            <p class="text-sm text-muted-foreground">
+                                {{ t.projects.archive_project_help }}
+                            </p>
                         </div>
                     </label>
 
                     <div class="space-y-3">
                         <div>
-                            <div class="text-sm font-medium">{{ t.projects.members }}</div>
-                            <p class="text-sm text-muted-foreground">{{ t.projects.project_members_help }}</p>
+                            <div class="text-sm font-medium">
+                                {{ t.projects.members }}
+                            </div>
+                            <p class="text-sm text-muted-foreground">
+                                {{ t.projects.project_members_help }}
+                            </p>
                         </div>
 
                         <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
@@ -1390,21 +1681,41 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 class="flex items-start gap-3 rounded-2xl border border-border bg-background/70 p-3"
                             >
                                 <Checkbox
-                                    :checked="projectForm.member_user_ids.includes(user.id)"
-                                    :disabled="projectEditorMode === 'edit' && activeProjectOwnerId === user.id"
-                                    @update:checked="projectMemberHandler(user.id)"
+                                    :checked="
+                                        projectForm.member_user_ids.includes(
+                                            user.id,
+                                        )
+                                    "
+                                    :disabled="
+                                        projectEditorMode === 'edit' &&
+                                        activeProjectOwnerId === user.id
+                                    "
+                                    @update:checked="
+                                        projectMemberHandler(user.id)
+                                    "
                                 />
                                 <div class="min-w-0 flex-1">
-                                    <div class="truncate text-sm font-medium">{{ fullName(user) }}</div>
-                                    <div class="truncate text-xs text-muted-foreground">{{ user.email }}</div>
+                                    <div class="truncate text-sm font-medium">
+                                        {{ fullName(user) }}
+                                    </div>
+                                    <div
+                                        class="truncate text-xs text-muted-foreground"
+                                    >
+                                        {{ user.email }}
+                                    </div>
                                 </div>
                             </label>
                         </div>
-                        <InputError :message="projectForm.errors.member_user_ids" />
+                        <InputError
+                            :message="projectForm.errors.member_user_ids"
+                        />
                     </div>
 
                     <div class="flex justify-end">
-                        <Button type="submit" :disabled="projectForm.processing">
+                        <Button
+                            type="submit"
+                            :disabled="projectForm.processing"
+                        >
                             <Save class="size-4" />
                             {{ t.common.save }}
                         </Button>
@@ -1415,54 +1726,125 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
 
         <section class="space-y-4">
             <template v-if="isTasksPage">
-                <div class="rounded-3xl border border-border bg-card p-5 shadow-sm">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div
+                    class="rounded-3xl border border-border bg-card p-5 shadow-sm"
+                >
+                    <div
+                        class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+                    >
                         <div class="space-y-3">
                             <div class="flex items-center gap-2">
-                                <ClipboardList class="size-5 text-muted-foreground" />
-                                <h1 class="text-xl font-semibold">{{ t.projects.tasks }}</h1>
+                                <ClipboardList
+                                    class="size-5 text-muted-foreground"
+                                />
+                                <h1 class="text-xl font-semibold">
+                                    {{ t.projects.tasks }}
+                                </h1>
                             </div>
 
                             <p class="max-w-3xl text-sm text-muted-foreground">
                                 {{ t.projects.tasks_page_description }}
                             </p>
 
-                            <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                <span class="rounded-full bg-background px-2 py-1">
-                                    {{ t.projects.tasks }}: {{ props.workspaceSummary.standalone_tasks_count }}
+                            <p class="max-w-3xl text-xs text-muted-foreground">
+                                {{ t.projects.csv_import_help }}
+                            </p>
+
+                            <div
+                                class="flex flex-wrap gap-2 text-xs text-muted-foreground"
+                            >
+                                <span
+                                    class="rounded-full bg-background px-2 py-1"
+                                >
+                                    {{ t.projects.tasks }}:
+                                    {{
+                                        props.workspaceSummary
+                                            .standalone_tasks_count
+                                    }}
                                 </span>
-                                <span class="rounded-full bg-background px-2 py-1">
-                                    {{ t.projects.open_tasks }}: {{ props.workspaceSummary.standalone_open_tasks_count }}
+                                <span
+                                    class="rounded-full bg-background px-2 py-1"
+                                >
+                                    {{ t.projects.open_tasks }}:
+                                    {{
+                                        props.workspaceSummary
+                                            .standalone_open_tasks_count
+                                    }}
                                 </span>
-                                <span class="rounded-full bg-background px-2 py-1">
-                                    {{ t.projects.done_tasks }}: {{ props.workspaceSummary.standalone_completed_tasks_count }}
+                                <span
+                                    class="rounded-full bg-background px-2 py-1"
+                                >
+                                    {{ t.projects.done_tasks }}:
+                                    {{
+                                        props.workspaceSummary
+                                            .standalone_completed_tasks_count
+                                    }}
                                 </span>
                             </div>
                         </div>
 
-                        <Button type="button" size="sm" @click="openCreateTask(null)">
-                            <Plus class="size-4" />
-                            {{ t.projects.create_task }}
-                        </Button>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                :disabled="taskCsvImportForm.processing"
+                                @click="downloadTaskCsv(null)"
+                            >
+                                <Download class="size-4" />
+                                {{ t.projects.export_tasks_csv }}
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                :disabled="taskCsvImportForm.processing"
+                                @click="openTaskCsvImport(null)"
+                            >
+                                <Upload class="size-4" />
+                                {{ t.projects.import_tasks_csv }}
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                @click="openCreateTask(null)"
+                            >
+                                <Plus class="size-4" />
+                                {{ t.projects.create_task }}
+                            </Button>
+                        </div>
                     </div>
+
+                    <InputError :message="standaloneTaskImportError" />
                 </div>
 
-                <div class="rounded-3xl border border-border bg-card p-5 shadow-sm">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div
+                    class="rounded-3xl border border-border bg-card p-5 shadow-sm"
+                >
+                    <div
+                        class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+                    >
                         <div>
-                            <div class="text-sm font-medium">{{ t.projects.view_mode }}</div>
+                            <div class="text-sm font-medium">
+                                {{ t.projects.view_mode }}
+                            </div>
                             <p class="text-sm text-muted-foreground">
                                 {{ t.projects.view_mode_description }}
                             </p>
                         </div>
 
-                        <div class="inline-flex flex-wrap gap-1 rounded-xl bg-muted/50 p-1">
+                        <div
+                            class="inline-flex flex-wrap gap-1 rounded-xl bg-muted/50 p-1"
+                        >
                             <Link
                                 v-for="option in taskViewOptions"
                                 :key="option.value"
                                 :href="
                                     props.activeTask
-                                        ? taskRoute(props.activeTask.id, option.value)
+                                        ? taskRoute(
+                                              props.activeTask.id,
+                                              option.value,
+                                          )
                                         : taskIndexRoute(option.value)
                                 "
                                 preserve-scroll
@@ -1481,15 +1863,24 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                     </div>
                 </div>
 
-                <div class="rounded-3xl border border-border bg-card p-5 shadow-sm">
-                    <div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div
+                    class="rounded-3xl border border-border bg-card p-5 shadow-sm"
+                >
+                    <div
+                        class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+                    >
                         <div class="space-y-3">
                             <div class="flex items-center gap-2">
                                 <Layers3 class="size-5 text-muted-foreground" />
-                                <h2 class="text-base font-semibold">{{ standaloneTaskGroup?.title }}</h2>
+                                <h2 class="text-base font-semibold">
+                                    {{ standaloneTaskGroup?.title }}
+                                </h2>
                             </div>
 
-                            <p v-if="standaloneTaskGroup?.description" class="text-sm text-muted-foreground">
+                            <p
+                                v-if="standaloneTaskGroup?.description"
+                                class="text-sm text-muted-foreground"
+                            >
                                 {{ standaloneTaskGroup.description }}
                             </p>
                         </div>
@@ -1504,7 +1895,12 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 <GitBranchPlus class="size-4" />
                                 {{ t.projects.create_task }}
                             </Button>
-                            <template v-if="props.taskDisplayMode === 'kanban' && props.can.manageTaskStages">
+                            <template
+                                v-if="
+                                    props.taskDisplayMode === 'kanban' &&
+                                    props.can.manageTaskStages
+                                "
+                            >
                                 <Button
                                     type="button"
                                     size="sm"
@@ -1521,7 +1917,9 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     @click="openTaskStageManager"
                                 >
                                     <Settings2 class="size-4" />
-                                    <span class="sr-only">{{ t.projects.manage_stages }}</span>
+                                    <span class="sr-only">{{
+                                        t.projects.manage_stages
+                                    }}</span>
                                 </Button>
                             </template>
                         </div>
@@ -1537,7 +1935,8 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                     <template v-else-if="props.taskDisplayMode === 'list'">
                         <div class="space-y-3">
                             <ProjectTaskTreeItem
-                                v-for="taskItem in standaloneTaskGroup?.tasks ?? []"
+                                v-for="taskItem in standaloneTaskGroup?.tasks ??
+                                []"
                                 :key="taskItem.id"
                                 :task="taskItem"
                                 :active-task-id="props.activeTask?.id ?? null"
@@ -1556,35 +1955,58 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 :key="column.value"
                                 class="rounded-2xl border border-border bg-background/60 p-4 transition-colors"
                                 :class="
-                                    dragOverTaskStatus === column.value || dragOverStageId === column.id
+                                    dragOverTaskStatus === column.value ||
+                                    dragOverStageId === column.id
                                         ? 'border-primary/50 bg-primary/5'
                                         : ''
                                 "
                                 :style="taskStageColumnStyle(column.value)"
-                                @dragover.prevent="handleKanbanColumnDragOver(column)"
-                                @dragenter.prevent="handleKanbanColumnDragOver(column)"
+                                @dragover.prevent="
+                                    handleKanbanColumnDragOver(column)
+                                "
+                                @dragenter.prevent="
+                                    handleKanbanColumnDragOver(column)
+                                "
                                 @drop.prevent="handleKanbanColumnDrop(column)"
                             >
-                                <div class="mb-4 flex items-center justify-between gap-3">
-                                    <div class="flex items-center gap-2 text-sm font-medium">
+                                <div
+                                    class="mb-4 flex items-center justify-between gap-3"
+                                >
+                                    <div
+                                        class="flex items-center gap-2 text-sm font-medium"
+                                    >
                                         <button
-                                            v-if="props.can.manageTaskStages && column.id !== null"
+                                            v-if="
+                                                props.can.manageTaskStages &&
+                                                column.id !== null
+                                            "
                                             type="button"
                                             draggable="true"
                                             class="inline-flex cursor-grab items-center justify-center rounded-md p-1 text-muted-foreground transition hover:bg-background hover:text-foreground active:cursor-grabbing"
-                                            :title="t.projects.stage_reorder_hint"
-                                            @dragstart="startDraggingStage(column.id, $event)"
+                                            :title="
+                                                t.projects.stage_reorder_hint
+                                            "
+                                            @dragstart="
+                                                startDraggingStage(
+                                                    column.id,
+                                                    $event,
+                                                )
+                                            "
                                             @dragend="resetKanbanStageDragState"
                                         >
                                             <GripVertical class="size-4" />
                                         </button>
                                         <span
                                             class="size-2.5 rounded-full"
-                                            :style="{ backgroundColor: column.color }"
+                                            :style="{
+                                                backgroundColor: column.color,
+                                            }"
                                         />
                                         {{ column.label }}
                                     </div>
-                                    <span class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground">
+                                    <span
+                                        class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground"
+                                    >
                                         {{ column.tasks.length }}
                                     </span>
                                 </div>
@@ -1611,31 +2033,61 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                                 ? 'opacity-60'
                                                 : 'cursor-grab active:cursor-grabbing',
                                         ]"
-                                        @dragstart="startDraggingTask(task.id, $event)"
+                                        @dragstart="
+                                            startDraggingTask(task.id, $event)
+                                        "
                                         @dragend="resetKanbanDragState"
                                     >
                                         <div class="space-y-3">
-                                            <div class="flex items-start justify-between gap-3">
+                                            <div
+                                                class="flex items-start justify-between gap-3"
+                                            >
                                                 <div class="min-w-0">
-                                                    <div class="truncate text-sm font-medium">{{ task.title }}</div>
                                                     <div
-                                                        v-if="task.parent_task_title"
+                                                        class="truncate text-sm font-medium"
+                                                    >
+                                                        {{ task.title }}
+                                                    </div>
+                                                    <div
+                                                        v-if="
+                                                            task.parent_task_title
+                                                        "
                                                         class="mt-1 truncate text-xs text-muted-foreground"
                                                     >
-                                                        {{ t.projects.parent_task }}: {{ task.parent_task_title }}
+                                                        {{
+                                                            t.projects
+                                                                .parent_task
+                                                        }}:
+                                                        {{
+                                                            task.parent_task_title
+                                                        }}
                                                     </div>
                                                 </div>
-                                                <span class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground">
+                                                <span
+                                                    class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground"
+                                                >
                                                     {{ task.level + 1 }}
                                                 </span>
                                             </div>
 
-                                            <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                                <span class="rounded-full bg-background px-2 py-1">
-                                                    {{ t.projects.assignee }}: {{ fullName(task.assignee) }}
+                                            <div
+                                                class="flex flex-wrap gap-2 text-xs text-muted-foreground"
+                                            >
+                                                <span
+                                                    class="rounded-full bg-background px-2 py-1"
+                                                >
+                                                    {{ t.projects.assignee }}:
+                                                    {{
+                                                        fullName(task.assignee)
+                                                    }}
                                                 </span>
-                                                <span class="rounded-full bg-background px-2 py-1">
-                                                    {{ t.projects.due_date }}: {{ formatDate(task.due_at) }}
+                                                <span
+                                                    class="rounded-full bg-background px-2 py-1"
+                                                >
+                                                    {{ t.projects.due_date }}:
+                                                    {{
+                                                        formatDate(task.due_at)
+                                                    }}
                                                 </span>
                                             </div>
                                         </div>
@@ -1652,9 +2104,14 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                         >
                             <div
                                 class="grid min-w-[900px] items-stretch rounded-2xl border border-border bg-background/70"
-                                :style="{ gridTemplateColumns: ganttGridTemplateColumns }"
+                                :style="{
+                                    gridTemplateColumns:
+                                        ganttGridTemplateColumns,
+                                }"
                             >
-                                <div class="border-b border-border px-4 py-3 text-sm font-medium">
+                                <div
+                                    class="border-b border-border px-4 py-3 text-sm font-medium"
+                                >
                                     {{ t.projects.gantt_task }}
                                 </div>
                                 <div
@@ -1662,17 +2119,34 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     :key="date.toISOString()"
                                     class="border-b border-l border-border px-2 py-3 text-center text-xs text-muted-foreground"
                                 >
-                                    {{ new Intl.DateTimeFormat(language === 'ru' ? 'ru-RU' : 'en-US', { month: 'short', day: 'numeric' }).format(date) }}
+                                    {{
+                                        new Intl.DateTimeFormat(
+                                            language === 'ru'
+                                                ? 'ru-RU'
+                                                : 'en-US',
+                                            { month: 'short', day: 'numeric' },
+                                        ).format(date)
+                                    }}
                                 </div>
 
-                                <template v-for="row in ganttRows" :key="row.id">
+                                <template
+                                    v-for="row in ganttRows"
+                                    :key="row.id"
+                                >
                                     <Link
                                         :href="taskHrefResolver(row)"
                                         class="border-t border-border px-4 py-4 transition hover:bg-background"
                                     >
-                                        <div class="truncate text-sm font-medium">{{ row.title }}</div>
-                                        <div class="mt-1 text-xs text-muted-foreground">
-                                            {{ formatDate(row.created_at) }} - {{ formatDate(row.due_at) }}
+                                        <div
+                                            class="truncate text-sm font-medium"
+                                        >
+                                            {{ row.title }}
+                                        </div>
+                                        <div
+                                            class="mt-1 text-xs text-muted-foreground"
+                                        >
+                                            {{ formatDate(row.created_at) }} -
+                                            {{ formatDate(row.due_at) }}
                                         </div>
                                     </Link>
 
@@ -1690,9 +2164,13 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     >
                                         <div
                                             class="flex h-8 w-full items-center rounded-full px-3 text-xs font-medium text-white"
-                                            :style="taskStageBarStyle(row.status)"
+                                            :style="
+                                                taskStageBarStyle(row.status)
+                                            "
                                         >
-                                            <span class="truncate">{{ row.title }}</span>
+                                            <span class="truncate">{{
+                                                row.title
+                                            }}</span>
                                         </div>
                                     </div>
                                 </template>
@@ -1710,7 +2188,9 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                             v-if="ganttTasksWithoutDueDate.length > 0"
                             class="mt-4 rounded-2xl border border-border bg-background/60 p-4"
                         >
-                            <div class="mb-3 text-sm font-medium">{{ t.projects.gantt_without_due_date }}</div>
+                            <div class="mb-3 text-sm font-medium">
+                                {{ t.projects.gantt_without_due_date }}
+                            </div>
                             <div class="flex flex-wrap gap-2">
                                 <Link
                                     v-for="task in ganttTasksWithoutDueDate"
@@ -1727,15 +2207,27 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
             </template>
 
             <template v-else>
-                <div v-if="props.activeProject" class="rounded-3xl border border-border bg-card p-5 shadow-sm">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div
+                    v-if="props.activeProject"
+                    class="rounded-3xl border border-border bg-card p-5 shadow-sm"
+                >
+                    <div
+                        class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+                    >
                         <div class="space-y-3">
                             <div class="flex items-center gap-2">
-                                <BriefcaseBusiness class="size-5 text-muted-foreground" />
-                                <h2 class="text-xl font-semibold">{{ props.activeProject.name }}</h2>
+                                <BriefcaseBusiness
+                                    class="size-5 text-muted-foreground"
+                                />
+                                <h2 class="text-xl font-semibold">
+                                    {{ props.activeProject.name }}
+                                </h2>
                             </div>
 
-                            <p v-if="props.activeProject.description" class="max-w-2xl text-sm text-muted-foreground">
+                            <p
+                                v-if="props.activeProject.description"
+                                class="max-w-2xl text-sm text-muted-foreground"
+                            >
                                 {{ props.activeProject.description }}
                             </p>
 
@@ -1748,18 +2240,56 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                             : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                                     "
                                 >
-                                    {{ props.activeProject.is_archived ? t.projects.archived : t.projects.active }}
+                                    {{
+                                        props.activeProject.is_archived
+                                            ? t.projects.archived
+                                            : t.projects.active
+                                    }}
                                 </span>
-                                <span class="rounded-full bg-background px-2.5 py-1 text-xs text-muted-foreground">
-                                    {{ t.projects.owner }}: {{ fullName(props.activeProject.owner) }}
+                                <span
+                                    class="rounded-full bg-background px-2.5 py-1 text-xs text-muted-foreground"
+                                >
+                                    {{ t.projects.owner }}:
+                                    {{ fullName(props.activeProject.owner) }}
                                 </span>
-                                <span class="rounded-full bg-background px-2.5 py-1 text-xs text-muted-foreground">
-                                    {{ t.projects.members }}: {{ props.activeProject.members.length }}
+                                <span
+                                    class="rounded-full bg-background px-2.5 py-1 text-xs text-muted-foreground"
+                                >
+                                    {{ t.projects.members }}:
+                                    {{ props.activeProject.members.length }}
                                 </span>
                             </div>
+
+                            <p class="max-w-2xl text-xs text-muted-foreground">
+                                {{ t.projects.csv_import_help }}
+                            </p>
                         </div>
 
                         <div class="flex flex-wrap gap-2">
+                            <Button
+                                v-if="props.can.workOnActiveProject"
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                :disabled="taskCsvImportForm.processing"
+                                @click="downloadTaskCsv(props.activeProject.id)"
+                            >
+                                <Download class="size-4" />
+                                {{ t.projects.export_tasks_csv }}
+                            </Button>
+                            <Button
+                                v-if="props.can.workOnActiveProject"
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                :disabled="taskCsvImportForm.processing"
+                                @click="
+                                    openTaskCsvImport(props.activeProject.id)
+                                "
+                            >
+                                <Upload class="size-4" />
+                                {{ t.projects.import_tasks_csv }}
+                            </Button>
                             <Button
                                 v-if="props.can.workOnActiveProject"
                                 type="button"
@@ -1791,14 +2321,23 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                             </Button>
                         </div>
                     </div>
+
+                    <InputError :message="activeProjectTaskImportError" />
                 </div>
 
-                <div v-else class="rounded-3xl border border-border bg-card p-5 shadow-sm">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div
+                    v-else
+                    class="rounded-3xl border border-border bg-card p-5 shadow-sm"
+                >
+                    <div
+                        class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+                    >
                         <div class="space-y-3">
                             <div class="flex items-center gap-2">
                                 <Layers3 class="size-5 text-muted-foreground" />
-                                <h2 class="text-xl font-semibold">{{ t.projects.workspace_overview }}</h2>
+                                <h2 class="text-xl font-semibold">
+                                    {{ t.projects.workspace_overview }}
+                                </h2>
                             </div>
 
                             <p class="max-w-2xl text-sm text-muted-foreground">
@@ -1806,7 +2345,11 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                             </p>
                         </div>
 
-                        <Button type="button" size="sm" @click="openCreateTask()">
+                        <Button
+                            type="button"
+                            size="sm"
+                            @click="openCreateTask()"
+                        >
                             <Plus class="size-4" />
                             {{ t.projects.create_task }}
                         </Button>
@@ -1819,33 +2362,56 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                         :key="group.key"
                         class="rounded-3xl border border-border bg-card p-5 shadow-sm"
                     >
-                        <div class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div
+                            class="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+                        >
                             <div class="space-y-3">
                                 <div class="flex items-center gap-2">
-                                    <FolderKanban class="size-5 text-muted-foreground" />
+                                    <FolderKanban
+                                        class="size-5 text-muted-foreground"
+                                    />
                                     <template v-if="group.project">
-                                        <Link :href="show(group.project.id)" class="text-base font-semibold hover:underline">
+                                        <Link
+                                            :href="show(group.project.id)"
+                                            class="text-base font-semibold hover:underline"
+                                        >
                                             {{ group.title }}
                                         </Link>
                                     </template>
                                     <template v-else>
-                                        <h3 class="text-base font-semibold">{{ group.title }}</h3>
+                                        <h3 class="text-base font-semibold">
+                                            {{ group.title }}
+                                        </h3>
                                     </template>
                                 </div>
 
-                                <p v-if="group.description" class="text-sm text-muted-foreground">
+                                <p
+                                    v-if="group.description"
+                                    class="text-sm text-muted-foreground"
+                                >
                                     {{ group.description }}
                                 </p>
 
-                                <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                    <span class="rounded-full bg-background px-2 py-1">
-                                        {{ t.projects.tasks }}: {{ group.tasks_count }}
+                                <div
+                                    class="flex flex-wrap gap-2 text-xs text-muted-foreground"
+                                >
+                                    <span
+                                        class="rounded-full bg-background px-2 py-1"
+                                    >
+                                        {{ t.projects.tasks }}:
+                                        {{ group.tasks_count }}
                                     </span>
-                                    <span class="rounded-full bg-background px-2 py-1">
-                                        {{ t.projects.open_tasks }}: {{ group.open_tasks_count }}
+                                    <span
+                                        class="rounded-full bg-background px-2 py-1"
+                                    >
+                                        {{ t.projects.open_tasks }}:
+                                        {{ group.open_tasks_count }}
                                     </span>
-                                    <span class="rounded-full bg-background px-2 py-1">
-                                        {{ t.projects.done_tasks }}: {{ group.completed_tasks_count }}
+                                    <span
+                                        class="rounded-full bg-background px-2 py-1"
+                                    >
+                                        {{ t.projects.done_tasks }}:
+                                        {{ group.completed_tasks_count }}
                                     </span>
                                 </div>
                             </div>
@@ -1854,7 +2420,9 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                @click="openCreateTask(group.project?.id ?? null)"
+                                @click="
+                                    openCreateTask(group.project?.id ?? null)
+                                "
                             >
                                 <GitBranchPlus class="size-4" />
                                 {{ t.projects.create_task }}
@@ -1888,20 +2456,35 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                 </div>
             </template>
         </section>
-
     </div>
 
-    <Sheet :open="taskStageSheetOpen" @update:open="handleTaskStageSheetOpenChange">
+    <Sheet
+        :open="taskStageSheetOpen"
+        @update:open="handleTaskStageSheetOpenChange"
+    >
         <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
-            <div v-if="taskStageSheetMode === 'list'" class="space-y-5 p-5 sm:p-6">
+            <div
+                v-if="taskStageSheetMode === 'list'"
+                class="space-y-5 p-5 sm:p-6"
+            >
                 <div class="flex items-start justify-between gap-3">
                     <div>
-                        <h2 class="text-base font-semibold">{{ t.projects.manage_stages }}</h2>
-                        <p class="text-sm text-muted-foreground">{{ t.projects.manage_stages_description }}</p>
-                        <p class="mt-1 text-xs text-muted-foreground">{{ t.projects.stage_reorder_hint }}</p>
+                        <h2 class="text-base font-semibold">
+                            {{ t.projects.manage_stages }}
+                        </h2>
+                        <p class="text-sm text-muted-foreground">
+                            {{ t.projects.manage_stages_description }}
+                        </p>
+                        <p class="mt-1 text-xs text-muted-foreground">
+                            {{ t.projects.stage_reorder_hint }}
+                        </p>
                     </div>
 
-                    <Button type="button" size="sm" @click="openCreateTaskStage">
+                    <Button
+                        type="button"
+                        size="sm"
+                        @click="openCreateTaskStage"
+                    >
                         <Plus class="size-4" />
                         {{ t.projects.create_stage }}
                     </Button>
@@ -1918,9 +2501,13 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 <div class="flex items-center gap-2">
                                     <span
                                         class="size-2.5 rounded-full"
-                                        :style="{ backgroundColor: stage.color }"
+                                        :style="{
+                                            backgroundColor: stage.color,
+                                        }"
                                     />
-                                    <span class="font-medium">{{ stage.label }}</span>
+                                    <span class="font-medium">{{
+                                        stage.label
+                                    }}</span>
                                     <span
                                         v-if="stage.is_completed"
                                         class="rounded-full bg-emerald-500/10 px-2 py-1 text-xs text-emerald-700 dark:text-emerald-300"
@@ -1929,11 +2516,17 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     </span>
                                 </div>
                                 <div class="text-xs text-muted-foreground">
-                                    {{ t.projects.stage_order }}: {{ stage.sort_order }}
+                                    {{ t.projects.stage_order }}:
+                                    {{ stage.sort_order }}
                                 </div>
                             </div>
 
-                            <Button type="button" size="sm" variant="outline" @click="openEditTaskStage(stage)">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                @click="openEditTaskStage(stage)"
+                            >
                                 <PencilLine class="size-4" />
                                 {{ t.projects.edit_stage }}
                             </Button>
@@ -1946,49 +2539,86 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <h2 class="text-base font-semibold">
-                            {{ taskStageSheetMode === 'create' ? t.projects.create_stage : t.projects.edit_stage }}
+                            {{
+                                taskStageSheetMode === 'create'
+                                    ? t.projects.create_stage
+                                    : t.projects.edit_stage
+                            }}
                         </h2>
-                        <p class="text-sm text-muted-foreground">{{ t.projects.stage_form_description }}</p>
+                        <p class="text-sm text-muted-foreground">
+                            {{ t.projects.stage_form_description }}
+                        </p>
                     </div>
 
-                    <Button type="button" size="sm" variant="ghost" @click="taskStageSheetMode = 'list'">
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        @click="taskStageSheetMode = 'list'"
+                    >
                         {{ t.common.cancel }}
                     </Button>
                 </div>
 
                 <form class="space-y-4" @submit.prevent="submitTaskStage">
                     <div class="space-y-2">
-                        <Label for="task-stage-name">{{ t.projects.stage_name }}</Label>
-                        <Input id="task-stage-name" v-model="taskStageForm.name" />
+                        <Label for="task-stage-name">{{
+                            t.projects.stage_name
+                        }}</Label>
+                        <Input
+                            id="task-stage-name"
+                            v-model="taskStageForm.name"
+                        />
                         <InputError :message="taskStageForm.errors.name" />
                     </div>
 
                     <div class="space-y-2">
-                        <Label for="task-stage-color">{{ t.projects.stage_color }}</Label>
-                        <Input id="task-stage-color" v-model="taskStageForm.color" type="color" />
+                        <Label for="task-stage-color">{{
+                            t.projects.stage_color
+                        }}</Label>
+                        <Input
+                            id="task-stage-color"
+                            v-model="taskStageForm.color"
+                            type="color"
+                        />
                         <InputError :message="taskStageForm.errors.color" />
                     </div>
 
-                    <div class="rounded-2xl border border-border bg-background/70 p-4">
-                        <div class="text-sm font-medium">{{ t.projects.stage_preview }}</div>
+                    <div
+                        class="rounded-2xl border border-border bg-background/70 p-4"
+                    >
+                        <div class="text-sm font-medium">
+                            {{ t.projects.stage_preview }}
+                        </div>
                         <div
                             class="mt-3 rounded-2xl border border-border bg-card p-4"
-                            :style="{ borderTopColor: taskStageForm.color, borderTopWidth: '5px' }"
+                            :style="{
+                                borderTopColor: taskStageForm.color,
+                                borderTopWidth: '5px',
+                            }"
                         >
                             <div class="flex items-center gap-2">
                                 <span
                                     class="size-2.5 rounded-full"
-                                    :style="{ backgroundColor: taskStageForm.color }"
+                                    :style="{
+                                        backgroundColor: taskStageForm.color,
+                                    }"
                                 />
                                 <span class="font-medium">
-                                    {{ taskStageForm.name.trim() || t.projects.stage_preview_placeholder }}
+                                    {{
+                                        taskStageForm.name.trim() ||
+                                        t.projects.stage_preview_placeholder
+                                    }}
                                 </span>
                             </div>
                         </div>
                     </div>
 
                     <div class="flex justify-end">
-                        <Button type="submit" :disabled="taskStageForm.processing">
+                        <Button
+                            type="submit"
+                            :disabled="taskStageForm.processing"
+                        >
                             <Save class="size-4" />
                             {{ t.common.save }}
                         </Button>
@@ -1999,29 +2629,52 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
     </Sheet>
 
     <Sheet :open="taskSheetOpen" @update:open="handleTaskSheetOpenChange">
-        <SheetContent side="right" class="w-full gap-0 p-0 sm:w-[80vw] sm:max-w-[80vw]">
-            <div v-if="taskEditorMode !== 'idle'" class="h-full min-h-0 overflow-y-auto bg-background">
+        <SheetContent
+            side="right"
+            class="w-full gap-0 p-0 sm:w-[80vw] sm:max-w-[80vw]"
+        >
+            <div
+                v-if="taskEditorMode !== 'idle'"
+                class="h-full min-h-0 overflow-y-auto bg-background"
+            >
                 <div class="mx-auto w-full max-w-4xl p-5 sm:p-8">
-                    <div class="rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-6">
-                        <div class="mb-4 flex items-center justify-between gap-3">
+                    <div
+                        class="rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-6"
+                    >
+                        <div
+                            class="mb-4 flex items-center justify-between gap-3"
+                        >
                             <h2 class="text-base font-semibold">
-                                {{ taskEditorMode === 'create' ? t.projects.create_task : t.projects.edit_task }}
+                                {{
+                                    taskEditorMode === 'create'
+                                        ? t.projects.create_task
+                                        : t.projects.edit_task
+                                }}
                             </h2>
 
-                            <Button type="button" variant="ghost" size="sm" @click="resetTaskForm">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                @click="resetTaskForm"
+                            >
                                 {{ t.common.cancel }}
                             </Button>
                         </div>
 
                         <form class="space-y-4" @submit.prevent="submitTask">
                             <div v-if="!isTasksPage" class="space-y-2">
-                                <Label for="task-project">{{ t.projects.task_location }}</Label>
+                                <Label for="task-project">{{
+                                    t.projects.task_location
+                                }}</Label>
                                 <select
                                     id="task-project"
                                     v-model="taskForm.project_id"
                                     class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                 >
-                                    <option value="">{{ t.projects.standalone_task }}</option>
+                                    <option value="">
+                                        {{ t.projects.standalone_task }}
+                                    </option>
                                     <option
                                         v-for="project in props.availableProjects"
                                         :key="project.id"
@@ -2030,17 +2683,23 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                         {{ project.name }}
                                     </option>
                                 </select>
-                                <InputError :message="taskForm.errors.project_id" />
+                                <InputError
+                                    :message="taskForm.errors.project_id"
+                                />
                             </div>
 
                             <div class="space-y-2">
-                                <Label for="task-parent">{{ t.projects.parent_task }}</Label>
+                                <Label for="task-parent">{{
+                                    t.projects.parent_task
+                                }}</Label>
                                 <select
                                     id="task-parent"
                                     v-model="taskForm.parent_task_id"
                                     class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                 >
-                                    <option value="">{{ t.projects.no_parent_task }}</option>
+                                    <option value="">
+                                        {{ t.projects.no_parent_task }}
+                                    </option>
                                     <option
                                         v-for="taskOption in parentTaskOptions"
                                         :key="taskOption.id"
@@ -2049,76 +2708,112 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                         {{ taskOption.label }}
                                     </option>
                                 </select>
-                                <InputError :message="taskForm.errors.parent_task_id" />
+                                <InputError
+                                    :message="taskForm.errors.parent_task_id"
+                                />
                             </div>
 
                             <div class="space-y-2">
-                                <Label for="task-title">{{ t.projects.task_title }}</Label>
-                                <Input id="task-title" v-model="taskForm.title" />
+                                <Label for="task-title">{{
+                                    t.projects.task_title
+                                }}</Label>
+                                <Input
+                                    id="task-title"
+                                    v-model="taskForm.title"
+                                />
                                 <InputError :message="taskForm.errors.title" />
                             </div>
 
                             <div class="grid gap-4 md:grid-cols-2">
                                 <div class="space-y-2">
-                                    <Label for="task-status">{{ t.projects.status }}</Label>
+                                    <Label for="task-status">{{
+                                        t.projects.status
+                                    }}</Label>
                                     <select
                                         id="task-status"
                                         v-model="taskForm.status"
                                         class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                     >
                                         <option
-                                            v-for="statusOption in props.taskOptions.statuses"
+                                            v-for="statusOption in props
+                                                .taskOptions.statuses"
                                             :key="statusOption.value"
                                             :value="statusOption.value"
                                         >
                                             {{ statusOption.label }}
                                         </option>
                                     </select>
-                                    <InputError :message="taskForm.errors.status" />
+                                    <InputError
+                                        :message="taskForm.errors.status"
+                                    />
                                 </div>
 
                                 <div class="space-y-2">
-                                    <Label for="task-importance">{{ t.projects.importance }}</Label>
+                                    <Label for="task-importance">{{
+                                        t.projects.importance
+                                    }}</Label>
                                     <select
                                         id="task-importance"
                                         v-model="taskForm.importance"
                                         class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                     >
                                         <option
-                                            v-for="importanceOption in props.taskOptions.importances"
+                                            v-for="importanceOption in props
+                                                .taskOptions.importances"
                                             :key="importanceOption.value"
                                             :value="importanceOption.value"
                                         >
                                             {{ importanceOption.label }}
                                         </option>
                                     </select>
-                                    <InputError :message="taskForm.errors.importance" />
+                                    <InputError
+                                        :message="taskForm.errors.importance"
+                                    />
                                 </div>
                             </div>
 
                             <div class="grid gap-4 md:grid-cols-2">
                                 <div class="space-y-2">
-                                    <Label for="task-due">{{ t.projects.due_date }}</Label>
-                                    <Input id="task-due" v-model="taskForm.due_at" type="datetime-local" step="60" />
-                                    <InputError :message="taskForm.errors.due_at" />
+                                    <Label for="task-due">{{
+                                        t.projects.due_date
+                                    }}</Label>
+                                    <Input
+                                        id="task-due"
+                                        v-model="taskForm.due_at"
+                                        type="datetime-local"
+                                        step="60"
+                                    />
+                                    <InputError
+                                        :message="taskForm.errors.due_at"
+                                    />
                                 </div>
 
                                 <div class="space-y-2">
-                                    <Label for="task-sort-order">{{ t.projects.sort_order }}</Label>
+                                    <Label for="task-sort-order">{{
+                                        t.projects.sort_order
+                                    }}</Label>
                                     <Input
                                         id="task-sort-order"
                                         v-model.number="taskForm.sort_order"
                                         type="number"
                                         min="0"
                                     />
-                                    <InputError :message="taskForm.errors.sort_order" />
+                                    <InputError
+                                        :message="taskForm.errors.sort_order"
+                                    />
                                 </div>
                             </div>
 
                             <div class="space-y-2">
-                                <div class="flex items-center justify-between gap-3">
-                                    <Label for="task-complexity">{{ t.projects.complexity }}</Label>
-                                    <span class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground">
+                                <div
+                                    class="flex items-center justify-between gap-3"
+                                >
+                                    <Label for="task-complexity">{{
+                                        t.projects.complexity
+                                    }}</Label>
+                                    <span
+                                        class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground"
+                                    >
                                         {{ taskForm.complexity }}/10
                                     </span>
                                 </div>
@@ -2130,62 +2825,105 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     max="10"
                                     class="w-full accent-primary"
                                 />
-                                <InputError :message="taskForm.errors.complexity" />
+                                <InputError
+                                    :message="taskForm.errors.complexity"
+                                />
                             </div>
 
                             <div class="space-y-2">
-                                <Label for="task-description">{{ t.projects.description_label }}</Label>
+                                <Label for="task-description">{{
+                                    t.projects.description_label
+                                }}</Label>
                                 <textarea
                                     id="task-description"
                                     v-model="taskForm.description"
                                     rows="6"
-                                    class="min-h-32 w-full rounded-2xl border border-input bg-background px-3 py-3 text-sm shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                    class="min-h-32 w-full rounded-2xl border border-input bg-background px-3 py-3 text-sm shadow-xs transition outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                 ></textarea>
-                                <InputError :message="taskForm.errors.description" />
+                                <InputError
+                                    :message="taskForm.errors.description"
+                                />
                             </div>
 
                             <div class="space-y-2">
-                                <Label for="task-assignee">{{ t.projects.assignee }}</Label>
+                                <Label for="task-assignee">{{
+                                    t.projects.assignee
+                                }}</Label>
                                 <select
                                     id="task-assignee"
                                     v-model="taskForm.assignee_user_id"
                                     class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                 >
-                                    <option value="">{{ t.projects.unassigned }}</option>
-                                    <option v-for="member in taskMemberOptions" :key="member.id" :value="member.id">
+                                    <option value="">
+                                        {{ t.projects.unassigned }}
+                                    </option>
+                                    <option
+                                        v-for="member in taskMemberOptions"
+                                        :key="member.id"
+                                        :value="member.id"
+                                    >
                                         {{ fullName(member) }}
                                     </option>
                                 </select>
-                                <InputError :message="taskForm.errors.assignee_user_id" />
+                                <InputError
+                                    :message="taskForm.errors.assignee_user_id"
+                                />
                             </div>
 
                             <div class="space-y-3">
                                 <div>
-                                    <div class="text-sm font-medium">{{ t.projects.co_assignees }}</div>
-                                    <p class="text-sm text-muted-foreground">{{ t.projects.co_assignees_help }}</p>
+                                    <div class="text-sm font-medium">
+                                        {{ t.projects.co_assignees }}
+                                    </div>
+                                    <p class="text-sm text-muted-foreground">
+                                        {{ t.projects.co_assignees_help }}
+                                    </p>
                                 </div>
 
-                                <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
+                                <div
+                                    class="max-h-72 space-y-2 overflow-y-auto pr-1"
+                                >
                                     <label
                                         v-for="member in taskMemberOptions"
                                         :key="member.id"
                                         class="flex items-start gap-3 rounded-2xl border border-border bg-background/70 p-3"
                                     >
                                         <Checkbox
-                                            :checked="taskForm.co_assignee_user_ids.includes(member.id)"
-                                            @update:checked="taskCoAssigneeHandler(member.id)"
+                                            :checked="
+                                                taskForm.co_assignee_user_ids.includes(
+                                                    member.id,
+                                                )
+                                            "
+                                            @update:checked="
+                                                taskCoAssigneeHandler(member.id)
+                                            "
                                         />
                                         <div class="min-w-0 flex-1">
-                                            <div class="truncate text-sm font-medium">{{ fullName(member) }}</div>
-                                            <div class="truncate text-xs text-muted-foreground">{{ member.email }}</div>
+                                            <div
+                                                class="truncate text-sm font-medium"
+                                            >
+                                                {{ fullName(member) }}
+                                            </div>
+                                            <div
+                                                class="truncate text-xs text-muted-foreground"
+                                            >
+                                                {{ member.email }}
+                                            </div>
                                         </div>
                                     </label>
                                 </div>
-                                <InputError :message="taskForm.errors.co_assignee_user_ids" />
+                                <InputError
+                                    :message="
+                                        taskForm.errors.co_assignee_user_ids
+                                    "
+                                />
                             </div>
 
                             <div class="flex justify-end">
-                                <Button type="submit" :disabled="taskForm.processing">
+                                <Button
+                                    type="submit"
+                                    :disabled="taskForm.processing"
+                                >
                                     <Save class="size-4" />
                                     {{ t.common.save }}
                                 </Button>
@@ -2203,11 +2941,19 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                     <div class="space-y-6">
                         <div class="flex items-center justify-between gap-3">
                             <div class="text-xs text-muted-foreground">
-                                <span v-if="props.can.manageTask && activeTaskSaveState === 'saving'">
+                                <span
+                                    v-if="
+                                        props.can.manageTask &&
+                                        activeTaskSaveState === 'saving'
+                                    "
+                                >
                                     {{ t.projects.task_autosave_saving }}
                                 </span>
                                 <span
-                                    v-else-if="props.can.manageTask && activeTaskSaveState === 'saved'"
+                                    v-else-if="
+                                        props.can.manageTask &&
+                                        activeTaskSaveState === 'saved'
+                                    "
                                     class="text-emerald-600 dark:text-emerald-400"
                                 >
                                     {{ t.projects.task_autosave_saved }}
@@ -2226,10 +2972,14 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                             </Button>
                         </div>
 
-                        <div class="rounded-3xl border border-border bg-card p-5 shadow-sm">
+                        <div
+                            class="rounded-3xl border border-border bg-card p-5 shadow-sm"
+                        >
                             <div class="space-y-4">
                                 <div class="flex items-center gap-3">
-                                    <ClipboardList class="size-5 text-muted-foreground" />
+                                    <ClipboardList
+                                        class="size-5 text-muted-foreground"
+                                    />
                                     <Input
                                         id="active-task-title"
                                         v-model="activeTaskForm.title"
@@ -2238,28 +2988,55 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                         @change="handleActiveTaskFieldChange"
                                     />
                                 </div>
-                                <InputError :message="activeTaskForm.errors.title" />
+                                <InputError
+                                    :message="activeTaskForm.errors.title"
+                                />
 
                                 <div class="flex flex-wrap gap-2 text-xs">
                                     <span
                                         class="rounded-full border px-2 py-1 font-medium"
-                                        :style="taskStageBadgeStyle(activeTaskForm.status)"
+                                        :style="
+                                            taskStageBadgeStyle(
+                                                activeTaskForm.status,
+                                            )
+                                        "
                                     >
-                                        {{ optionLabel(props.taskOptions.statuses, activeTaskForm.status) }}
+                                        {{
+                                            optionLabel(
+                                                props.taskOptions.statuses,
+                                                activeTaskForm.status,
+                                            )
+                                        }}
                                     </span>
                                     <span
                                         class="rounded-full px-2 py-1 font-medium"
-                                        :class="importanceClass(activeTaskForm.importance)"
+                                        :class="
+                                            importanceClass(
+                                                activeTaskForm.importance,
+                                            )
+                                        "
                                     >
-                                        {{ optionLabel(props.taskOptions.importances, activeTaskForm.importance) }}
-                                    </span>
-                                    <span class="rounded-full bg-background px-2 py-1 text-muted-foreground">
-                                        {{ t.projects.complexity }}: {{ activeTaskForm.complexity }}/10
-                                    </span>
-                                    <span class="rounded-full bg-background px-2 py-1 text-muted-foreground">
                                         {{
-                                            projectOptionFor(selectedActiveTaskProjectId)?.name
-                                                ?? t.projects.standalone_task
+                                            optionLabel(
+                                                props.taskOptions.importances,
+                                                activeTaskForm.importance,
+                                            )
+                                        }}
+                                    </span>
+                                    <span
+                                        class="rounded-full bg-background px-2 py-1 text-muted-foreground"
+                                    >
+                                        {{ t.projects.complexity }}:
+                                        {{ activeTaskForm.complexity }}/10
+                                    </span>
+                                    <span
+                                        class="rounded-full bg-background px-2 py-1 text-muted-foreground"
+                                    >
+                                        {{
+                                            projectOptionFor(
+                                                selectedActiveTaskProjectId,
+                                            )?.name ??
+                                            t.projects.standalone_task
                                         }}
                                     </span>
                                 </div>
@@ -2267,8 +3044,13 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                         </div>
 
                         <div class="grid gap-4 xl:grid-cols-2">
-                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                                <Label for="active-task-project" class="mb-2 block text-sm font-medium">
+                            <div
+                                class="rounded-2xl border border-border bg-muted/15 p-4"
+                            >
+                                <Label
+                                    for="active-task-project"
+                                    class="mb-2 block text-sm font-medium"
+                                >
                                     {{ t.projects.task_location }}
                                 </Label>
                                 <select
@@ -2278,7 +3060,9 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     :disabled="!props.can.manageTask"
                                     @change="handleActiveTaskFieldChange"
                                 >
-                                    <option value="">{{ t.projects.standalone_task }}</option>
+                                    <option value="">
+                                        {{ t.projects.standalone_task }}
+                                    </option>
                                     <option
                                         v-for="project in props.availableProjects"
                                         :key="project.id"
@@ -2287,11 +3071,19 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                         {{ project.name }}
                                     </option>
                                 </select>
-                                <InputError class="mt-2" :message="activeTaskForm.errors.project_id" />
+                                <InputError
+                                    class="mt-2"
+                                    :message="activeTaskForm.errors.project_id"
+                                />
                             </div>
 
-                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                                <Label for="active-task-parent" class="mb-2 block text-sm font-medium">
+                            <div
+                                class="rounded-2xl border border-border bg-muted/15 p-4"
+                            >
+                                <Label
+                                    for="active-task-parent"
+                                    class="mb-2 block text-sm font-medium"
+                                >
                                     {{ t.projects.parent_task }}
                                 </Label>
                                 <select
@@ -2301,7 +3093,9 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     :disabled="!props.can.manageTask"
                                     @change="handleActiveTaskFieldChange"
                                 >
-                                    <option value="">{{ t.projects.no_parent_task }}</option>
+                                    <option value="">
+                                        {{ t.projects.no_parent_task }}
+                                    </option>
                                     <option
                                         v-for="taskOption in activeParentTaskOptions"
                                         :key="taskOption.id"
@@ -2310,11 +3104,21 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                         {{ taskOption.label }}
                                     </option>
                                 </select>
-                                <InputError class="mt-2" :message="activeTaskForm.errors.parent_task_id" />
+                                <InputError
+                                    class="mt-2"
+                                    :message="
+                                        activeTaskForm.errors.parent_task_id
+                                    "
+                                />
                             </div>
 
-                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                                <Label for="active-task-status" class="mb-2 block text-sm font-medium">
+                            <div
+                                class="rounded-2xl border border-border bg-muted/15 p-4"
+                            >
+                                <Label
+                                    for="active-task-status"
+                                    class="mb-2 block text-sm font-medium"
+                                >
                                     {{ t.projects.status }}
                                 </Label>
                                 <select
@@ -2325,18 +3129,27 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     @change="handleActiveTaskFieldChange"
                                 >
                                     <option
-                                        v-for="statusOption in props.taskOptions.statuses"
+                                        v-for="statusOption in props.taskOptions
+                                            .statuses"
                                         :key="statusOption.value"
                                         :value="statusOption.value"
                                     >
                                         {{ statusOption.label }}
                                     </option>
                                 </select>
-                                <InputError class="mt-2" :message="activeTaskForm.errors.status" />
+                                <InputError
+                                    class="mt-2"
+                                    :message="activeTaskForm.errors.status"
+                                />
                             </div>
 
-                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                                <Label for="active-task-importance" class="mb-2 block text-sm font-medium">
+                            <div
+                                class="rounded-2xl border border-border bg-muted/15 p-4"
+                            >
+                                <Label
+                                    for="active-task-importance"
+                                    class="mb-2 block text-sm font-medium"
+                                >
                                     {{ t.projects.importance }}
                                 </Label>
                                 <select
@@ -2347,18 +3160,27 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     @change="handleActiveTaskFieldChange"
                                 >
                                     <option
-                                        v-for="importanceOption in props.taskOptions.importances"
+                                        v-for="importanceOption in props
+                                            .taskOptions.importances"
                                         :key="importanceOption.value"
                                         :value="importanceOption.value"
                                     >
                                         {{ importanceOption.label }}
                                     </option>
                                 </select>
-                                <InputError class="mt-2" :message="activeTaskForm.errors.importance" />
+                                <InputError
+                                    class="mt-2"
+                                    :message="activeTaskForm.errors.importance"
+                                />
                             </div>
 
-                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                                <Label for="active-task-due" class="mb-2 block text-sm font-medium">
+                            <div
+                                class="rounded-2xl border border-border bg-muted/15 p-4"
+                            >
+                                <Label
+                                    for="active-task-due"
+                                    class="mb-2 block text-sm font-medium"
+                                >
                                     {{ t.projects.due_date }}
                                 </Label>
                                 <Input
@@ -2370,13 +3192,23 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     @change="handleActiveTaskFieldChange"
                                 />
                                 <div class="mt-2 text-xs text-muted-foreground">
-                                    {{ formatDateTime(props.activeTask.due_at) }}
+                                    {{
+                                        formatDateTime(props.activeTask.due_at)
+                                    }}
                                 </div>
-                                <InputError class="mt-2" :message="activeTaskForm.errors.due_at" />
+                                <InputError
+                                    class="mt-2"
+                                    :message="activeTaskForm.errors.due_at"
+                                />
                             </div>
 
-                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                                <Label for="active-task-sort-order" class="mb-2 block text-sm font-medium">
+                            <div
+                                class="rounded-2xl border border-border bg-muted/15 p-4"
+                            >
+                                <Label
+                                    for="active-task-sort-order"
+                                    class="mb-2 block text-sm font-medium"
+                                >
                                     {{ t.projects.sort_order }}
                                 </Label>
                                 <Input
@@ -2387,12 +3219,21 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     :disabled="!props.can.manageTask"
                                     @change="handleActiveTaskFieldChange"
                                 />
-                                <InputError class="mt-2" :message="activeTaskForm.errors.sort_order" />
+                                <InputError
+                                    class="mt-2"
+                                    :message="activeTaskForm.errors.sort_order"
+                                />
                             </div>
 
-                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                                <div class="mb-1 flex items-center gap-2 text-sm font-medium">
-                                    <UserRound class="size-4 text-muted-foreground" />
+                            <div
+                                class="rounded-2xl border border-border bg-muted/15 p-4"
+                            >
+                                <div
+                                    class="mb-1 flex items-center gap-2 text-sm font-medium"
+                                >
+                                    <UserRound
+                                        class="size-4 text-muted-foreground"
+                                    />
                                     {{ t.projects.assignee }}
                                 </div>
                                 <select
@@ -2402,7 +3243,9 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     :disabled="!props.can.manageTask"
                                     @change="handleActiveTaskFieldChange"
                                 >
-                                    <option value="">{{ t.projects.unassigned }}</option>
+                                    <option value="">
+                                        {{ t.projects.unassigned }}
+                                    </option>
                                     <option
                                         v-for="member in activeTaskMemberOptions"
                                         :key="member.id"
@@ -2411,12 +3254,23 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                         {{ fullName(member) }}
                                     </option>
                                 </select>
-                                <InputError class="mt-2" :message="activeTaskForm.errors.assignee_user_id" />
+                                <InputError
+                                    class="mt-2"
+                                    :message="
+                                        activeTaskForm.errors.assignee_user_id
+                                    "
+                                />
                             </div>
 
-                            <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                                <div class="mb-1 flex items-center gap-2 text-sm font-medium">
-                                    <Shield class="size-4 text-muted-foreground" />
+                            <div
+                                class="rounded-2xl border border-border bg-muted/15 p-4"
+                            >
+                                <div
+                                    class="mb-1 flex items-center gap-2 text-sm font-medium"
+                                >
+                                    <Shield
+                                        class="size-4 text-muted-foreground"
+                                    />
                                     {{ t.projects.creator }}
                                 </div>
                                 <div class="mt-2 text-sm text-muted-foreground">
@@ -2425,12 +3279,21 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                             </div>
                         </div>
 
-                        <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                            <div class="mb-2 flex items-center justify-between gap-3">
-                                <Label for="active-task-complexity" class="text-sm font-medium">
+                        <div
+                            class="rounded-2xl border border-border bg-muted/15 p-4"
+                        >
+                            <div
+                                class="mb-2 flex items-center justify-between gap-3"
+                            >
+                                <Label
+                                    for="active-task-complexity"
+                                    class="text-sm font-medium"
+                                >
                                     {{ t.projects.complexity }}
                                 </Label>
-                                <span class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground">
+                                <span
+                                    class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground"
+                                >
                                     {{ activeTaskForm.complexity }}/10
                                 </span>
                             </div>
@@ -2444,63 +3307,117 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 :disabled="!props.can.manageTask"
                                 @change="handleActiveTaskFieldChange"
                             />
-                            <InputError class="mt-2" :message="activeTaskForm.errors.complexity" />
+                            <InputError
+                                class="mt-2"
+                                :message="activeTaskForm.errors.complexity"
+                            />
                         </div>
 
-                        <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                            <Label for="active-task-description" class="mb-2 block text-sm font-medium">
+                        <div
+                            class="rounded-2xl border border-border bg-muted/15 p-4"
+                        >
+                            <Label
+                                for="active-task-description"
+                                class="mb-2 block text-sm font-medium"
+                            >
                                 {{ t.projects.description_label }}
                             </Label>
                             <textarea
                                 id="active-task-description"
                                 v-model="activeTaskForm.description"
                                 rows="6"
-                                class="min-h-32 w-full rounded-2xl border border-input bg-background px-3 py-3 text-sm shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                class="min-h-32 w-full rounded-2xl border border-input bg-background px-3 py-3 text-sm shadow-xs transition outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                 :disabled="!props.can.manageTask"
                                 @change="handleActiveTaskFieldChange"
                             ></textarea>
-                            <InputError class="mt-2" :message="activeTaskForm.errors.description" />
+                            <InputError
+                                class="mt-2"
+                                :message="activeTaskForm.errors.description"
+                            />
                         </div>
 
-                        <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                            <div class="mb-3 flex items-center gap-2 text-sm font-medium">
-                                <UsersRound class="size-4 text-muted-foreground" />
+                        <div
+                            class="rounded-2xl border border-border bg-muted/15 p-4"
+                        >
+                            <div
+                                class="mb-3 flex items-center gap-2 text-sm font-medium"
+                            >
+                                <UsersRound
+                                    class="size-4 text-muted-foreground"
+                                />
                                 {{ t.projects.co_assignees }}
                             </div>
                             <p class="mb-3 text-sm text-muted-foreground">
                                 {{ t.projects.co_assignees_help }}
                             </p>
 
-                            <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
+                            <div
+                                class="max-h-72 space-y-2 overflow-y-auto pr-1"
+                            >
                                 <label
                                     v-for="member in activeTaskMemberOptions"
                                     :key="member.id"
                                     class="flex items-start gap-3 rounded-2xl border border-border bg-background/70 p-3"
                                 >
                                     <Checkbox
-                                        :checked="activeTaskForm.co_assignee_user_ids.includes(member.id)"
+                                        :checked="
+                                            activeTaskForm.co_assignee_user_ids.includes(
+                                                member.id,
+                                            )
+                                        "
                                         :disabled="!props.can.manageTask"
-                                        @update:checked="activeTaskCoAssigneeHandler(member.id)"
+                                        @update:checked="
+                                            activeTaskCoAssigneeHandler(
+                                                member.id,
+                                            )
+                                        "
                                     />
                                     <div class="min-w-0 flex-1">
-                                        <div class="truncate text-sm font-medium">{{ fullName(member) }}</div>
-                                        <div class="truncate text-xs text-muted-foreground">{{ member.email }}</div>
+                                        <div
+                                            class="truncate text-sm font-medium"
+                                        >
+                                            {{ fullName(member) }}
+                                        </div>
+                                        <div
+                                            class="truncate text-xs text-muted-foreground"
+                                        >
+                                            {{ member.email }}
+                                        </div>
                                     </div>
                                 </label>
                             </div>
-                            <InputError class="mt-2" :message="activeTaskForm.errors.co_assignee_user_ids" />
+                            <InputError
+                                class="mt-2"
+                                :message="
+                                    activeTaskForm.errors.co_assignee_user_ids
+                                "
+                            />
                         </div>
 
-                        <div class="rounded-2xl border border-border bg-muted/15 p-4">
-                            <div class="mb-3 flex items-center justify-between gap-3">
-                                <div class="text-sm font-medium">{{ t.projects.subtasks }}</div>
-                                <Button type="button" variant="outline" size="sm" @click="openCreateSubtaskFromActiveTask">
+                        <div
+                            class="rounded-2xl border border-border bg-muted/15 p-4"
+                        >
+                            <div
+                                class="mb-3 flex items-center justify-between gap-3"
+                            >
+                                <div class="text-sm font-medium">
+                                    {{ t.projects.subtasks }}
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    @click="openCreateSubtaskFromActiveTask"
+                                >
                                     <GitBranchPlus class="size-4" />
                                     {{ t.projects.create_subtask }}
                                 </Button>
                             </div>
 
-                            <div v-if="props.activeTask.subtasks.length === 0" class="text-sm text-muted-foreground">
+                            <div
+                                v-if="props.activeTask.subtasks.length === 0"
+                                class="text-sm text-muted-foreground"
+                            >
                                 {{ t.projects.no_subtasks_description }}
                             </div>
 
@@ -2512,16 +3429,45 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     class="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3 py-3 transition hover:border-primary/40 hover:bg-background"
                                 >
                                     <div class="min-w-0">
-                                        <div class="truncate text-sm font-medium">{{ subtask.title }}</div>
-                                        <div class="mt-1 flex flex-wrap gap-2 text-xs">
+                                        <div
+                                            class="truncate text-sm font-medium"
+                                        >
+                                            {{ subtask.title }}
+                                        </div>
+                                        <div
+                                            class="mt-1 flex flex-wrap gap-2 text-xs"
+                                        >
                                             <span
                                                 class="rounded-full border px-2 py-1"
-                                                :style="taskStageBadgeStyle(subtask.status)"
+                                                :style="
+                                                    taskStageBadgeStyle(
+                                                        subtask.status,
+                                                    )
+                                                "
                                             >
-                                                {{ optionLabel(props.taskOptions.statuses, subtask.status) }}
+                                                {{
+                                                    optionLabel(
+                                                        props.taskOptions
+                                                            .statuses,
+                                                        subtask.status,
+                                                    )
+                                                }}
                                             </span>
-                                            <span class="rounded-full px-2 py-1" :class="importanceClass(subtask.importance)">
-                                                {{ optionLabel(props.taskOptions.importances, subtask.importance) }}
+                                            <span
+                                                class="rounded-full px-2 py-1"
+                                                :class="
+                                                    importanceClass(
+                                                        subtask.importance,
+                                                    )
+                                                "
+                                            >
+                                                {{
+                                                    optionLabel(
+                                                        props.taskOptions
+                                                            .importances,
+                                                        subtask.importance,
+                                                    )
+                                                }}
                                             </span>
                                         </div>
                                     </div>
@@ -2535,7 +3481,10 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                     </div>
                 </div>
 
-                <ProjectTaskConversationPanel :active="taskSheetOpen" :task-id="props.activeTask.id" />
+                <ProjectTaskConversationPanel
+                    :active="taskSheetOpen"
+                    :task-id="props.activeTask.id"
+                />
             </div>
         </SheetContent>
     </Sheet>

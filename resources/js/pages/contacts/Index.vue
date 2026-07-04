@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { Building2, Pencil, Plus, Search, Trash2, UserRound } from '@lucide/vue';
+import { Ban, Building2, Pencil, Plus, Search, Trash2, UserRound } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
 import {
     destroy,
@@ -14,6 +14,7 @@ import LocalizedFilePicker from '@/components/LocalizedFilePicker.vue';
 import PaginationControls from '@/components/PaginationControls.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -31,6 +32,7 @@ import { index } from '@/routes/contacts';
 import type { PaginatedCollection } from '@/types/ui';
 
 type ContactType = 'person' | 'company';
+type BlacklistFilter = 'all' | 'blacklisted' | 'not_blacklisted';
 
 type ContactActor = {
     id: number;
@@ -68,6 +70,7 @@ type ContactRow = {
     email: string | null;
     phone: string | null;
     notes: string | null;
+    is_blacklisted: boolean;
     avatar: string | null;
     company_requisites: ContactRequisitesRow;
     comments: ContactCommentRow[];
@@ -80,6 +83,7 @@ type ContactRow = {
 type Filters = {
     search: string;
     type: 'all' | ContactType;
+    blacklist: BlacklistFilter;
     per_page: number;
 };
 
@@ -123,6 +127,7 @@ const emptyContactRequisites = (): ContactRequisitesForm => ({
 const filtersForm = useForm<Filters>({
     search: props.filters.search,
     type: props.filters.type,
+    blacklist: props.filters.blacklist,
     per_page: props.filters.per_page,
 });
 
@@ -135,6 +140,7 @@ const contactForm = useForm({
     email: '',
     phone: '',
     notes: '',
+    is_blacklisted: false,
     avatar: null as File | null,
     company_requisites: emptyContactRequisites(),
 });
@@ -298,6 +304,7 @@ const resetContactForm = (): void => {
     contactForm.clearErrors();
     editingContactId.value = null;
     contactForm.type = (props.availableTypes[0]?.value ?? 'person') as ContactType;
+    contactForm.is_blacklisted = false;
     contactForm.company_requisites = emptyContactRequisites();
     persistedAvatarUrl.value = null;
     requisitesDialogOpen.value = false;
@@ -321,6 +328,7 @@ const openEditDialog = (contact: ContactRow): void => {
     contactForm.email = contact.email ?? '';
     contactForm.phone = contact.phone ?? '';
     contactForm.notes = contact.notes ?? '';
+    contactForm.is_blacklisted = contact.is_blacklisted;
     contactForm.avatar = null;
     assignContactRequisites(contact.company_requisites);
     persistedAvatarUrl.value = contact.avatar;
@@ -380,6 +388,7 @@ const submitFilters = (): void => {
         {
             search: filtersForm.search,
             type: filtersForm.type,
+            blacklist: filtersForm.blacklist,
             per_page: filtersForm.per_page,
         },
         {
@@ -561,6 +570,42 @@ onBeforeUnmount(clearLocalAvatarUrl);
                     {{ type.label }}
                 </Button>
             </div>
+
+            <div class="mt-3 flex flex-wrap gap-2">
+                <Button
+                    type="button"
+                    size="sm"
+                    :variant="filtersForm.blacklist === 'all' ? 'default' : 'outline'"
+                    @click="
+                        filtersForm.blacklist = 'all';
+                        submitFilters();
+                    "
+                >
+                    {{ t.contacts.blacklist_filter_all }}
+                </Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    :variant="filtersForm.blacklist === 'blacklisted' ? 'default' : 'outline'"
+                    @click="
+                        filtersForm.blacklist = 'blacklisted';
+                        submitFilters();
+                    "
+                >
+                    {{ t.contacts.blacklist_filter_blacklisted }}
+                </Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    :variant="filtersForm.blacklist === 'not_blacklisted' ? 'default' : 'outline'"
+                    @click="
+                        filtersForm.blacklist = 'not_blacklisted';
+                        submitFilters();
+                    "
+                >
+                    {{ t.contacts.blacklist_filter_not_blacklisted }}
+                </Button>
+            </div>
         </section>
 
         <section
@@ -575,6 +620,7 @@ onBeforeUnmount(clearLocalAvatarUrl);
                 v-for="contact in contacts.data"
                 :key="contact.id"
                 class="rounded-2xl border border-border bg-card p-5"
+                :class="{ 'border-destructive/40 bg-destructive/5': contact.is_blacklisted }"
             >
                 <div
                     class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
@@ -609,6 +655,13 @@ onBeforeUnmount(clearLocalAvatarUrl);
                                         />
                                         <UserRound v-else class="size-3.5" />
                                         {{ contact.type_label }}
+                                    </span>
+                                    <span
+                                        v-if="contact.is_blacklisted"
+                                        class="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-1 text-xs text-destructive"
+                                    >
+                                        <Ban class="size-3.5" />
+                                        {{ t.contacts.blacklisted }}
                                     </span>
                                 </div>
                             </div>
@@ -933,6 +986,29 @@ onBeforeUnmount(clearLocalAvatarUrl);
                                 v-model="contactForm.phone"
                             />
                             <InputError :message="contactForm.errors.phone" />
+                        </div>
+
+                        <div class="space-y-3 md:col-span-2">
+                            <label
+                                class="flex items-start gap-3 rounded-2xl border border-border/80 bg-muted/20 p-4"
+                            >
+                                <Checkbox
+                                    :checked="contactForm.is_blacklisted"
+                                    @update:checked="
+                                        (value) =>
+                                            (contactForm.is_blacklisted =
+                                                value === true)
+                                    "
+                                />
+                                <div class="space-y-1">
+                                    <div class="font-medium text-foreground">
+                                        {{ t.contacts.blacklist }}
+                                    </div>
+                                    <p class="text-sm text-muted-foreground">
+                                        {{ t.contacts.blacklist_description }}
+                                    </p>
+                                </div>
+                            </label>
                         </div>
 
                         <div class="space-y-3 md:col-span-2">

@@ -169,6 +169,49 @@ test('super admin can update company contacts with requisites', function () {
         ->and($company->company_requisites['bank_name'])->toBe('Kaspi Bank');
 });
 
+test('super admin can blacklist contacts and filter them in the workspace', function () {
+    config(['admin.super_admin_email' => 'super@example.com']);
+
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+    ]);
+
+    $blacklisted = Contact::factory()->person()->blacklisted()->create([
+        'name' => 'Blocked Person',
+    ]);
+    Contact::factory()->person()->create([
+        'name' => 'Open Person',
+    ]);
+
+    $this->actingAs($superAdmin)
+        ->get(route('contacts.index', ['blacklist' => Contact::BLACKLIST_FILTER_ONLY]))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.blacklist', Contact::BLACKLIST_FILTER_ONLY)
+            ->has('contacts.data', 1)
+            ->where('contacts.data.0.id', $blacklisted->id)
+            ->where('contacts.data.0.is_blacklisted', true)
+        );
+
+    $this->actingAs($superAdmin)
+        ->post(route('contacts.store'), [
+            'type' => Contact::TYPE_PERSON,
+            'name' => 'Fresh Blacklisted Person',
+            'is_blacklisted' => true,
+        ])
+        ->assertRedirect();
+
+    $createdContact = Contact::query()
+        ->where('name', 'Fresh Blacklisted Person')
+        ->where('type', Contact::TYPE_PERSON)
+        ->first();
+
+    expect($createdContact)
+        ->not()->toBeNull()
+        ->and($createdContact?->is_blacklisted)
+        ->toBeTrue();
+});
+
 test('super admin can add contact history comments', function () {
     config(['admin.super_admin_email' => 'super@example.com']);
 

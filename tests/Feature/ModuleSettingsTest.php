@@ -109,6 +109,7 @@ test('disabled module routes return not found', function (string $module, string
     ['production', 'production.index'],
     ['api', 'settings.api.edit'],
     ['integrations', 'settings.integrations.edit'],
+    ['business-processes', 'settings.business-processes.index'],
     ['webhooks', 'settings.webhooks.edit'],
 ]);
 

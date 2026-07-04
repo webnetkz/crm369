@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ImportProjectTasksRequest;
 use App\Http\Requests\MoveProjectTaskRequest;
 use App\Http\Requests\MoveProjectTaskStagesRequest;
 use App\Http\Requests\StoreProjectRequest;
@@ -13,16 +14,20 @@ use App\Http\Requests\UpdateProjectTaskStageRequest;
 use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\ProjectTaskStage;
+use App\Models\User;
 use App\Support\ProjectPageData;
 use App\Support\ProjectTaskAssignmentNotifier;
 use App\Support\ProjectTaskChangeLogger;
+use App\Support\ProjectTaskCsvService;
 use App\Support\TaskConversationManager;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProjectController extends Controller
 {
@@ -63,6 +68,34 @@ class ProjectController extends Controller
         ));
     }
 
+    public function exportStandaloneTasks(Request $request, ProjectTaskCsvService $projectTaskCsvService): StreamedResponse
+    {
+        $user = $request->user();
+        abort_unless($user !== null, 401);
+
+        return $projectTaskCsvService->download(
+            $this->standaloneTasksForExport($user),
+            'standalone-tasks-'.now()->format('Y-m-d-H-i-s').'.csv',
+        );
+    }
+
+    public function importStandaloneTasks(
+        ImportProjectTasksRequest $request,
+        ProjectTaskCsvService $projectTaskCsvService,
+    ): RedirectResponse {
+        $user = $request->user();
+        abort_unless($user !== null, 401);
+
+        $importedCount = $projectTaskCsvService->import($request->file('file'), $user);
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('ui.projects.csv_import_success', ['count' => $importedCount]),
+        ]);
+
+        return back();
+    }
+
     public function show(Request $request, Project $project, ProjectPageData $pageData): Response
     {
         $visibleProject = $this->visibleProject($request, $project);
@@ -76,6 +109,37 @@ class ProjectController extends Controller
         $visibleTask = $this->visibleTaskInProject($visibleProject, $projectTask);
 
         return Inertia::render('projects/Index', $pageData->build($request->user(), $visibleProject, $visibleTask));
+    }
+
+    public function exportProjectTasks(
+        Request $request,
+        Project $project,
+        ProjectTaskCsvService $projectTaskCsvService,
+    ): StreamedResponse {
+        $visibleProject = $this->visibleProject($request, $project);
+
+        return $projectTaskCsvService->download(
+            $this->projectTasksForExport($request, $visibleProject),
+            $visibleProject->slug.'-tasks-'.now()->format('Y-m-d-H-i-s').'.csv',
+        );
+    }
+
+    public function importProjectTasks(
+        ImportProjectTasksRequest $request,
+        Project $project,
+        ProjectTaskCsvService $projectTaskCsvService,
+    ): RedirectResponse {
+        $visibleProject = $this->visibleProject($request, $project);
+        abort_unless($request->user()->canWorkOnProject($visibleProject), 403);
+
+        $importedCount = $projectTaskCsvService->import($request->file('file'), $request->user(), $visibleProject);
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('ui.projects.csv_import_success', ['count' => $importedCount]),
+        ]);
+
+        return back();
     }
 
     public function store(StoreProjectRequest $request): RedirectResponse
@@ -470,5 +534,41 @@ class ProjectController extends Controller
         }
 
         return $slug;
+    }
+
+    /**
+     * @return Collection<int, ProjectTask>
+     */
+    private function standaloneTasksForExport(User $user): Collection
+    {
+        return ProjectTask::query()
+            ->visibleTo($user)
+            ->whereNull('project_id')
+            ->with([
+                'assignee:id,email',
+                'coAssignees:id,email',
+            ])
+            ->orderBy('sort_order')
+            ->orderBy('due_at')
+            ->orderByDesc('created_at')
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, ProjectTask>
+     */
+    private function projectTasksForExport(Request $request, Project $project): Collection
+    {
+        return ProjectTask::query()
+            ->visibleTo($request->user())
+            ->where('project_id', $project->id)
+            ->with([
+                'assignee:id,email',
+                'coAssignees:id,email',
+            ])
+            ->orderBy('sort_order')
+            ->orderBy('due_at')
+            ->orderByDesc('created_at')
+            ->get();
     }
 }

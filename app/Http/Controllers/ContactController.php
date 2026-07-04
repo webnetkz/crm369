@@ -12,7 +12,6 @@ use App\Models\User;
 use App\Support\ContactAvatarManager;
 use App\Support\PaginationData;
 use App\Support\PerPageOptions;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -40,9 +39,11 @@ class ContactController extends Controller
                 'comments.author:id,name,last_name',
             ])
             ->visibleTo($user)
-            ->when($filters['search'] !== '', fn (Builder $query) => $this->applySearch($query, $filters['search']))
-            ->when($activeType !== 'all', fn (Builder $query) => $query->where('type', $activeType))
+            ->when($filters['search'] !== '', fn ($query) => $query->search($filters['search']))
+            ->withBlacklistFilter($filters['blacklist'])
+            ->when($activeType !== 'all', fn ($query) => $query->where('type', $activeType))
             ->orderBy('type')
+            ->orderBy('is_blacklisted', 'desc')
             ->orderBy('name')
             ->paginate($filters['per_page'])
             ->withQueryString()
@@ -153,20 +154,5 @@ class ContactController extends Controller
         }
 
         return count($availableTypes) === 1 ? $availableTypes[0] : 'all';
-    }
-
-    /**
-     * @param  Builder<Contact>  $query
-     */
-    private function applySearch(Builder $query, string $search): void
-    {
-        $query->where(function (Builder $searchQuery) use ($search): void {
-            $searchQuery
-                ->where('name', 'like', "%{$search}%")
-                ->orWhere('contact_person', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%")
-                ->orWhere('phone', 'like', "%{$search}%")
-                ->orWhere('position', 'like', "%{$search}%");
-        });
     }
 }

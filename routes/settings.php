@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\ApiController;
 use App\Http\Controllers\Settings\AppearanceController;
+use App\Http\Controllers\Settings\BusinessProcessController;
 use App\Http\Controllers\Settings\LogController;
 use App\Http\Controllers\Settings\MenuController;
 use App\Http\Controllers\Settings\MessengerIntegrationController;
@@ -91,6 +92,18 @@ Route::middleware(['auth', 'verified', 'can:manage-users'])->group(function () {
     Route::post('settings/portal', [PortalController::class, 'update'])->name('settings.portal.update');
     Route::get('settings/modules', [ModuleController::class, 'edit'])->name('settings.modules.edit');
     Route::patch('settings/modules', [ModuleController::class, 'update'])->name('settings.modules.update');
+    Route::get('settings/business-processes', [BusinessProcessController::class, 'index'])
+        ->middleware('module.enabled:business-processes')
+        ->name('settings.business-processes.index');
+    Route::post('settings/business-processes', [BusinessProcessController::class, 'store'])
+        ->middleware('module.enabled:business-processes')
+        ->name('settings.business-processes.store');
+    Route::patch('settings/business-processes/{businessProcess}', [BusinessProcessController::class, 'update'])
+        ->middleware('module.enabled:business-processes')
+        ->name('settings.business-processes.update');
+    Route::delete('settings/business-processes/{businessProcess}', [BusinessProcessController::class, 'destroy'])
+        ->middleware('module.enabled:business-processes')
+        ->name('settings.business-processes.destroy');
     Route::get('settings/logs', [LogController::class, 'edit'])->name('settings.logs.edit');
 
     Route::get('settings/integrations', [MessengerIntegrationController::class, 'edit'])

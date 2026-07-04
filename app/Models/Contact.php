@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string|null $phone
  * @property string|null $notes
  * @property string|null $avatar_path
+ * @property bool $is_blacklisted
  * @property array<string, string|null>|null $company_requisites
  * @property int|null $created_by_user_id
  * @property int|null $updated_by_user_id
@@ -37,6 +38,7 @@ use Illuminate\Support\Facades\Storage;
     'phone',
     'notes',
     'avatar_path',
+    'is_blacklisted',
     'company_requisites',
     'created_by_user_id',
     'updated_by_user_id',
@@ -46,6 +48,12 @@ class Contact extends Model
     public const string TYPE_PERSON = 'person';
 
     public const string TYPE_COMPANY = 'company';
+
+    public const string BLACKLIST_FILTER_ALL = 'all';
+
+    public const string BLACKLIST_FILTER_ONLY = 'blacklisted';
+
+    public const string BLACKLIST_FILTER_EXCLUDE = 'not_blacklisted';
 
     /** @use HasFactory<ContactFactory> */
     use HasFactory;
@@ -67,6 +75,7 @@ class Contact extends Model
         return [
             'created_by_user_id' => 'integer',
             'company_requisites' => 'array',
+            'is_blacklisted' => 'boolean',
             'updated_by_user_id' => 'integer',
         ];
     }
@@ -95,6 +104,18 @@ class Contact extends Model
     }
 
     /**
+     * @return array<int, string>
+     */
+    public static function availableBlacklistFilters(): array
+    {
+        return [
+            self::BLACKLIST_FILTER_ALL,
+            self::BLACKLIST_FILTER_ONLY,
+            self::BLACKLIST_FILTER_EXCLUDE,
+        ];
+    }
+
+    /**
      * @param  Builder<Contact>  $query
      * @return Builder<Contact>
      */
@@ -111,6 +132,35 @@ class Contact extends Model
         }
 
         return $query->whereIn('type', $types);
+    }
+
+    /**
+     * @param  Builder<Contact>  $query
+     * @return Builder<Contact>
+     */
+    public function scopeSearch(Builder $query, string $search): Builder
+    {
+        return $query->where(function (Builder $searchQuery) use ($search): void {
+            $searchQuery
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('contact_person', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%")
+                ->orWhere('position', 'like', "%{$search}%");
+        });
+    }
+
+    /**
+     * @param  Builder<Contact>  $query
+     * @return Builder<Contact>
+     */
+    public function scopeWithBlacklistFilter(Builder $query, string $blacklist): Builder
+    {
+        return match ($blacklist) {
+            self::BLACKLIST_FILTER_ONLY => $query->where('is_blacklisted', true),
+            self::BLACKLIST_FILTER_EXCLUDE => $query->where('is_blacklisted', false),
+            default => $query,
+        };
     }
 
     public function typeLabel(): string

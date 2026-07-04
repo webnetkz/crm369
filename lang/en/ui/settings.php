@@ -31,6 +31,7 @@ return [
     'menu' => 'Menu',
     'portal' => 'Portal',
     'modules' => 'Modules',
+    'business_processes' => 'Business processes',
     'integrations' => 'Integrations',
     'logs' => 'Logs',
     'api' => 'API',

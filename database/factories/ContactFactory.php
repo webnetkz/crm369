@@ -27,6 +27,7 @@ class ContactFactory extends Factory
             'email' => fake()->safeEmail(),
             'phone' => fake()->phoneNumber(),
             'notes' => fake()->optional()->sentence(),
+            'is_blacklisted' => false,
             'company_requisites' => $type === Contact::TYPE_COMPANY
                 ? [
                     'bin' => fake()->numerify('############'),
@@ -68,6 +69,13 @@ class ContactFactory extends Factory
                 'iban' => 'KZ'.fake()->numerify('##################'),
                 'kbe' => fake()->randomElement(['17', '18']),
             ],
+        ]);
+    }
+
+    public function blacklisted(): static
+    {
+        return $this->state(fn (): array => [
+            'is_blacklisted' => true,
         ]);
     }
 }

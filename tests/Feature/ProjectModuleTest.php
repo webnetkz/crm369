@@ -147,6 +147,111 @@ test('standalone task can be opened in tasks mode while project task returns 404
         ->assertNotFound();
 });
 
+test('standalone tasks can be exported to csv', function () {
+    $user = User::factory()->create(['email' => 'owner@example.com']);
+    $assignee = User::factory()->create(['email' => 'assignee@example.com']);
+    $coAssignee = User::factory()->create(['email' => 'helper@example.com']);
+
+    $parentTask = ProjectTask::factory()->standalone()->create([
+        'creator_user_id' => $user->id,
+        'assignee_user_id' => $assignee->id,
+        'updated_by_user_id' => $user->id,
+        'title' => 'Parent export task',
+        'description' => 'Parent description',
+        'status' => ProjectTask::STATUS_IN_PROGRESS,
+        'importance' => ProjectTask::IMPORTANCE_HIGH,
+        'complexity' => 6,
+        'sort_order' => 1,
+        'due_at' => now()->addDay()->startOfMinute(),
+    ]);
+    $parentTask->coAssignees()->sync([$coAssignee->id]);
+
+    ProjectTask::factory()->standalone()->create([
+        'creator_user_id' => $user->id,
+        'assignee_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+        'parent_task_id' => $parentTask->id,
+        'title' => 'Child export task',
+        'status' => ProjectTask::STATUS_TODO,
+        'importance' => ProjectTask::IMPORTANCE_NORMAL,
+        'complexity' => 3,
+        'sort_order' => 2,
+        'due_at' => null,
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('tasks.export'))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($response->streamedContent())
+        ->toContain('task_key,parent_task_key,title,description,status,importance,complexity,due_at,sort_order,assignee_email,co_assignee_emails')
+        ->toContain('Parent export task')
+        ->toContain('Child export task')
+        ->toContain('assignee@example.com')
+        ->toContain('helper@example.com');
+});
+
+test('standalone tasks can be imported from csv with parent links', function () {
+    $user = User::factory()->create(['email' => 'owner@example.com']);
+    $assignee = User::factory()->create(['email' => 'assignee@example.com']);
+    $coAssignee = User::factory()->create(['email' => 'helper@example.com']);
+
+    $csv = <<<'CSV'
+task_key,parent_task_key,title,description,status,importance,complexity,due_at,sort_order,assignee_email,co_assignee_emails
+launch,,Launch plan,Plan the release,in_progress,high,7,2026-07-03T09:00:00+00:00,2,assignee@example.com,helper@example.com
+checklist,launch,Prepare checklist,,todo,normal,3,,5,,
+CSV;
+
+    $response = $this->actingAs($user)
+        ->from(route('tasks.index'))
+        ->post(route('tasks.import'), [
+            'file' => UploadedFile::fake()->createWithContent('tasks.csv', $csv),
+        ])
+        ->assertRedirect(route('tasks.index'));
+
+    $parentTask = ProjectTask::query()->where('title', 'Launch plan')->firstOrFail();
+    $childTask = ProjectTask::query()->where('title', 'Prepare checklist')->firstOrFail();
+
+    expect($parentTask->project_id)->toBeNull()
+        ->and($parentTask->creator_user_id)->toBe($user->id)
+        ->and($parentTask->assignee_user_id)->toBe($assignee->id)
+        ->and($parentTask->coAssignees()->pluck('users.id')->all())->toBe([$coAssignee->id])
+        ->and($parentTask->chatConversation()->exists())->toBeTrue()
+        ->and($childTask->parent_task_id)->toBe($parentTask->id)
+        ->and($childTask->project_id)->toBeNull();
+
+    $response->assertSessionHasNoErrors();
+});
+
+test('project task csv import requires project member assignees', function () {
+    $owner = User::factory()->create(['email' => 'owner@example.com']);
+    $outsider = User::factory()->create(['email' => 'outsider@example.com']);
+
+    $project = Project::factory()->create([
+        'owner_user_id' => $owner->id,
+        'created_by_user_id' => $owner->id,
+        'updated_by_user_id' => $owner->id,
+    ]);
+    $project->members()->sync([$owner->id]);
+
+    $csv = <<<'CSV'
+task_key,parent_task_key,title,description,status,importance,complexity,due_at,sort_order,assignee_email,co_assignee_emails
+launch,,Launch plan,Plan the release,in_progress,high,7,,2,outsider@example.com,
+CSV;
+
+    $this->actingAs($owner)
+        ->from(route('projects.show', $project))
+        ->post(route('projects.tasks.import', $project), [
+            'file' => UploadedFile::fake()->createWithContent('project-tasks.csv', $csv),
+        ])
+        ->assertRedirect(route('projects.show', $project))
+        ->assertSessionHasErrors('file');
+
+    expect(ProjectTask::query()->where('project_id', $project->id)->count())->toBe(0)
+        ->and($outsider->email)->toBe('outsider@example.com');
+});
+
 test('standalone task can be moved across kanban stages and is closed when moved to done', function () {
     $user = User::factory()->create();
 

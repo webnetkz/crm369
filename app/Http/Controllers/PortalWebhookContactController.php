@@ -10,7 +10,6 @@ use App\Http\Resources\ApiContactResource;
 use App\Models\Contact;
 use App\Models\PortalWebhook;
 use App\Support\ContactAvatarManager;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 
 class PortalWebhookContactController extends Controller
@@ -32,9 +31,11 @@ class PortalWebhookContactController extends Controller
                 'creator:id,name,last_name',
                 'updater:id,name,last_name',
             ])
-            ->when($filters['search'] !== '', fn (Builder $query) => $this->applySearch($query, $filters['search']))
-            ->when($filters['type'] !== 'all', fn (Builder $query) => $query->where('type', $filters['type']))
+            ->when($filters['search'] !== '', fn ($query) => $query->search($filters['search']))
+            ->withBlacklistFilter($filters['blacklist'])
+            ->when($filters['type'] !== 'all', fn ($query) => $query->where('type', $filters['type']))
             ->orderBy('type')
+            ->orderBy('is_blacklisted', 'desc')
             ->orderBy('name')
             ->paginate($filters['per_page'])
             ->withQueryString();
@@ -150,20 +151,5 @@ class PortalWebhookContactController extends Controller
                 'id' => $deletedId,
             ],
         ]);
-    }
-
-    /**
-     * @param  Builder<Contact>  $query
-     */
-    private function applySearch(Builder $query, string $search): void
-    {
-        $query->where(function (Builder $searchQuery) use ($search): void {
-            $searchQuery
-                ->where('name', 'like', "%{$search}%")
-                ->orWhere('contact_person', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%")
-                ->orWhere('phone', 'like', "%{$search}%")
-                ->orWhere('position', 'like', "%{$search}%");
-        });
     }
 }

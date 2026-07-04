@@ -99,6 +99,46 @@ test('webhook contacts write permission can create update and delete contacts', 
     expect(Contact::query()->whereKey($contactId)->exists())->toBeFalse();
 });
 
+test('webhook contacts endpoints support blacklisted contacts', function () {
+    $webhook = PortalWebhook::factory()->create([
+        'permissions' => [
+            PortalWebhook::PERMISSION_CONTACTS_READ,
+            PortalWebhook::PERMISSION_CONTACTS_WRITE,
+        ],
+    ]);
+    $webhook->issueToken('contacts-blacklist-token');
+
+    $blacklisted = Contact::factory()->person()->blacklisted()->create([
+        'name' => 'Webhook Blacklisted Person',
+    ]);
+    Contact::factory()->person()->create([
+        'name' => 'Webhook Open Person',
+    ]);
+
+    $this->get(
+        route('portal-webhooks.contacts.index', $webhook)
+        .'?token=contacts-blacklist-token&blacklist='
+        .Contact::BLACKLIST_FILTER_ONLY,
+    )
+        ->assertOk()
+        ->assertJsonPath('filters.blacklist', Contact::BLACKLIST_FILTER_ONLY)
+        ->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('data.0.id', $blacklisted->id)
+        ->assertJsonPath('data.0.is_blacklisted', true);
+
+    $this->postJson(
+        route('portal-webhooks.contacts.store', $webhook).'?token=contacts-blacklist-token',
+        [
+            'type' => Contact::TYPE_PERSON,
+            'name' => 'Webhook Created Blacklisted Person',
+            'is_blacklisted' => true,
+        ],
+    )
+        ->assertCreated()
+        ->assertJsonPath('data.name', 'Webhook Created Blacklisted Person')
+        ->assertJsonPath('data.is_blacklisted', true);
+});
+
 test('webhook contacts write permission can upload and clean up avatars', function () {
     Storage::fake('public');
 

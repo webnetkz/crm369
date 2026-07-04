@@ -3,6 +3,7 @@ import {
     BadgeCheck,
     Building2,
     FileText,
+    GitBranchPlus,
     LayoutGrid,
     LockKeyhole,
     Menu,
@@ -21,6 +22,7 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import { edit as editApi } from '@/routes/settings/api';
+import { index as businessProcessesIndex } from '@/routes/settings/business-processes';
 import { index as groupsIndex } from '@/routes/settings/groups';
 import { edit as editIntegrations } from '@/routes/settings/integrations';
 import { edit as editLogs } from '@/routes/settings/logs';
@@ -130,6 +132,18 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                           title: t.value.settings.modules,
                           href: editModules(),
                           icon: LayoutGrid,
+                      },
+                  ]
+                : []),
+            ...(page.props.auth.isSuperAdmin &&
+            isVisible('settings.business-processes') &&
+            isModuleEnabled('business-processes')
+                ? [
+                      {
+                          key: 'settings.business-processes',
+                          title: t.value.settings.business_processes,
+                          href: businessProcessesIndex(),
+                          icon: GitBranchPlus,
                       },
                   ]
                 : []),

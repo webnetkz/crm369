@@ -22,6 +22,7 @@ class ApiContactResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'notes' => $this->notes,
+            'is_blacklisted' => $this->is_blacklisted,
             'avatar' => $this->avatarUrl(),
             'company_requisites' => $this->company_requisites,
             'comments' => $this->relationLoaded('comments')

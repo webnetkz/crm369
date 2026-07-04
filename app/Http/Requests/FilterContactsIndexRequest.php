@@ -24,6 +24,7 @@ class FilterContactsIndexRequest extends FormRequest
         $this->merge([
             'search' => $this->normalizeString($this->input('search')) ?? '',
             'type' => $this->normalizeString($this->input('type')) ?? 'all',
+            'blacklist' => $this->normalizeString($this->input('blacklist')) ?? Contact::BLACKLIST_FILTER_ALL,
             'per_page' => (int) $this->input('per_page', PerPageOptions::DEFAULT),
         ]);
     }
@@ -33,18 +34,20 @@ class FilterContactsIndexRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:255'],
             'type' => ['required', 'string', Rule::in(['all', ...Contact::availableTypes()])],
+            'blacklist' => ['required', 'string', Rule::in(Contact::availableBlacklistFilters())],
             'per_page' => ['required', 'integer', Rule::in(PerPageOptions::allowed())],
         ];
     }
 
     /**
-     * @return array{search: string, type: string, per_page: int}
+     * @return array{search: string, type: string, blacklist: string, per_page: int}
      */
     public function filters(): array
     {
         return [
             'search' => $this->validated('search') ?? '',
             'type' => $this->validated('type') ?? 'all',
+            'blacklist' => $this->validated('blacklist') ?? Contact::BLACKLIST_FILTER_ALL,
             'per_page' => $this->validated('per_page') ?? PerPageOptions::DEFAULT,
         ];
     }

@@ -198,6 +198,50 @@ test('api contacts validate person IIN length and uniqueness', function () {
     expect($duplicateResponse->json('errors')['company_requisites.iin'][0])->toBe(__('ui.contacts.iin_unique'));
 });
 
+test('api contacts can create and filter blacklisted contacts', function () {
+    $group = UserGroup::factory()->create([
+        'permissions' => [
+            UserGroup::PERMISSION_MANAGE_USER_ACCOUNTS,
+            UserGroup::PERMISSION_ACCESS_PERSON_CONTACTS,
+        ],
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'user_group_id' => $group->id,
+    ]);
+
+    $blacklisted = Contact::factory()->person()->blacklisted()->create([
+        'name' => 'API Blacklisted Person',
+    ]);
+    Contact::factory()->person()->create([
+        'name' => 'API Open Person',
+    ]);
+
+    $token = issueContactApiTokenFor($user, [
+        ApiAccessToken::PERMISSION_CONTACTS_READ,
+        ApiAccessToken::PERMISSION_CONTACTS_WRITE,
+    ]);
+
+    $this->withHeaders(contactApiHeaders($token))
+        ->getJson('/api/v1/contacts?blacklist='.Contact::BLACKLIST_FILTER_ONLY)
+        ->assertOk()
+        ->assertJsonPath('filters.blacklist', Contact::BLACKLIST_FILTER_ONLY)
+        ->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('data.0.id', $blacklisted->id)
+        ->assertJsonPath('data.0.is_blacklisted', true);
+
+    $this->withHeaders(contactApiHeaders($token))
+        ->postJson('/api/v1/contacts', [
+            'type' => Contact::TYPE_PERSON,
+            'name' => 'Created API Blacklisted Person',
+            'is_blacklisted' => true,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.name', 'Created API Blacklisted Person')
+        ->assertJsonPath('data.is_blacklisted', true);
+});
+
 test('api contacts can upload avatar images', function () {
     Storage::fake('public');
 
