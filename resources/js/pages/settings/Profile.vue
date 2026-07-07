@@ -12,7 +12,12 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/composables/useLanguage';
 import { getInitials } from '@/composables/useInitials';
 import { edit } from '@/routes/profile';
+import type { IssuedEquipmentSummary } from '@/types/ui';
 import { send } from '@/routes/verification';
+
+const props = defineProps<{
+    issuedEquipment: IssuedEquipmentSummary[];
+}>();
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
@@ -115,6 +120,17 @@ watchEffect(() => {
         ],
     });
 });
+
+const formatUserName = (person: {
+    name: string;
+    last_name: string | null;
+} | null): string => {
+    if (!person) {
+        return t.value.equipment.not_assigned;
+    }
+
+    return [person.name, person.last_name].filter(Boolean).join(' ');
+};
 </script>
 
 <template>
@@ -245,6 +261,67 @@ watchEffect(() => {
                 </p>
                 <InputError class="mt-2" :message="profileForm.errors.phone" />
             </div>
+
+            <section
+                v-if="props.issuedEquipment.length > 0"
+                class="space-y-4 rounded-lg border border-border p-4"
+            >
+                <Heading
+                    variant="small"
+                    :title="t.profile.issued_equipment"
+                    :description="t.profile.issued_equipment_description"
+                />
+
+                <div class="grid gap-3">
+                    <div
+                        v-for="equipmentItem in props.issuedEquipment"
+                        :key="equipmentItem.id"
+                        class="rounded-2xl border border-border bg-card p-4"
+                    >
+                        <div
+                            class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"
+                        >
+                            <div class="space-y-1">
+                                <div class="font-medium">
+                                    {{ equipmentItem.name }}
+                                </div>
+                                <div class="flex flex-wrap items-start gap-4">
+                                    <div
+                                        class="overflow-hidden rounded-lg border border-border bg-white p-2 shadow-sm"
+                                    >
+                                        <img
+                                            :src="
+                                                equipmentItem.qr_code_svg_data_uri
+                                            "
+                                            :alt="`${t.equipment.qr_code}: ${equipmentItem.qr_code}`"
+                                            class="size-24"
+                                        />
+                                    </div>
+                                    <div
+                                        class="text-sm text-muted-foreground"
+                                    >
+                                        {{ t.equipment.qr_code }}:
+                                        {{ equipmentItem.qr_code }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <span
+                                class="inline-flex w-fit rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
+                            >
+                                {{ equipmentItem.status_label }}
+                            </span>
+                        </div>
+
+                        <div
+                            class="mt-3 text-sm text-muted-foreground"
+                        >
+                            {{ t.equipment.responsible_user }}:
+                            {{ formatUserName(equipmentItem.responsible_user) }}
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             <section class="space-y-4 rounded-lg border border-border p-4">
                 <Heading

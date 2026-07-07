@@ -86,6 +86,18 @@ class PortalSetting extends Model
                 'title_key' => 'ui.production.title',
                 'description_key' => 'ui.production.description',
             ],
+            'warehouses' => [
+                'title_key' => 'ui.warehouses.title',
+                'description_key' => 'ui.warehouses.description',
+            ],
+            'tsd' => [
+                'title_key' => 'ui.tsd.title',
+                'description_key' => 'ui.tsd.description',
+            ],
+            'equipment' => [
+                'title_key' => 'ui.equipment.title',
+                'description_key' => 'ui.equipment.description',
+            ],
             'api' => [
                 'title_key' => 'ui.api.title',
                 'description_key' => 'ui.api.description',

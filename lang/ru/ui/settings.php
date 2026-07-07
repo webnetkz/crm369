@@ -35,5 +35,6 @@ return [
     'integrations' => 'Интеграции',
     'logs' => 'Логи',
     'api' => 'API',
+    'api_documentation' => 'Документация API',
     'webhooks' => 'Веб-хуки',
 ];

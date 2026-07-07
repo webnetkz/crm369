@@ -107,6 +107,7 @@ test('settings layout uses shared settings navigation for all available tabs', f
         ->and($settingsNavigation)->toContain("key: 'settings.modules'")
         ->and($settingsNavigation)->toContain("key: 'settings.integrations'")
         ->and($settingsNavigation)->toContain("key: 'settings.logs'")
+        ->and($settingsNavigation)->toContain("key: 'settings.api.documentation'")
         ->and($settingsNavigation)->toContain("key: 'settings.webhooks'")
         ->and($settingsNavigation)->toContain('page.props.auth.canViewUsers')
         ->and($settingsNavigation)->toContain('page.props.auth.isSuperAdmin')

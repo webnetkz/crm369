@@ -35,5 +35,6 @@ return [
     'integrations' => 'Integrations',
     'logs' => 'Logs',
     'api' => 'API',
+    'api_documentation' => 'API docs',
     'webhooks' => 'Webhooks',
 ];

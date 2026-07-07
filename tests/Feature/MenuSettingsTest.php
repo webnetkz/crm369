@@ -478,6 +478,26 @@ test('nav reorder handle appears after two second hover delay and renders six dr
         ->and($sidebar)->toContain('menu.order = response.order');
 });
 
+test('menu settings page exposes explicit sidebar order controls including settings', function () {
+    $menuPage = file_get_contents(resource_path('js/pages/settings/Menu.vue'));
+    $english = require lang_path('en/ui/menu.php');
+    $russian = require lang_path('ru/ui/menu.php');
+
+    expect($menuPage)->toContain('const sidebarBuiltInKeys = [')
+        ->and($menuPage)->toContain("key: 'settings'")
+        ->and($menuPage)->toContain('const orderedSidebarItems = computed<SidebarOrderItem[]>(() => {')
+        ->and($menuPage)->toContain('updateMenuOrder.url()')
+        ->and($menuPage)->toContain('@click="moveSidebarItem(item.key, \'up\')"')
+        ->and($menuPage)->toContain('@click="moveSidebarItem(item.key, \'down\')"')
+        ->and($menuPage)->toContain('t.menu.sidebar_order')
+        ->and($english['sidebar_order'])->toBe('Sidebar order')
+        ->and($english['move_up'])->toBe('Move up')
+        ->and($english['move_down'])->toBe('Move down')
+        ->and($russian['sidebar_order'])->toBe('Порядок бокового меню')
+        ->and($russian['move_up'])->toBe('Переместить вверх')
+        ->and($russian['move_down'])->toBe('Переместить вниз');
+});
+
 test('collapsed sidebar opens the parent settings item using its default href', function () {
     $navMain = file_get_contents(resource_path('js/components/NavMain.vue'));
     $sidebar = file_get_contents(resource_path('js/components/AppSidebar.vue'));

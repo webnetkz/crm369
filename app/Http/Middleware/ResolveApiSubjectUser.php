@@ -24,6 +24,7 @@ class ResolveApiSubjectUser
         'api.v1.projects.',
         'api.v1.tasks.',
         'api.v1.menu.',
+        'api.v1.equipment.',
     ];
 
     public function handle(Request $request, Closure $next): Response

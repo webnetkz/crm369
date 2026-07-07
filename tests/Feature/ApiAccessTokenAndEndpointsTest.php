@@ -59,7 +59,7 @@ test('api settings page is visible to verified users and token issuance is limit
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/Api')
             ->where('can.manage_tokens', false)
-            ->has('documentation')
+            ->has('baseUrl')
             ->has('permissions')
         );
 
@@ -82,7 +82,7 @@ test('api settings page is visible to verified users and token issuance is limit
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/Api')
             ->where('can.manage_tokens', true)
-            ->has('documentation')
+            ->has('baseUrl')
             ->has('permissions')
             ->where('tokens', [])
         );
@@ -105,6 +105,21 @@ test('api settings page is visible to verified users and token issuance is limit
             ApiAccessToken::PERMISSION_PROFILE_READ,
             ApiAccessToken::PERMISSION_MENU_WRITE,
         ]);
+});
+
+test('api documentation page is visible to verified users', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('settings.api.documentation.edit'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('settings/ApiDocumentation')
+            ->has('baseUrl')
+            ->has('documentation')
+        );
 });
 
 test('admin can create api token without expiration date and it becomes never expiring', function () {
@@ -875,6 +890,7 @@ test('api documentation marks which endpoints support the user_id query paramete
 
 test('api token settings form keeps selected permissions in the posted payload', function () {
     $apiPage = file_get_contents(resource_path('js/pages/settings/Api.vue'));
+    $apiDocumentationPage = file_get_contents(resource_path('js/pages/settings/ApiDocumentation.vue'));
 
     expect($apiPage)->toContain('never_expires: true')
         ->and($apiPage)->toContain('issuedTokenDialogOpen')
@@ -883,31 +899,35 @@ test('api token settings form keeps selected permissions in the posted payload',
         ->and($apiPage)->toContain('aria-label="API sections"')
         ->and($apiPage)->toContain("const createTokenSectionId = 'api-create-token'")
         ->and($apiPage)->toContain("const tokensSectionId = 'api-tokens'")
-        ->and($apiPage)->toContain("const documentationSectionId = 'api-documentation'")
         ->and($apiPage)->toContain(':href="`#${section.id}`"')
         ->and($apiPage)->toContain('class="rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"')
-        ->and($apiPage)->toContain('{{ t.api.target_user_overview }}')
-        ->and($apiPage)->toContain('{{ t.api.target_user }}')
-        ->and($apiPage)->toContain('{{ endpoint.target_user }}')
-        ->and($apiPage)->toContain('v-if="section.notes.length > 0"')
-        ->and($apiPage)->toContain('v-for="note in section.notes"')
-        ->and($apiPage)->toContain('const documentationSectionAnchorId = (index: number): string =>')
-        ->and($apiPage)->toContain('const documentationNavigationSections = computed(() =>')
-        ->and($apiPage)->toContain('class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start xl:gap-6"')
-        ->and($apiPage)->toContain('class="scroll-mt-24 space-y-3 rounded-2xl border border-border p-4"')
-        ->and($apiPage)->toContain('class="hidden xl:block xl:sticky xl:top-24"')
-        ->and($apiPage)->not->toContain('class="sticky top-24 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"')
-        ->and($apiPage)->not->toContain('IntersectionObserver')
-        ->and($apiPage)->not->toContain('v-show="documentationNavigationPinned"')
-        ->and($apiPage)->not->toContain('fixed top-24 right-4 z-20 w-72')
-        ->and($apiPage)->toContain('<details')
-        ->and($apiPage)->toContain('{{ t.api.documentation_blocks }}')
         ->and($apiPage)->toContain('DialogContent class="sm:max-w-lg"')
         ->and($apiPage)->toContain("form.never_expires = form.expires_at.trim() === ''")
         ->and($apiPage)->toContain('form.permissions = togglePermission(')
         ->and($apiPage)->toContain('onFlash: (flash: { apiToken?: IssuedApiToken }) =>')
         ->and($apiPage)->toContain('permissions: [] as string[]')
-        ->and($apiPage)->not->toContain(':disabled="form.never_expires"');
+        ->and($apiPage)->not->toContain(':disabled="form.never_expires"')
+        ->and($apiPage)->not->toContain("const documentationSectionId = 'api-documentation'")
+        ->and($apiDocumentationPage)->toContain("const documentationSectionId = 'api-documentation'")
+        ->and($apiDocumentationPage)->toContain('{{ t.api.target_user_overview }}')
+        ->and($apiDocumentationPage)->toContain('{{ t.api.target_user }}')
+        ->and($apiDocumentationPage)->toContain('{{ endpoint.target_user }}')
+        ->and($apiDocumentationPage)->toContain('v-if="section.notes.length > 0"')
+        ->and($apiDocumentationPage)->toContain('v-for="note in section.notes"')
+        ->and($apiDocumentationPage)->toContain('const documentationSectionAnchorId = (index: number): string =>')
+        ->and($apiDocumentationPage)->toContain('const sectionCardClass = (title: string): string =>')
+        ->and($apiDocumentationPage)->toContain('title === t.value.api.section_equipment')
+        ->and($apiDocumentationPage)->toContain("'scroll-mt-40 space-y-3 rounded-2xl border border-border p-4'")
+        ->and($apiDocumentationPage)->toContain('const documentationNavigationSections = computed(() =>')
+        ->and($apiDocumentationPage)->toContain('class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start xl:gap-6"')
+        ->and($apiDocumentationPage)->toContain("'scroll-mt-32 space-y-3 rounded-2xl border border-border p-4'")
+        ->and($apiDocumentationPage)->toContain('class="hidden xl:block xl:sticky xl:top-32"')
+        ->and($apiDocumentationPage)->not->toContain('class="sticky top-24 z-10 rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"')
+        ->and($apiDocumentationPage)->not->toContain('IntersectionObserver')
+        ->and($apiDocumentationPage)->not->toContain('v-show="documentationNavigationPinned"')
+        ->and($apiDocumentationPage)->not->toContain('fixed top-24 right-4 z-20 w-72')
+        ->and($apiDocumentationPage)->toContain('<details')
+        ->and($apiDocumentationPage)->toContain('{{ t.api.documentation_blocks }}');
 });
 
 test('checkbox component supports checked-style bindings used by settings forms', function () {

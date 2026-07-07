@@ -160,6 +160,15 @@ class User extends Authenticatable implements PasskeyUser
             ->orderByDesc('id');
     }
 
+    /**
+     * @return HasMany<EquipmentItem, $this>
+     */
+    public function issuedEquipmentItems(): HasMany
+    {
+        return $this->hasMany(EquipmentItem::class, 'issued_to_user_id')
+            ->ordered();
+    }
+
     public function isSuperAdmin(): bool
     {
         $superAdminEmail = config('admin.super_admin_email');

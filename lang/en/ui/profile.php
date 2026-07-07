@@ -11,6 +11,8 @@ return [
     'phone_help' => 'Use a Kazakhstan number in +7 format.',
     'phone_placeholder' => '+7 777 123 45 67',
     'language_updated' => 'Language updated.',
+    'issued_equipment' => 'Issued equipment',
+    'issued_equipment_description' => 'Equipment that is currently assigned to your profile.',
     'update_profile' => 'Profile',
     'update_profile_description' => 'Update your name and email address',
     'verification_link_sent' => 'A new verification link has been sent to your email address.',

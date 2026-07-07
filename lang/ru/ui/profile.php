@@ -11,6 +11,8 @@ return [
     'phone_help' => 'Используйте номер Казахстана в формате +7.',
     'phone_placeholder' => '+7 777 123 45 67',
     'language_updated' => 'Язык обновлён.',
+    'issued_equipment' => 'Выданное оборудование',
+    'issued_equipment_description' => 'Оборудование, которое сейчас закреплено за вашим профилем.',
     'update_profile' => 'Профиль',
     'update_profile_description' => 'Обновите имя и адрес электронной почты',
     'verification_link_sent' => 'Новая ссылка для подтверждения отправлена на вашу электронную почту.',

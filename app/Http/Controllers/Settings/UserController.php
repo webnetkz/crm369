@@ -20,6 +20,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Lang;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,7 +33,10 @@ class UserController extends Controller
         $filters = $request->filters();
 
         $users = User::query()
-            ->with('group:id,name')
+            ->with([
+                'group:id,name',
+                ...$this->issuedEquipmentRelations(),
+            ])
             ->select([
                 'id',
                 'name',
@@ -102,7 +106,10 @@ class UserController extends Controller
     public function show(User $user, ManagedUserProfileData $managedUserProfileData): JsonResponse
     {
         return response()->json([
-            'data' => $managedUserProfileData->serialize($user->load('group:id,name')),
+            'data' => $managedUserProfileData->serialize($user->load([
+                'group:id,name',
+                ...$this->issuedEquipmentRelations(),
+            ])),
             'canEdit' => $managedUserProfileData->canEdit(request()->user(), $user),
         ]);
     }
@@ -249,5 +256,30 @@ class UserController extends Controller
         return $group->name === UserGroup::ADMINISTRATORS_NAME
             ? Lang::get('ui.admin.administrators_group', [], $locale)
             : $group->name;
+    }
+
+    /**
+     * @return array<int|string, mixed>
+     */
+    private function issuedEquipmentRelations(): array
+    {
+        if (! PortalSetting::current()->isModuleEnabled('equipment') || ! Schema::hasTable('equipment_items')) {
+            return [];
+        }
+
+        return [
+            'issuedEquipmentItems' => fn ($query) => $query
+                ->select([
+                    'id',
+                    'name',
+                    'qr_code',
+                    'status',
+                    'issued_to_user_id',
+                    'responsible_user_id',
+                    'updated_at',
+                ])
+                ->with('responsibleUser:id,name,last_name,email')
+                ->ordered(),
+        ];
     }
 }

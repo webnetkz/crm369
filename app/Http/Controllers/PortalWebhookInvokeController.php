@@ -5,11 +5,15 @@ namespace App\Http\Controllers;
 use App\Concerns\EnsuresContactsTableIsReady;
 use App\Http\Resources\ApiContactResource;
 use App\Http\Resources\ApiEdoDocumentResource;
+use App\Http\Resources\ApiEquipmentResource;
 use App\Http\Resources\ApiUserResource;
+use App\Http\Resources\ApiWarehouseResource;
 use App\Models\Contact;
 use App\Models\EdoDocument;
+use App\Models\EquipmentItem;
 use App\Models\PortalWebhook;
 use App\Models\User;
+use App\Models\Warehouse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,6 +36,8 @@ class PortalWebhookInvokeController extends Controller
             'users' => $this->usersPayload($resolvedWebhook),
             'contacts' => $this->contactsPayload($resolvedWebhook),
             'edo_documents' => $this->edoPayload($resolvedWebhook),
+            'equipment_items' => $this->equipmentPayload($resolvedWebhook),
+            'warehouses' => $this->warehousesPayload($resolvedWebhook),
             'endpoints' => $this->availableEndpoints($resolvedWebhook, $plainTextToken),
         ]);
     }
@@ -97,6 +103,62 @@ class PortalWebhookInvokeController extends Controller
                 'public_link_template' => route('portal-webhooks.edo.public-link.store', [
                     'portalWebhook' => $portalWebhook,
                     'edoDocument' => '__EDO_DOCUMENT_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_EQUIPMENT_READ)) {
+            $endpoints['equipment'] = [
+                'index' => route('portal-webhooks.equipment.index', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'show_template' => route('portal-webhooks.equipment.show', [
+                    'portalWebhook' => $portalWebhook,
+                    'equipmentItem' => '__EQUIPMENT_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_EQUIPMENT_WRITE)) {
+            $endpoints['equipment_write'] = [
+                'store' => route('portal-webhooks.equipment.store', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'update_template' => route('portal-webhooks.equipment.update', [
+                    'portalWebhook' => $portalWebhook,
+                    'equipmentItem' => '__EQUIPMENT_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_TSD_READ)) {
+            $endpoints['tsd'] = [
+                'index' => route('portal-webhooks.tsd.index', $portalWebhook).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_TSD_WRITE)) {
+            $endpoints['tsd_write'] = [
+                'store' => route('portal-webhooks.tsd.store', $portalWebhook).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_WAREHOUSES_READ)) {
+            $endpoints['warehouses'] = [
+                'index' => route('portal-webhooks.warehouses.index', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'show_template' => route('portal-webhooks.warehouses.show', [
+                    'portalWebhook' => $portalWebhook,
+                    'warehouse' => '__WAREHOUSE_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_WAREHOUSES_WRITE)) {
+            $endpoints['warehouses_write'] = [
+                'store' => route('portal-webhooks.warehouses.store', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'update_template' => route('portal-webhooks.warehouses.update', [
+                    'portalWebhook' => $portalWebhook,
+                    'warehouse' => '__WAREHOUSE_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+                'destroy_template' => route('portal-webhooks.warehouses.destroy', [
+                    'portalWebhook' => $portalWebhook,
+                    'warehouse' => '__WAREHOUSE_ID__',
                 ]).'?token='.urlencode($plainTextToken),
             ];
         }
@@ -188,6 +250,51 @@ class PortalWebhookInvokeController extends Controller
             ->orderByDesc('id')
             ->get()
             ->map(fn (EdoDocument $document): array => (new ApiEdoDocumentResource($document))->resolve())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function equipmentPayload(PortalWebhook $portalWebhook): ?array
+    {
+        if (! $portalWebhook->hasPermission(PortalWebhook::PERMISSION_EQUIPMENT_READ)) {
+            return null;
+        }
+
+        return EquipmentItem::query()
+            ->with([
+                'issuedToUser:id,name,last_name,email',
+                'responsibleUser:id,name,last_name,email',
+                'createdByUser:id,name,last_name,email',
+                'updatedByUser:id,name,last_name,email',
+            ])
+            ->ordered()
+            ->get()
+            ->map(fn (EquipmentItem $equipmentItem): array => (new ApiEquipmentResource($equipmentItem))->resolve())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function warehousesPayload(PortalWebhook $portalWebhook): ?array
+    {
+        if (! $portalWebhook->hasPermission(PortalWebhook::PERMISSION_WAREHOUSES_READ)) {
+            return null;
+        }
+
+        return Warehouse::query()
+            ->with([
+                'creator:id,name,last_name',
+                'updater:id,name,last_name',
+                'rows.columns.floors.places',
+            ])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Warehouse $warehouse): array => (new ApiWarehouseResource($warehouse))->resolve())
             ->values()
             ->all();
     }

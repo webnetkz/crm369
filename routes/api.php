@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\EdoDocumentController as ApiEdoDocumentController;
+use App\Http\Controllers\Api\V1\EquipmentController;
 use App\Http\Controllers\Api\V1\KnowledgeBaseController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\MessengerIntegrationController;
@@ -11,8 +12,10 @@ use App\Http\Controllers\Api\V1\PortalController;
 use App\Http\Controllers\Api\V1\PortalWebhookController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\ProjectController;
+use App\Http\Controllers\Api\V1\TsdController as ApiTsdController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\UserGroupController;
+use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Middleware\ResolveApiSubjectUser;
 use Illuminate\Support\Facades\Route;
 
@@ -150,6 +153,48 @@ Route::prefix('v1')->middleware(['module.enabled:api', 'auth:api', ResolveApiSub
         Route::delete('tasks/{projectTask}', [ProjectController::class, 'destroyTask'])
             ->middleware('api.token:tasks.write')
             ->name('api.v1.tasks.destroy');
+    });
+
+    Route::middleware('module.enabled:warehouses')->group(function (): void {
+        Route::get('warehouses', [WarehouseController::class, 'index'])
+            ->middleware('api.token:warehouses.read')
+            ->name('api.v1.warehouses.index');
+        Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show'])
+            ->middleware('api.token:warehouses.read')
+            ->name('api.v1.warehouses.show');
+        Route::post('warehouses', [WarehouseController::class, 'store'])
+            ->middleware('api.token:warehouses.write')
+            ->name('api.v1.warehouses.store');
+        Route::patch('warehouses/{warehouse}', [WarehouseController::class, 'update'])
+            ->middleware('api.token:warehouses.write')
+            ->name('api.v1.warehouses.update');
+        Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])
+            ->middleware('api.token:warehouses.write')
+            ->name('api.v1.warehouses.destroy');
+    });
+
+    Route::middleware('module.enabled:equipment')->group(function (): void {
+        Route::get('equipment', [EquipmentController::class, 'index'])
+            ->middleware('api.token:equipment.read')
+            ->name('api.v1.equipment.index');
+        Route::get('equipment/{equipmentItem}', [EquipmentController::class, 'show'])
+            ->middleware('api.token:equipment.read')
+            ->name('api.v1.equipment.show');
+        Route::post('equipment', [EquipmentController::class, 'store'])
+            ->middleware('api.token:equipment.write')
+            ->name('api.v1.equipment.store');
+        Route::patch('equipment/{equipmentItem}', [EquipmentController::class, 'update'])
+            ->middleware('api.token:equipment.write')
+            ->name('api.v1.equipment.update');
+    });
+
+    Route::middleware('module.enabled:tsd')->group(function (): void {
+        Route::get('tsd/scans', [ApiTsdController::class, 'index'])
+            ->middleware('api.token:tsd.read')
+            ->name('api.v1.tsd.index');
+        Route::post('tsd/scans', [ApiTsdController::class, 'store'])
+            ->middleware('api.token:tsd.write')
+            ->name('api.v1.tsd.store');
     });
 
     Route::get('users', [UserController::class, 'index'])

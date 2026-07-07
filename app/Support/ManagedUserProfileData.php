@@ -2,7 +2,9 @@
 
 namespace App\Support;
 
+use App\Models\EquipmentItem;
 use App\Models\User;
+use Illuminate\Support\Collection;
 
 class ManagedUserProfileData
 {
@@ -29,6 +31,7 @@ class ManagedUserProfileData
             'is_super_admin' => $user->isSuperAdmin(),
             'is_active' => $user->is_active,
             'deactivated_at' => $user->deactivated_at?->toISOString(),
+            'issued_equipment' => $this->serializeIssuedEquipment($user),
             'group' => $group
                 ? [
                     'id' => $group->id,
@@ -37,6 +40,43 @@ class ManagedUserProfileData
                 ]
                 : null,
         ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function serializeIssuedEquipment(User $user): array
+    {
+        /** @var Collection<int, EquipmentItem> $equipmentItems */
+        $equipmentItems = $user->relationLoaded('issuedEquipmentItems')
+            ? $user->issuedEquipmentItems
+            : $user->issuedEquipmentItems()
+                ->with('responsibleUser:id,name,last_name,email')
+                ->get();
+
+        return $equipmentItems
+            ->map(fn (EquipmentItem $equipmentItem): array => [
+                'id' => $equipmentItem->id,
+                'name' => $equipmentItem->name,
+                'qr_code' => $equipmentItem->qr_code,
+                'qr_code_svg_data_uri' => $equipmentItem->qrCodeSvgDataUri(),
+                'status' => $equipmentItem->status,
+                'status_label' => __(
+                    EquipmentItem::statusDefinitions()[$equipmentItem->status]['label_key']
+                        ?? 'ui.equipment.statuses.on_balance',
+                ),
+                'updated_at' => $equipmentItem->updated_at?->toISOString(),
+                'responsible_user' => $equipmentItem->responsibleUser
+                    ? [
+                        'id' => $equipmentItem->responsibleUser->id,
+                        'name' => $equipmentItem->responsibleUser->name,
+                        'last_name' => $equipmentItem->responsibleUser->last_name,
+                        'email' => $equipmentItem->responsibleUser->email,
+                    ]
+                    : null,
+            ])
+            ->values()
+            ->all();
     }
 
     public function canEdit(?User $viewer, User $user): bool

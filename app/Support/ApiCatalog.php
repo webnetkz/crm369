@@ -105,6 +105,38 @@ class ApiCatalog
                 ],
             ],
             [
+                'title' => __('ui.api.section_equipment'),
+                'description' => __('ui.api.section_equipment_description'),
+                'notes' => [],
+                'endpoints' => [
+                    $this->endpoint('GET', '/api/v1/equipment', 'ui.api.endpoint_equipment_index', ApiAccessToken::PERMISSION_EQUIPMENT_READ, 'ui.api.access_scope_based'),
+                    $this->endpoint('GET', '/api/v1/equipment/{equipmentItem}', 'ui.api.endpoint_equipment_show', ApiAccessToken::PERMISSION_EQUIPMENT_READ, 'ui.api.access_scope_based'),
+                    $this->endpoint('POST', '/api/v1/equipment', 'ui.api.endpoint_equipment_store', ApiAccessToken::PERMISSION_EQUIPMENT_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('PATCH', '/api/v1/equipment/{equipmentItem}', 'ui.api.endpoint_equipment_update', ApiAccessToken::PERMISSION_EQUIPMENT_WRITE, 'ui.api.access_scope_based'),
+                ],
+            ],
+            [
+                'title' => __('ui.api.section_warehouses'),
+                'description' => __('ui.api.section_warehouses_description'),
+                'notes' => [],
+                'endpoints' => [
+                    $this->endpoint('GET', '/api/v1/warehouses', 'ui.api.endpoint_warehouses_index', ApiAccessToken::PERMISSION_WAREHOUSES_READ, 'ui.api.access_scope_based'),
+                    $this->endpoint('GET', '/api/v1/warehouses/{warehouse}', 'ui.api.endpoint_warehouses_show', ApiAccessToken::PERMISSION_WAREHOUSES_READ, 'ui.api.access_scope_based'),
+                    $this->endpoint('POST', '/api/v1/warehouses', 'ui.api.endpoint_warehouses_store', ApiAccessToken::PERMISSION_WAREHOUSES_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('PATCH', '/api/v1/warehouses/{warehouse}', 'ui.api.endpoint_warehouses_update', ApiAccessToken::PERMISSION_WAREHOUSES_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('DELETE', '/api/v1/warehouses/{warehouse}', 'ui.api.endpoint_warehouses_destroy', ApiAccessToken::PERMISSION_WAREHOUSES_WRITE, 'ui.api.access_scope_based'),
+                ],
+            ],
+            [
+                'title' => __('ui.api.section_tsd'),
+                'description' => __('ui.api.section_tsd_description'),
+                'notes' => [],
+                'endpoints' => [
+                    $this->endpoint('GET', '/api/v1/tsd/scans', 'ui.api.endpoint_tsd_index', ApiAccessToken::PERMISSION_TSD_READ, 'ui.api.access_scope_based'),
+                    $this->endpoint('POST', '/api/v1/tsd/scans', 'ui.api.endpoint_tsd_store', ApiAccessToken::PERMISSION_TSD_WRITE, 'ui.api.access_scope_based'),
+                ],
+            ],
+            [
                 'title' => __('ui.api.section_users'),
                 'description' => __('ui.api.section_users_description'),
                 'notes' => [],

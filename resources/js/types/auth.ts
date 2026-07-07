@@ -1,3 +1,5 @@
+import type { IssuedEquipmentSummary } from '@/types/ui';
+
 export type UserGroupSummary = {
     id: number;
     name: string;
@@ -27,6 +29,7 @@ export type User = {
     is_active?: boolean;
     deactivated_at?: string | null;
     two_factor_enabled?: boolean;
+    issued_equipment?: IssuedEquipmentSummary[];
     created_at: string;
     updated_at: string;
     [key: string]: unknown;

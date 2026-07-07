@@ -82,11 +82,22 @@ type WebhookDocumentation = {
     contacts_store_url: string;
     contacts_update_url: string;
     contacts_destroy_url: string;
+    equipment_index_url: string;
+    equipment_show_url: string;
+    equipment_store_url: string;
+    equipment_update_url: string;
     edo_index_url: string;
     edo_show_url: string;
     edo_store_url: string;
     edo_update_url: string;
     edo_public_link_url: string;
+    tsd_index_url: string;
+    tsd_store_url: string;
+    warehouses_index_url: string;
+    warehouses_show_url: string;
+    warehouses_store_url: string;
+    warehouses_update_url: string;
+    warehouses_destroy_url: string;
 };
 
 type DraftWebhook = {
@@ -179,8 +190,14 @@ const webhookHeaderValue = (token: string): string => {
 const PortalWebhookUsersReadPermission = 'users.read';
 const PortalWebhookContactsReadPermission = 'contacts.read';
 const PortalWebhookContactsWritePermission = 'contacts.write';
+const PortalWebhookEquipmentReadPermission = 'equipment.read';
+const PortalWebhookEquipmentWritePermission = 'equipment.write';
 const PortalWebhookEdoReadPermission = 'edo.read';
 const PortalWebhookEdoWritePermission = 'edo.write';
+const PortalWebhookTsdReadPermission = 'tsd.read';
+const PortalWebhookTsdWritePermission = 'tsd.write';
+const PortalWebhookWarehousesReadPermission = 'warehouses.read';
+const PortalWebhookWarehousesWritePermission = 'warehouses.write';
 const tokenQueryValue = '{token}';
 const existingSectionId = 'webhook-existing';
 const createSectionId = 'webhook-create';
@@ -260,6 +277,34 @@ const endpointExamples = computed(() => [
     },
     {
         method: 'GET',
+        path: `${props.documentation.equipment_index_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_equipment_index_title,
+        description: t.value.webhooks.documentation_endpoint_equipment_index_description,
+        permission: PortalWebhookEquipmentReadPermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.equipment_show_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_equipment_show_title,
+        description: t.value.webhooks.documentation_endpoint_equipment_show_description,
+        permission: PortalWebhookEquipmentReadPermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.equipment_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_equipment_store_title,
+        description: t.value.webhooks.documentation_endpoint_equipment_store_description,
+        permission: PortalWebhookEquipmentWritePermission,
+    },
+    {
+        method: 'PATCH',
+        path: `${props.documentation.equipment_update_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_equipment_update_title,
+        description: t.value.webhooks.documentation_endpoint_equipment_update_description,
+        permission: PortalWebhookEquipmentWritePermission,
+    },
+    {
+        method: 'GET',
         path: `${props.documentation.edo_index_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_edo_index_title,
         description: t.value.webhooks.documentation_endpoint_edo_index_description,
@@ -292,6 +337,60 @@ const endpointExamples = computed(() => [
         title: t.value.webhooks.documentation_endpoint_edo_public_link_title,
         description: t.value.webhooks.documentation_endpoint_edo_public_link_description,
         permission: PortalWebhookEdoWritePermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.tsd_index_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_tsd_index_title,
+        description: t.value.webhooks.documentation_endpoint_tsd_index_description,
+        permission: PortalWebhookTsdReadPermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.tsd_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_tsd_store_title,
+        description: t.value.webhooks.documentation_endpoint_tsd_store_description,
+        permission: PortalWebhookTsdWritePermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.warehouses_index_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_warehouses_index_title,
+        description:
+            t.value.webhooks.documentation_endpoint_warehouses_index_description,
+        permission: PortalWebhookWarehousesReadPermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.warehouses_show_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_warehouses_show_title,
+        description:
+            t.value.webhooks.documentation_endpoint_warehouses_show_description,
+        permission: PortalWebhookWarehousesReadPermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.warehouses_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_warehouses_store_title,
+        description:
+            t.value.webhooks.documentation_endpoint_warehouses_store_description,
+        permission: PortalWebhookWarehousesWritePermission,
+    },
+    {
+        method: 'PATCH',
+        path: `${props.documentation.warehouses_update_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_warehouses_update_title,
+        description:
+            t.value.webhooks.documentation_endpoint_warehouses_update_description,
+        permission: PortalWebhookWarehousesWritePermission,
+    },
+    {
+        method: 'DELETE',
+        path: `${props.documentation.warehouses_destroy_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_warehouses_destroy_title,
+        description:
+            t.value.webhooks.documentation_endpoint_warehouses_destroy_description,
+        permission: PortalWebhookWarehousesWritePermission,
     },
 ]);
 

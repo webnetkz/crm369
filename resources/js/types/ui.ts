@@ -550,6 +550,22 @@ export type UserGroupOption = {
     display_name: string;
 };
 
+export type IssuedEquipmentSummary = {
+    id: number;
+    name: string;
+    qr_code: string;
+    qr_code_svg_data_uri: string;
+    status: string;
+    status_label: string;
+    updated_at: string | null;
+    responsible_user: {
+        id: number;
+        name: string;
+        last_name: string | null;
+        email: string;
+    } | null;
+};
+
 export type ManagedUserProfile = {
     id: number;
     name: string;
@@ -564,6 +580,7 @@ export type ManagedUserProfile = {
     is_super_admin: boolean;
     is_active: boolean;
     deactivated_at: string | null;
+    issued_equipment: IssuedEquipmentSummary[];
     group: UserGroupOption | null;
 };
 

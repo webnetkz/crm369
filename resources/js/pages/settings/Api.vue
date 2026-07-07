@@ -7,12 +7,7 @@ import {
     usePage,
 } from '@inertiajs/vue3';
 import { BookText, Copy, KeyRound, ShieldCheck, Trash2 } from '@lucide/vue';
-import {
-    computed,
-    ref,
-    watch,
-    watchEffect,
-} from 'vue';
+import { computed, ref, watch, watchEffect } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -50,23 +45,6 @@ type TokenRow = {
     created_at: string | null;
 };
 
-type DocumentationEndpoint = {
-    method: string;
-    path: string;
-    summary: string;
-    permission: string;
-    access: string;
-    content_type: string;
-    target_user: string;
-};
-
-type DocumentationSection = {
-    title: string;
-    description: string;
-    notes: string[];
-    endpoints: DocumentationEndpoint[];
-};
-
 type IssuedApiToken = {
     name: string;
     token: string;
@@ -84,7 +62,6 @@ const props = defineProps<{
         manage_tokens: boolean;
     };
     baseUrl: string;
-    documentation: DocumentationSection[];
     permissions: PermissionOption[];
     tokens: TokenRow[];
 }>();
@@ -92,6 +69,7 @@ const props = defineProps<{
 const page = usePage<PageProps>();
 const { language, t } = useLanguage();
 const copiedToken = ref(false);
+
 const readFlashApiToken = (): IssuedApiToken => {
     const flashFromPage = (page as typeof page & {
         flash?: { apiToken?: IssuedApiToken };
@@ -114,9 +92,6 @@ const issuedToken = ref<IssuedApiToken>(readFlashApiToken());
 const issuedTokenDialogOpen = ref(issuedToken.value !== null);
 const createTokenSectionId = 'api-create-token';
 const tokensSectionId = 'api-tokens';
-const documentationSectionId = 'api-documentation';
-const documentationSectionAnchorId = (index: number): string =>
-    `api-doc-section-${index + 1}`;
 
 const form = useForm({
     name: '',
@@ -145,35 +120,21 @@ watch(
 );
 
 const navigationSections = computed(() => {
-    const sections = [];
-
-    if (props.can.manage_tokens) {
-        sections.push(
-            {
-                id: createTokenSectionId,
-                title: t.value.api.create_token,
-            },
-            {
-                id: tokensSectionId,
-                title: t.value.api.active_tokens,
-            },
-        );
+    if (!props.can.manage_tokens) {
+        return [];
     }
 
-    sections.push({
-        id: documentationSectionId,
-        title: t.value.api.documentation_title,
-    });
-
-    return sections;
+    return [
+        {
+            id: createTokenSectionId,
+            title: t.value.api.create_token,
+        },
+        {
+            id: tokensSectionId,
+            title: t.value.api.active_tokens,
+        },
+    ];
 });
-
-const documentationNavigationSections = computed(() =>
-    props.documentation.map((section, index) => ({
-        id: documentationSectionAnchorId(index),
-        title: section.title,
-    })),
-);
 
 const togglePermission = (
     permissions: string[],
@@ -303,7 +264,7 @@ const formatDateTime = (value: string | null): string => {
         <Heading
             variant="small"
             :title="t.api.title"
-            :description="t.api.description"
+            :description="t.api.token_management_description"
         />
 
         <section class="space-y-4 rounded-2xl border border-border p-5">
@@ -316,10 +277,6 @@ const formatDateTime = (value: string | null): string => {
                 {{ t.api.overview_description }}
             </p>
 
-            <p class="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
-                {{ t.api.target_user_overview }}
-            </p>
-
             <div class="grid gap-2">
                 <Label>{{ t.api.base_url }}</Label>
                 <Input :model-value="props.baseUrl" readonly />
@@ -327,6 +284,7 @@ const formatDateTime = (value: string | null): string => {
         </section>
 
         <nav
+            v-if="navigationSections.length"
             aria-label="API sections"
             class="rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"
         >
@@ -342,10 +300,7 @@ const formatDateTime = (value: string | null): string => {
             </div>
         </nav>
 
-        <section
-            v-if="props.can.manage_tokens"
-            class="space-y-6 rounded-2xl border border-border p-5"
-        >
+        <section class="space-y-6 rounded-2xl border border-border p-5">
             <Heading
                 variant="small"
                 :title="t.api.token_management"
@@ -353,6 +308,7 @@ const formatDateTime = (value: string | null): string => {
             />
 
             <form
+                v-if="props.can.manage_tokens"
                 :id="createTokenSectionId"
                 class="scroll-mt-6 space-y-6 rounded-2xl border border-border p-4"
                 @submit.prevent="submit"
@@ -427,7 +383,15 @@ const formatDateTime = (value: string | null): string => {
                 </Button>
             </form>
 
+            <div
+                v-else
+                class="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground"
+            >
+                {{ t.api.token_management_description }}
+            </div>
+
             <section
+                v-if="props.can.manage_tokens"
                 :id="tokensSectionId"
                 class="scroll-mt-6 space-y-3"
             >
@@ -532,168 +496,6 @@ const formatDateTime = (value: string | null): string => {
                     {{ t.api.no_tokens }}
                 </div>
             </section>
-        </section>
-
-        <section
-            :id="documentationSectionId"
-            class="scroll-mt-6 space-y-4 rounded-2xl border border-border p-5"
-        >
-            <Heading
-                variant="small"
-                :title="t.api.documentation_title"
-                :description="t.api.documentation_description"
-            />
-
-            <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start xl:gap-6">
-                <details
-                    open
-                    class="rounded-2xl border border-border bg-background/95 p-4 shadow-sm xl:hidden"
-                >
-                    <summary class="cursor-pointer list-none text-sm font-semibold">
-                        {{ t.api.documentation_blocks }}
-                    </summary>
-
-                    <div class="mt-4 grid gap-2">
-                        <a
-                            v-for="section in documentationNavigationSections"
-                            :key="section.id"
-                            :href="`#${section.id}`"
-                            class="rounded-xl border border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
-                        >
-                            {{ section.title }}
-                        </a>
-                    </div>
-                </details>
-
-                <div class="space-y-4">
-                    <div
-                        v-for="(section, index) in props.documentation"
-                        :id="documentationSectionAnchorId(index)"
-                        :key="section.title"
-                        class="scroll-mt-24 space-y-3 rounded-2xl border border-border p-4"
-                    >
-                        <div>
-                            <h2 class="text-base font-semibold">{{ section.title }}</h2>
-                            <p class="text-sm text-muted-foreground">
-                                {{ section.description }}
-                            </p>
-                        </div>
-
-                        <div
-                            v-if="section.notes.length > 0"
-                            class="grid gap-2 rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground"
-                        >
-                            <p
-                                v-for="note in section.notes"
-                                :key="note"
-                            >
-                                {{ note }}
-                            </p>
-                        </div>
-
-                        <div class="overflow-x-auto rounded-2xl border border-border">
-                            <table class="w-full min-w-[1260px] text-sm">
-                                <thead class="bg-muted/50 text-left">
-                                    <tr>
-                                        <th
-                                            class="border-r border-border px-4 py-3 font-medium"
-                                        >
-                                            {{ t.api.method }}
-                                        </th>
-                                        <th
-                                            class="border-r border-border px-4 py-3 font-medium"
-                                        >
-                                            {{ t.api.path }}
-                                        </th>
-                                        <th
-                                            class="border-r border-border px-4 py-3 font-medium"
-                                        >
-                                            {{ t.api.summary }}
-                                        </th>
-                                        <th
-                                            class="border-r border-border px-4 py-3 font-medium"
-                                        >
-                                            {{ t.api.permission }}
-                                        </th>
-                                        <th
-                                            class="border-r border-border px-4 py-3 font-medium"
-                                        >
-                                            {{ t.api.access }}
-                                        </th>
-                                        <th
-                                            class="border-r border-border px-4 py-3 font-medium"
-                                        >
-                                            {{ t.api.target_user }}
-                                        </th>
-                                        <th class="px-4 py-3 font-medium">
-                                            {{ t.api.content_type }}
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-border">
-                                    <tr
-                                        v-for="endpoint in section.endpoints"
-                                        :key="`${endpoint.method}-${endpoint.path}`"
-                                    >
-                                        <td
-                                            class="border-r border-border px-4 py-3 font-medium"
-                                        >
-                                            {{ endpoint.method }}
-                                        </td>
-                                        <td
-                                            class="border-r border-border px-4 py-3 font-mono text-xs"
-                                        >
-                                            {{ endpoint.path }}
-                                        </td>
-                                        <td class="border-r border-border px-4 py-3">
-                                            {{ endpoint.summary }}
-                                        </td>
-                                        <td
-                                            class="border-r border-border px-4 py-3 font-mono text-xs"
-                                        >
-                                            {{ endpoint.permission }}
-                                        </td>
-                                        <td
-                                            class="border-r border-border px-4 py-3 text-muted-foreground"
-                                        >
-                                            {{ endpoint.access }}
-                                        </td>
-                                        <td
-                                            class="border-r border-border px-4 py-3 text-xs text-muted-foreground"
-                                        >
-                                            {{ endpoint.target_user }}
-                                        </td>
-                                        <td class="px-4 py-3 font-mono text-xs">
-                                            {{ endpoint.content_type }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <aside class="hidden xl:block xl:sticky xl:top-24">
-                    <div
-                        class="rounded-2xl border border-border bg-background/95 p-4 shadow-sm supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur"
-                    >
-                        <div class="text-sm font-semibold">
-                            {{ t.api.documentation_blocks }}
-                        </div>
-
-                        <div class="mt-4 grid gap-2">
-                            <a
-                                v-for="section in documentationNavigationSections"
-                                :key="section.id"
-                                :href="`#${section.id}`"
-                                class="rounded-xl border border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
-                            >
-                                {{ section.title }}
-                            </a>
-                        </div>
-                    </div>
-                </aside>
-            </div>
         </section>
     </div>
 </template>

@@ -1,9 +1,11 @@
 <?php
 
+use App\Models\EquipmentItem;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('profile page is displayed', function () {
     $user = User::factory()->create();
@@ -13,6 +15,34 @@ test('profile page is displayed', function () {
         ->get(route('profile.edit'));
 
     $response->assertOk();
+});
+
+test('profile page shows issued equipment assigned to the current user', function () {
+    $user = User::factory()->create();
+    $responsibleUser = User::factory()->create([
+        'name' => 'Responsible',
+        'last_name' => 'Manager',
+    ]);
+
+    EquipmentItem::factory()->issued()->create([
+        'name' => 'Profile Laptop',
+        'qr_code' => 'EQ-PROFILE-01',
+        'issued_to_user_id' => $user->id,
+        'responsible_user_id' => $responsibleUser->id,
+        'created_by_user_id' => $responsibleUser->id,
+        'updated_by_user_id' => $responsibleUser->id,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('profile.edit'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('settings/Profile')
+            ->where('issuedEquipment.0.name', 'Profile Laptop')
+            ->where('issuedEquipment.0.qr_code', 'EQ-PROFILE-01')
+            ->where('issuedEquipment.0.qr_code_svg_data_uri', fn (string $value): bool => str_starts_with($value, 'data:image/svg+xml;utf8,'))
+            ->where('issuedEquipment.0.responsible_user.name', 'Responsible')
+        );
 });
 
 test('profile page does not expose account deletion UI', function () {
@@ -101,6 +131,9 @@ test('profile page exposes last name and phone fields', function () {
     expect($profilePage)
         ->toContain('profileForm.last_name')
         ->toContain('profileForm.phone')
+        ->toContain('props.issuedEquipment.length > 0')
+        ->toContain('t.profile.issued_equipment')
+        ->toContain('equipmentItem.qr_code_svg_data_uri')
         ->toContain('autocomplete="family-name"')
         ->toContain('autocomplete="tel"');
 });

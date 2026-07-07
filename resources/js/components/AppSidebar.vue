@@ -3,6 +3,7 @@ import { Link, usePage } from '@inertiajs/vue3';
 import {
     BellRing,
     BookOpenText,
+    Boxes,
     ClipboardList,
     FileText,
     Factory,
@@ -10,6 +11,8 @@ import {
     LayoutDashboard,
     MessageSquareMore,
     Newspaper,
+    Package,
+    QrCode,
     Settings,
     ListTodo,
     Users,
@@ -43,6 +46,7 @@ import { index as edoIndex } from '@/routes/edo';
 import { index as formsIndex } from '@/routes/forms';
 import { index as newsIndex } from '@/routes/news';
 import { index as notificationsIndex } from '@/routes/notifications';
+import { index as equipmentIndex } from '@/routes/equipment';
 import {
     index as productionIndex,
     show as showProductionSection,
@@ -51,6 +55,8 @@ import { index as projectsIndex } from '@/routes/projects';
 import { edit as editMenu } from '@/routes/settings/menu';
 import { update as updateMenuOrder } from '@/routes/settings/menu/order';
 import { index as tasksIndex } from '@/routes/tasks';
+import { index as tsdIndex } from '@/routes/tsd';
+import { index as warehousesIndex } from '@/routes/warehouses';
 import type { MenuCustomItem, MenuKnowledgeBaseItem, NavItem } from '@/types';
 
 const page = usePage();
@@ -261,6 +267,36 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                               href: showProductionSection('quality-control'),
                           },
                       ],
+                  },
+              ]
+            : []),
+        ...(isMenuItemVisible('warehouses')
+            ? [
+                  {
+                      key: 'warehouses',
+                      title: t.value.warehouses.title,
+                      href: warehousesIndex(),
+                      icon: Boxes,
+                  },
+              ]
+            : []),
+        ...(isMenuItemVisible('tsd')
+            ? [
+                  {
+                      key: 'tsd',
+                      title: t.value.tsd.title,
+                      href: tsdIndex(),
+                      icon: QrCode,
+                  },
+              ]
+            : []),
+        ...(isMenuItemVisible('equipment')
+            ? [
+                  {
+                      key: 'equipment',
+                      title: t.value.equipment.title,
+                      href: equipmentIndex(),
+                      icon: Package,
                   },
               ]
             : []),

@@ -48,3 +48,62 @@ function something()
 {
     // ..
 }
+
+/**
+ * @return array{
+ *     name: string,
+ *     area_sqm: float,
+ *     rows: array<int, array{
+ *         name: string,
+ *         columns: array<int, array{
+ *             name: string,
+ *             floors: array<int, array{
+ *                 name: string,
+ *                 places: array<int, array{name: string}>
+ *             }>
+ *         }>
+ *     }>
+ * }
+ */
+function warehouseHierarchyPayload(string $name = 'Центральный склад', float $area = 1250.5): array
+{
+    return [
+        'name' => $name,
+        'area_sqm' => $area,
+        'rows' => [
+            [
+                'name' => 'Ряд A',
+                'columns' => [
+                    [
+                        'name' => 'Колонка 01',
+                        'floors' => [
+                            [
+                                'name' => 'Этаж 1',
+                                'places' => [
+                                    ['name' => 'A-01-1-001'],
+                                    ['name' => 'A-01-1-002'],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            [
+                'name' => 'Ряд B',
+                'columns' => [
+                    [
+                        'name' => 'Колонка 02',
+                        'floors' => [
+                            [
+                                'name' => 'Этаж 1',
+                                'places' => [
+                                    ['name' => 'B-02-1-001'],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ];
+}

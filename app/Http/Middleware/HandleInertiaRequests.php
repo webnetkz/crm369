@@ -7,6 +7,7 @@ use App\Models\MenuItem;
 use App\Models\PortalSetting;
 use App\Models\User;
 use App\Support\ChatSidebarData;
+use App\Support\ManagedUserProfileData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
@@ -175,7 +176,25 @@ class HandleInertiaRequests extends Middleware
             'deactivated_at' => $user->deactivated_at?->toISOString(),
             'created_at' => $user->created_at?->toISOString(),
             'updated_at' => $user->updated_at?->toISOString(),
+            'issued_equipment' => $this->serializeAuthUserIssuedEquipment($user),
         ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function serializeAuthUserIssuedEquipment(User $user): array
+    {
+        if (! $this->moduleEnabled('equipment') || ! Schema::hasTable('equipment_items')) {
+            return [];
+        }
+
+        return app(ManagedUserProfileData::class)->serializeIssuedEquipment(
+            $user->loadMissing([
+                'issuedEquipmentItems:id,name,qr_code,status,issued_to_user_id,responsible_user_id,updated_at',
+                'issuedEquipmentItems.responsibleUser:id,name,last_name,email',
+            ]),
+        );
     }
 
     /**

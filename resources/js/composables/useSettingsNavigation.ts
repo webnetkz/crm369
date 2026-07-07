@@ -1,5 +1,6 @@
 import { usePage } from '@inertiajs/vue3';
 import {
+    BookText,
     BadgeCheck,
     Building2,
     FileText,
@@ -22,6 +23,7 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import { edit as editApi } from '@/routes/settings/api';
+import { edit as editApiDocumentation } from '@/routes/settings/api/documentation';
 import { index as businessProcessesIndex } from '@/routes/settings/business-processes';
 import { index as groupsIndex } from '@/routes/settings/groups';
 import { edit as editIntegrations } from '@/routes/settings/integrations';
@@ -176,6 +178,12 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                           title: t.value.settings.api,
                           href: editApi(),
                           icon: LockKeyhole,
+                      },
+                      {
+                          key: 'settings.api.documentation',
+                          title: t.value.settings.api_documentation,
+                          href: editApiDocumentation(),
+                          icon: BookText,
                       },
                   ]
                 : []),

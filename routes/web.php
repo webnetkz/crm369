@@ -8,6 +8,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CrmFunnelController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EdoDocumentController;
+use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\KnowledgeBaseController;
 use App\Http\Controllers\LanguageController;
@@ -17,13 +18,18 @@ use App\Http\Controllers\NotificationPageController;
 use App\Http\Controllers\PortalFormController;
 use App\Http\Controllers\PortalWebhookContactController;
 use App\Http\Controllers\PortalWebhookEdoController;
+use App\Http\Controllers\PortalWebhookEquipmentController;
 use App\Http\Controllers\PortalWebhookInvokeController;
+use App\Http\Controllers\PortalWebhookTsdController;
 use App\Http\Controllers\PortalWebhookUserController;
+use App\Http\Controllers\PortalWebhookWarehouseController;
 use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectTaskConversationController;
 use App\Http\Controllers\PublicEdoSigningController;
 use App\Http\Controllers\PublicPortalFormController;
+use App\Http\Controllers\TsdController;
+use App\Http\Controllers\WarehouseController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -73,6 +79,39 @@ Route::patch('portal-webhooks/{portalWebhook}/edo/documents/{edoDocument}', [Por
 Route::post('portal-webhooks/{portalWebhook}/edo/documents/{edoDocument}/public-link', [PortalWebhookEdoController::class, 'issuePublicLink'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:edo.write', 'module.enabled:edo'])
     ->name('portal-webhooks.edo.public-link.store');
+Route::get('portal-webhooks/{portalWebhook}/warehouses', [PortalWebhookWarehouseController::class, 'index'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:warehouses.read', 'module.enabled:warehouses'])
+    ->name('portal-webhooks.warehouses.index');
+Route::get('portal-webhooks/{portalWebhook}/warehouses/{warehouse}', [PortalWebhookWarehouseController::class, 'show'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:warehouses.read', 'module.enabled:warehouses'])
+    ->name('portal-webhooks.warehouses.show');
+Route::post('portal-webhooks/{portalWebhook}/warehouses', [PortalWebhookWarehouseController::class, 'store'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:warehouses.write', 'module.enabled:warehouses'])
+    ->name('portal-webhooks.warehouses.store');
+Route::patch('portal-webhooks/{portalWebhook}/warehouses/{warehouse}', [PortalWebhookWarehouseController::class, 'update'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:warehouses.write', 'module.enabled:warehouses'])
+    ->name('portal-webhooks.warehouses.update');
+Route::delete('portal-webhooks/{portalWebhook}/warehouses/{warehouse}', [PortalWebhookWarehouseController::class, 'destroy'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:warehouses.write', 'module.enabled:warehouses'])
+    ->name('portal-webhooks.warehouses.destroy');
+Route::get('portal-webhooks/{portalWebhook}/equipment', [PortalWebhookEquipmentController::class, 'index'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:equipment.read', 'module.enabled:equipment'])
+    ->name('portal-webhooks.equipment.index');
+Route::get('portal-webhooks/{portalWebhook}/equipment/{equipmentItem}', [PortalWebhookEquipmentController::class, 'show'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:equipment.read', 'module.enabled:equipment'])
+    ->name('portal-webhooks.equipment.show');
+Route::post('portal-webhooks/{portalWebhook}/equipment', [PortalWebhookEquipmentController::class, 'store'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:equipment.write', 'module.enabled:equipment'])
+    ->name('portal-webhooks.equipment.store');
+Route::patch('portal-webhooks/{portalWebhook}/equipment/{equipmentItem}', [PortalWebhookEquipmentController::class, 'update'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:equipment.write', 'module.enabled:equipment'])
+    ->name('portal-webhooks.equipment.update');
+Route::get('portal-webhooks/{portalWebhook}/tsd/scans', [PortalWebhookTsdController::class, 'index'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:tsd.read', 'module.enabled:tsd'])
+    ->name('portal-webhooks.tsd.index');
+Route::post('portal-webhooks/{portalWebhook}/tsd/scans', [PortalWebhookTsdController::class, 'store'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:tsd.write', 'module.enabled:tsd'])
+    ->name('portal-webhooks.tsd.store');
 
 Route::get('forms/public/{portalForm:public_token}', [PublicPortalFormController::class, 'show'])
     ->middleware('module.enabled:forms')
@@ -214,6 +253,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('module.enabled:production')->group(function () {
         Route::get('production', [ProductionController::class, 'index'])->name('production.index');
         Route::get('production/{section}', [ProductionController::class, 'show'])->name('production.show');
+    });
+
+    Route::middleware('module.enabled:warehouses')->group(function () {
+        Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
+        Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
+    });
+
+    Route::middleware('module.enabled:equipment')->group(function () {
+        Route::get('equipment', [EquipmentController::class, 'index'])->name('equipment.index');
+        Route::post('equipment', [EquipmentController::class, 'store'])->name('equipment.store');
+        Route::patch('equipment/{equipmentItem}', [EquipmentController::class, 'update'])->name('equipment.update');
+    });
+
+    Route::middleware('module.enabled:tsd')->group(function () {
+        Route::get('tsd', [TsdController::class, 'index'])->name('tsd.index');
+        Route::post('tsd/scans', [TsdController::class, 'store'])->name('tsd.store');
     });
 });
 

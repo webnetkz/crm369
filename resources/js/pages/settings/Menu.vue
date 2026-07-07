@@ -7,6 +7,8 @@ import {
     usePage,
 } from '@inertiajs/vue3';
 import {
+    ArrowDown,
+    ArrowUp,
     ExternalLink,
     Eye,
     EyeOff,
@@ -37,6 +39,7 @@ import {
 } from '@/components/ui/select';
 import { useLanguage } from '@/composables/useLanguage';
 import { resolveMenuIcon } from '@/lib/menuIcons';
+import { fetchSameOriginJson } from '@/lib/sameOriginJson';
 import { edit, store } from '@/routes/settings/menu';
 import { update as updateBuiltInVisibility } from '@/routes/settings/menu/built-in/visibility';
 import {
@@ -44,6 +47,7 @@ import {
     update as updateMenuItem,
 } from '@/routes/settings/menu/items';
 import { update as updateCustomVisibility } from '@/routes/settings/menu/items/visibility';
+import { update as updateMenuOrder } from '@/routes/settings/menu/order';
 
 type MenuIconOption = {
     value: string;
@@ -67,6 +71,18 @@ type CustomMenuItem = {
     is_visible: boolean;
 };
 
+type SidebarOrderItem = {
+    key: string;
+    title: string;
+    url: string;
+};
+
+type MenuState = {
+    order?: string[];
+};
+
+type CheckboxValue = boolean | 'indeterminate' | null | undefined;
+
 const props = defineProps<{
     can: {
         share_with_all_users: boolean;
@@ -76,8 +92,31 @@ const props = defineProps<{
     customItems: CustomMenuItem[];
 }>();
 
+const sidebarBuiltInKeys = [
+    'news',
+    'notifications',
+    'dashboard',
+    'projects',
+    'chats',
+    'knowledge-bases',
+    'funnels',
+    'forms',
+    'contacts',
+    'edo',
+    'production',
+    'warehouses',
+    'tsd',
+    'equipment',
+] as const;
+
 const page = usePage();
 const { t } = useLanguage();
+const savingSidebarOrder = ref(false);
+let sidebarOrderRequestId = 0;
+
+const isChecked = (value: CheckboxValue): boolean => {
+    return value === true;
+};
 
 const createMenuItemDefaults = {
     title: '',
@@ -239,6 +278,179 @@ const canEditCustomItem = (item: CustomMenuItem): boolean => {
 const canDeleteCustomItem = (item: CustomMenuItem): boolean => {
     return canEditCustomItem(item);
 };
+
+const sidebarOrder = computed<string[]>(() => {
+    return Array.isArray(page.props.menu?.order) ? page.props.menu.order : [];
+});
+
+const sidebarBuiltInItems = computed<SidebarOrderItem[]>(() => {
+    const builtInItems = new Map(
+        props.builtInItems.map((item) => [item.key, item] as const),
+    );
+
+    return sidebarBuiltInKeys.flatMap((key) => {
+        const item = builtInItems.get(key);
+
+        if (!item) {
+            return [];
+        }
+
+        return [
+            {
+                key: item.key,
+                title: item.title,
+                url: item.url,
+            },
+        ];
+    });
+});
+
+const sidebarSettingsItem = computed<SidebarOrderItem>(() => {
+    const profileItem = props.builtInItems.find(
+        (item) => item.key === 'settings.profile',
+    );
+
+    return {
+        key: 'settings',
+        title: t.value.common.settings,
+        url: profileItem?.url ?? '/settings/profile',
+    };
+});
+
+const sidebarCustomItems = computed<SidebarOrderItem[]>(() => {
+    return props.customItems
+        .filter((item) => item.is_visible)
+        .map((item) => ({
+            key: `custom:${item.id}`,
+            title: item.title,
+            url: item.url,
+        }));
+});
+
+const sidebarItems = computed<SidebarOrderItem[]>(() => {
+    return [
+        ...sidebarBuiltInItems.value,
+        sidebarSettingsItem.value,
+        ...sidebarCustomItems.value,
+    ];
+});
+
+const orderedSidebarItems = computed<SidebarOrderItem[]>(() => {
+    const orderMap = new Map(
+        sidebarOrder.value.map((key, index) => [key, index] as const),
+    );
+
+    return sidebarItems.value
+        .map((item, index) => ({
+            item,
+            index,
+            orderIndex: orderMap.get(item.key),
+        }))
+        .sort((first, second) => {
+            if (
+                typeof first.orderIndex === 'number' &&
+                typeof second.orderIndex === 'number'
+            ) {
+                return first.orderIndex - second.orderIndex;
+            }
+
+            if (typeof first.orderIndex === 'number') {
+                return -1;
+            }
+
+            if (typeof second.orderIndex === 'number') {
+                return 1;
+            }
+
+            return first.index - second.index;
+        })
+        .map(({ item }) => item);
+});
+
+const normalizeSidebarOrder = (keys: string[]): string[] => {
+    const allowedKeys = new Set(sidebarItems.value.map((item) => item.key));
+
+    return keys.filter((key, index) => {
+        return allowedKeys.has(key) && keys.indexOf(key) === index;
+    });
+};
+
+const persistSidebarOrder = async (keys: string[]): Promise<void> => {
+    const nextOrder = normalizeSidebarOrder(keys);
+    const currentOrder = [...sidebarOrder.value];
+    const menu = page.props.menu as MenuState | undefined;
+    const requestId = ++sidebarOrderRequestId;
+
+    if (!menu) {
+        return;
+    }
+
+    menu.order = nextOrder;
+    savingSidebarOrder.value = true;
+
+    try {
+        const response = await fetchSameOriginJson<{ order: string[] }>(
+            updateMenuOrder.url(),
+            {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    items: nextOrder,
+                }),
+            },
+        );
+
+        if (requestId === sidebarOrderRequestId) {
+            menu.order = response.order;
+        }
+    } catch (error) {
+        console.error(error);
+
+        if (requestId === sidebarOrderRequestId) {
+            menu.order = currentOrder;
+        }
+    } finally {
+        if (requestId === sidebarOrderRequestId) {
+            savingSidebarOrder.value = false;
+        }
+    }
+};
+
+const moveSidebarItem = (itemKey: string, direction: 'up' | 'down'): void => {
+    if (savingSidebarOrder.value) {
+        return;
+    }
+
+    const keys = orderedSidebarItems.value.map((item) => item.key);
+    const itemIndex = keys.indexOf(itemKey);
+
+    if (itemIndex === -1) {
+        return;
+    }
+
+    const targetIndex = direction === 'up' ? itemIndex - 1 : itemIndex + 1;
+
+    if (targetIndex < 0 || targetIndex >= keys.length) {
+        return;
+    }
+
+    [keys[itemIndex], keys[targetIndex]] = [keys[targetIndex], keys[itemIndex]];
+
+    void persistSidebarOrder(keys);
+};
+
+const isFirstSidebarItem = (itemKey: string): boolean => {
+    return (
+        orderedSidebarItems.value.findIndex((item) => item.key === itemKey) ===
+        0
+    );
+};
+
+const isLastSidebarItem = (itemKey: string): boolean => {
+    return (
+        orderedSidebarItems.value.findIndex((item) => item.key === itemKey) ===
+        orderedSidebarItems.value.length - 1
+    );
+};
 </script>
 
 <template>
@@ -331,8 +543,8 @@ const canDeleteCustomItem = (item: CustomMenuItem): boolean => {
                     <Checkbox
                         :checked="createForm.opens_in_new_tab"
                         @update:checked="
-                            (value: boolean | 'indeterminate') =>
-                                (createForm.opens_in_new_tab = value === true)
+                            (value) =>
+                                (createForm.opens_in_new_tab = isChecked(value))
                         "
                     />
                     <span>{{ t.menu.open_new_tab }}</span>
@@ -345,8 +557,7 @@ const canDeleteCustomItem = (item: CustomMenuItem): boolean => {
                     <Checkbox
                         :checked="createForm.is_global"
                         @update:checked="
-                            (value: boolean | 'indeterminate') =>
-                                (createForm.is_global = value === true)
+                            (value) => (createForm.is_global = isChecked(value))
                         "
                     />
                     <span>{{ t.menu.for_all_users }}</span>
@@ -357,6 +568,67 @@ const canDeleteCustomItem = (item: CustomMenuItem): boolean => {
                 {{ t.menu.create_item }}
             </Button>
         </form>
+
+        <section class="space-y-3">
+            <Heading
+                variant="small"
+                :title="t.menu.sidebar_order"
+                :description="t.menu.sidebar_order_description"
+            />
+
+            <div class="overflow-hidden rounded-lg border border-border">
+                <ul class="divide-y divide-border">
+                    <li
+                        v-for="item in orderedSidebarItems"
+                        :key="item.key"
+                        class="flex items-center gap-3 px-4 py-3"
+                    >
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate font-medium">{{ item.title }}</p>
+                            <p class="truncate text-xs text-muted-foreground">
+                                {{ item.url }}
+                            </p>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon-sm"
+                                :disabled="
+                                    savingSidebarOrder ||
+                                    isFirstSidebarItem(item.key)
+                                "
+                                :title="t.menu.move_up"
+                                @click="moveSidebarItem(item.key, 'up')"
+                            >
+                                <ArrowUp class="size-4" />
+                                <span class="sr-only">{{
+                                    t.menu.move_up
+                                }}</span>
+                            </Button>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon-sm"
+                                :disabled="
+                                    savingSidebarOrder ||
+                                    isLastSidebarItem(item.key)
+                                "
+                                :title="t.menu.move_down"
+                                @click="moveSidebarItem(item.key, 'down')"
+                            >
+                                <ArrowDown class="size-4" />
+                                <span class="sr-only">{{
+                                    t.menu.move_down
+                                }}</span>
+                            </Button>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </section>
 
         <section class="space-y-3">
             <Heading variant="small" :title="t.menu.system_items" />
@@ -704,9 +976,9 @@ const canDeleteCustomItem = (item: CustomMenuItem): boolean => {
                             <Checkbox
                                 :checked="editForm.opens_in_new_tab"
                                 @update:checked="
-                                    (value: boolean | 'indeterminate') =>
+                                    (value) =>
                                         (editForm.opens_in_new_tab =
-                                            value === true)
+                                            isChecked(value))
                                 "
                             />
                             <span>{{ t.menu.open_new_tab }}</span>
@@ -716,8 +988,8 @@ const canDeleteCustomItem = (item: CustomMenuItem): boolean => {
                             <Checkbox
                                 :checked="editForm.is_visible"
                                 @update:checked="
-                                    (value: boolean | 'indeterminate') =>
-                                        (editForm.is_visible = value === true)
+                                    (value) =>
+                                        (editForm.is_visible = isChecked(value))
                                 "
                             />
                             <span>{{ t.menu.visible }}</span>
@@ -730,8 +1002,8 @@ const canDeleteCustomItem = (item: CustomMenuItem): boolean => {
                             <Checkbox
                                 :checked="editForm.is_global"
                                 @update:checked="
-                                    (value: boolean | 'indeterminate') =>
-                                        (editForm.is_global = value === true)
+                                    (value) =>
+                                        (editForm.is_global = isChecked(value))
                                 "
                             />
                             <span>{{ t.menu.for_all_users }}</span>

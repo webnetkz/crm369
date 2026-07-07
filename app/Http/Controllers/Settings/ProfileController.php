@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
+use App\Models\PortalSetting;
+use App\Support\ManagedUserProfileData;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,11 +20,23 @@ class ProfileController extends Controller
     /**
      * Show the user's profile settings page.
      */
-    public function edit(Request $request): Response
+    public function edit(Request $request, ManagedUserProfileData $managedUserProfileData): Response
     {
+        $user = $request->user();
+
         return Inertia::render('settings/Profile', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            'issuedEquipment' => $user !== null
+                && PortalSetting::current()->isModuleEnabled('equipment')
+                && Schema::hasTable('equipment_items')
+                ? $managedUserProfileData->serializeIssuedEquipment(
+                    $user->load([
+                        'issuedEquipmentItems:id,name,qr_code,status,issued_to_user_id,responsible_user_id,updated_at',
+                        'issuedEquipmentItems.responsibleUser:id,name,last_name,email',
+                    ]),
+                )
+                : [],
         ]);
     }
 

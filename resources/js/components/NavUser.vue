@@ -37,7 +37,7 @@ const page = usePage();
 const auth = computed(() => page.props.auth);
 const user = computed(() => auth.value.user);
 const { getInitials } = useInitials();
-const { t } = useLanguage();
+const { language, t } = useLanguage();
 const profileSheetOpen = ref(false);
 
 const avatarImageStyle = computed(() => ({
@@ -48,6 +48,31 @@ const avatarImageStyle = computed(() => ({
 const userGroupLabel = computed(() => {
     return user.value.group?.display_name ?? t.value.admin.simple_user;
 });
+
+const formatDateTime = (value: string | null): string => {
+    if (! value) {
+        return t.value.common.not_specified;
+    }
+
+    return new Intl.DateTimeFormat(
+        language.value === 'ru' ? 'ru-RU' : 'en-US',
+        {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        },
+    ).format(new Date(value));
+};
+
+const formatUserName = (person: {
+    name: string;
+    last_name: string | null;
+} | null): string => {
+    if (! person) {
+        return t.value.equipment.not_assigned;
+    }
+
+    return [person.name, person.last_name].filter(Boolean).join(' ');
+};
 
 const handleLogout = (): void => {
     router.flushAll();
@@ -234,6 +259,82 @@ const stopImpersonation = (): void => {
                                             ? t.admin.verified
                                             : t.admin.not_verified
                                     }}
+                                </div>
+                            </div>
+
+                            <div
+                                class="rounded-2xl border border-border bg-card p-4 sm:col-span-2"
+                            >
+                                <div class="text-sm text-muted-foreground">
+                                    {{ t.admin.created_at }}
+                                </div>
+                                <div class="mt-1 font-medium">
+                                    {{ formatDateTime(user.created_at ?? null) }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="user.issued_equipment?.length"
+                            class="space-y-3"
+                        >
+                            <div class="text-sm font-medium text-foreground">
+                                {{ t.profile.issued_equipment }}
+                            </div>
+
+                            <div class="grid gap-3">
+                                <div
+                                    v-for="equipmentItem in user.issued_equipment"
+                                    :key="equipmentItem.id"
+                                    class="rounded-2xl border border-border bg-card p-4"
+                                >
+                                    <div
+                                        class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+                                    >
+                                        <div class="space-y-1">
+                                            <div class="font-medium">
+                                                {{ equipmentItem.name }}
+                                            </div>
+                                            <div
+                                                class="flex flex-wrap items-start gap-4"
+                                            >
+                                                <div
+                                                    class="overflow-hidden rounded-lg border border-border bg-white p-2 shadow-sm"
+                                                >
+                                                    <img
+                                                        :src="
+                                                            equipmentItem.qr_code_svg_data_uri
+                                                        "
+                                                        :alt="`${t.equipment.qr_code}: ${equipmentItem.qr_code}`"
+                                                        class="size-24"
+                                                    />
+                                                </div>
+                                                <div
+                                                    class="text-sm text-muted-foreground"
+                                                >
+                                                    {{ t.equipment.qr_code }}:
+                                                    {{ equipmentItem.qr_code }}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <span
+                                            class="inline-flex w-fit rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
+                                        >
+                                            {{ equipmentItem.status_label }}
+                                        </span>
+                                    </div>
+
+                                    <div
+                                        class="mt-3 text-sm text-muted-foreground"
+                                    >
+                                        {{ t.equipment.responsible_user }}:
+                                        {{
+                                            formatUserName(
+                                                equipmentItem.responsible_user,
+                                            )
+                                        }}
+                                    </div>
                                 </div>
                             </div>
                         </div>

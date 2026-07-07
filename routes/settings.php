@@ -41,6 +41,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 Route::middleware(['auth', 'verified', 'module.enabled:api'])->group(function () {
     Route::get('settings/api', [ApiController::class, 'edit'])->name('settings.api.edit');
+    Route::get('settings/api/documentation', [ApiController::class, 'documentation'])
+        ->name('settings.api.documentation.edit');
 
     Route::middleware('can:manage-user-accounts')->group(function () {
         Route::post('settings/api/tokens', [ApiController::class, 'store'])

@@ -101,6 +101,18 @@ class ApiAccessToken extends Model
 
     public const string PERMISSION_WEBHOOKS_WRITE = 'webhooks.write';
 
+    public const string PERMISSION_WAREHOUSES_READ = 'warehouses.read';
+
+    public const string PERMISSION_WAREHOUSES_WRITE = 'warehouses.write';
+
+    public const string PERMISSION_EQUIPMENT_READ = 'equipment.read';
+
+    public const string PERMISSION_EQUIPMENT_WRITE = 'equipment.write';
+
+    public const string PERMISSION_TSD_READ = 'tsd.read';
+
+    public const string PERMISSION_TSD_WRITE = 'tsd.write';
+
     /** @use HasFactory<ApiAccessTokenFactory> */
     use HasFactory;
 
@@ -236,6 +248,30 @@ class ApiAccessToken extends Model
             self::PERMISSION_WEBHOOKS_WRITE => [
                 'label_key' => 'ui.api.permission_webhooks_write',
                 'description_key' => 'ui.api.permission_webhooks_write_description',
+            ],
+            self::PERMISSION_WAREHOUSES_READ => [
+                'label_key' => 'ui.api.permission_warehouses_read',
+                'description_key' => 'ui.api.permission_warehouses_read_description',
+            ],
+            self::PERMISSION_WAREHOUSES_WRITE => [
+                'label_key' => 'ui.api.permission_warehouses_write',
+                'description_key' => 'ui.api.permission_warehouses_write_description',
+            ],
+            self::PERMISSION_EQUIPMENT_READ => [
+                'label_key' => 'ui.api.permission_equipment_read',
+                'description_key' => 'ui.api.permission_equipment_read_description',
+            ],
+            self::PERMISSION_EQUIPMENT_WRITE => [
+                'label_key' => 'ui.api.permission_equipment_write',
+                'description_key' => 'ui.api.permission_equipment_write_description',
+            ],
+            self::PERMISSION_TSD_READ => [
+                'label_key' => 'ui.api.permission_tsd_read',
+                'description_key' => 'ui.api.permission_tsd_read_description',
+            ],
+            self::PERMISSION_TSD_WRITE => [
+                'label_key' => 'ui.api.permission_tsd_write',
+                'description_key' => 'ui.api.permission_tsd_write_description',
             ],
         ];
     }

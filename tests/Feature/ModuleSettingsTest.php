@@ -59,7 +59,7 @@ test('disabled modules are hidden in shared props', function () {
     config(['admin.super_admin_email' => 'super@example.com']);
 
     PortalSetting::current()->update([
-        'disabled_modules' => ['chats', 'contacts', 'funnels', 'knowledge-bases', 'production'],
+        'disabled_modules' => ['chats', 'contacts', 'funnels', 'knowledge-bases', 'production', 'warehouses', 'tsd'],
     ]);
 
     $superAdmin = User::factory()->create([
@@ -73,7 +73,9 @@ test('disabled modules are hidden in shared props', function () {
         ->toContain('contacts')
         ->toContain('funnels')
         ->toContain('knowledge-bases')
-        ->toContain('production');
+        ->toContain('production')
+        ->toContain('warehouses')
+        ->toContain('tsd');
 
     expect($response->inertiaProps('auth.canAccessContacts'))->toBeFalse()
         ->and($response->inertiaProps('auth.canManageKnowledgeBases'))->toBeFalse()
@@ -107,7 +109,11 @@ test('disabled module routes return not found', function (string $module, string
     ['edo', 'edo.index'],
     ['files', 'files.index'],
     ['production', 'production.index'],
+    ['warehouses', 'warehouses.index'],
+    ['tsd', 'tsd.index'],
+    ['equipment', 'equipment.index'],
     ['api', 'settings.api.edit'],
+    ['api', 'settings.api.documentation.edit'],
     ['integrations', 'settings.integrations.edit'],
     ['business-processes', 'settings.business-processes.index'],
     ['webhooks', 'settings.webhooks.edit'],

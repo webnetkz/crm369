@@ -14,7 +14,7 @@ use Inertia\Response;
 
 class ApiController extends Controller
 {
-    public function edit(Request $request, ApiCatalog $apiCatalog): Response
+    public function edit(Request $request): Response
     {
         $user = $request->user();
 
@@ -22,8 +22,7 @@ class ApiController extends Controller
             'can' => [
                 'manage_tokens' => $user?->can('manage-api-tokens') ?? false,
             ],
-            'baseUrl' => rtrim($request->getSchemeAndHttpHost(), '/').'/api/v1',
-            'documentation' => $apiCatalog->sections(),
+            'baseUrl' => $this->baseUrl($request),
             'permissions' => collect(ApiAccessToken::permissionDefinitions())
                 ->map(fn (array $definition, string $key): array => [
                     'key' => $key,
@@ -36,6 +35,14 @@ class ApiController extends Controller
                     $user->apiAccessTokens()->get()
                 )->resolve()
                 : [],
+        ]);
+    }
+
+    public function documentation(Request $request, ApiCatalog $apiCatalog): Response
+    {
+        return Inertia::render('settings/ApiDocumentation', [
+            'baseUrl' => $this->baseUrl($request),
+            'documentation' => $apiCatalog->sections(),
         ]);
     }
 
@@ -77,5 +84,10 @@ class ApiController extends Controller
         ]);
 
         return back();
+    }
+
+    private function baseUrl(Request $request): string
+    {
+        return rtrim($request->getSchemeAndHttpHost(), '/').'/api/v1';
     }
 }

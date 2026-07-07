@@ -156,6 +156,24 @@ class MenuItem extends Model
                 'url' => '/production',
                 'sort_order' => 100,
             ],
+            'warehouses' => [
+                'title_key' => 'ui.warehouses.title',
+                'fallback_title' => 'Warehouses',
+                'url' => '/warehouses',
+                'sort_order' => 102,
+            ],
+            'tsd' => [
+                'title_key' => 'ui.tsd.title',
+                'fallback_title' => 'TSD',
+                'url' => '/tsd',
+                'sort_order' => 103,
+            ],
+            'equipment' => [
+                'title_key' => 'ui.equipment.title',
+                'fallback_title' => 'Equipment',
+                'url' => '/equipment',
+                'sort_order' => 105,
+            ],
             'settings.profile' => [
                 'title_key' => 'ui.settings.profile',
                 'fallback_title' => 'Profile',
@@ -248,6 +266,9 @@ class MenuItem extends Model
             'contacts',
             'edo',
             'production',
+            'warehouses',
+            'tsd',
+            'equipment',
         ];
     }
 

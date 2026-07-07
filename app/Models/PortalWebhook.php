@@ -54,6 +54,18 @@ class PortalWebhook extends Model
 
     public const string PERMISSION_NOTIFICATIONS_READ = 'notifications.read';
 
+    public const string PERMISSION_WAREHOUSES_READ = 'warehouses.read';
+
+    public const string PERMISSION_WAREHOUSES_WRITE = 'warehouses.write';
+
+    public const string PERMISSION_EQUIPMENT_READ = 'equipment.read';
+
+    public const string PERMISSION_EQUIPMENT_WRITE = 'equipment.write';
+
+    public const string PERMISSION_TSD_READ = 'tsd.read';
+
+    public const string PERMISSION_TSD_WRITE = 'tsd.write';
+
     /** @use HasFactory<PortalWebhookFactory> */
     use HasFactory;
 
@@ -128,6 +140,30 @@ class PortalWebhook extends Model
             self::PERMISSION_NOTIFICATIONS_READ => [
                 'label_key' => 'ui.webhooks.permission_notifications_read',
                 'description_key' => 'ui.webhooks.permission_notifications_read_description',
+            ],
+            self::PERMISSION_WAREHOUSES_READ => [
+                'label_key' => 'ui.webhooks.permission_warehouses_read',
+                'description_key' => 'ui.webhooks.permission_warehouses_read_description',
+            ],
+            self::PERMISSION_WAREHOUSES_WRITE => [
+                'label_key' => 'ui.webhooks.permission_warehouses_write',
+                'description_key' => 'ui.webhooks.permission_warehouses_write_description',
+            ],
+            self::PERMISSION_EQUIPMENT_READ => [
+                'label_key' => 'ui.webhooks.permission_equipment_read',
+                'description_key' => 'ui.webhooks.permission_equipment_read_description',
+            ],
+            self::PERMISSION_EQUIPMENT_WRITE => [
+                'label_key' => 'ui.webhooks.permission_equipment_write',
+                'description_key' => 'ui.webhooks.permission_equipment_write_description',
+            ],
+            self::PERMISSION_TSD_READ => [
+                'label_key' => 'ui.webhooks.permission_tsd_read',
+                'description_key' => 'ui.webhooks.permission_tsd_read_description',
+            ],
+            self::PERMISSION_TSD_WRITE => [
+                'label_key' => 'ui.webhooks.permission_tsd_write',
+                'description_key' => 'ui.webhooks.permission_tsd_write_description',
             ],
         ];
     }

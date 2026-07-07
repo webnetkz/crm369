@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\EquipmentItem;
 use App\Models\User;
 use App\Models\UserGroup;
 use Illuminate\Support\Facades\Hash;
@@ -338,7 +339,77 @@ test('users page shows profile details in a right sheet sidebar', function () {
         ->and($profileSheet)->toContain('t.admin.profile_description')
         ->and($profileSheet)->toContain('formatDateTime(')
         ->and($profileSheet)->toContain('t.admin.simple_user')
+        ->and($profileSheet)->toContain('user?.issued_equipment?.length')
+        ->and($profileSheet)->toContain('t.profile.issued_equipment')
+        ->and($profileSheet)->toContain('equipmentItem.qr_code_svg_data_uri')
         ->and($profileSheet)->toContain('profile_autosave_saving');
+});
+
+test('managed user profile payload includes issued equipment', function () {
+    $administrators = UserGroup::query()->firstOrCreate([
+        'name' => UserGroup::ADMINISTRATORS_NAME,
+    ]);
+
+    $adminUser = User::factory()->create([
+        'user_group_id' => $administrators->id,
+    ]);
+
+    $targetUser = User::factory()->create([
+        'name' => 'Issued User',
+    ]);
+
+    $responsibleUser = User::factory()->create([
+        'name' => 'Responsible',
+        'last_name' => 'Manager',
+    ]);
+
+    EquipmentItem::factory()->issued()->create([
+        'name' => 'User Sheet Scanner',
+        'qr_code' => 'EQ-USER-SHEET-01',
+        'issued_to_user_id' => $targetUser->id,
+        'responsible_user_id' => $responsibleUser->id,
+        'created_by_user_id' => $adminUser->id,
+        'updated_by_user_id' => $adminUser->id,
+    ]);
+
+    $this->actingAs($adminUser)
+        ->getJson(route('settings.users.show', $targetUser))
+        ->assertSuccessful()
+        ->assertJsonPath('data.issued_equipment.0.name', 'User Sheet Scanner')
+        ->assertJsonPath('data.issued_equipment.0.qr_code', 'EQ-USER-SHEET-01')
+        ->assertJsonPath('data.issued_equipment.0.qr_code_svg_data_uri', fn (string $value): bool => str_starts_with($value, 'data:image/svg+xml;utf8,'))
+        ->assertJsonPath('data.issued_equipment.0.responsible_user.name', 'Responsible');
+});
+
+test('shared auth user payload includes issued equipment for sidebar profile sheet', function () {
+    $user = User::factory()->create([
+        'name' => 'Sidebar User',
+    ]);
+
+    $responsibleUser = User::factory()->create([
+        'name' => 'Sidebar Responsible',
+        'last_name' => 'Manager',
+    ]);
+
+    EquipmentItem::factory()->issued()->create([
+        'name' => 'Sidebar QR Scanner',
+        'qr_code' => 'EQ-SIDEBAR-01',
+        'issued_to_user_id' => $user->id,
+        'responsible_user_id' => $responsibleUser->id,
+        'created_by_user_id' => $responsibleUser->id,
+        'updated_by_user_id' => $responsibleUser->id,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn ($page) => $page
+            ->component('Dashboard')
+            ->where('auth.user.issued_equipment.0.name', 'Sidebar QR Scanner')
+            ->where('auth.user.issued_equipment.0.qr_code', 'EQ-SIDEBAR-01')
+            ->where('auth.user.issued_equipment.0.qr_code_svg_data_uri', fn (string $value): bool => str_starts_with($value, 'data:image/svg+xml;utf8,'))
+            ->where('auth.user.issued_equipment.0.responsible_user.name', 'Sidebar Responsible')
+        );
 });
 
 test('users page supports inline profile editing with autosave', function () {
@@ -363,6 +434,9 @@ test('sidebar user button opens a left bottom sheet instead of a dropdown', func
         ->toContain('side="left"')
         ->toContain('bottom-4 left-4')
         ->toContain('userGroupLabel')
+        ->toContain('formatDateTime(user.created_at ?? null)')
+        ->toContain('user.issued_equipment?.length')
+        ->toContain('equipmentItem.qr_code_svg_data_uri')
         ->not
         ->toContain('<DropdownMenu');
 });
