@@ -92,4 +92,19 @@ class WarehouseRow extends Model
                 ->select('id'))
             ->count();
     }
+
+    public function itemCount(): int
+    {
+        if ($this->relationLoaded('columns')) {
+            return $this->columns->sum(fn (WarehouseColumn $column): int => $column->itemCount());
+        }
+
+        return WarehouseItem::query()
+            ->whereIn('warehouse_place_id', WarehousePlace::query()
+                ->whereIn('warehouse_floor_id', WarehouseFloor::query()
+                    ->whereIn('warehouse_column_id', $this->columns()->select('id'))
+                    ->select('id'))
+                ->select('id'))
+            ->count();
+    }
 }

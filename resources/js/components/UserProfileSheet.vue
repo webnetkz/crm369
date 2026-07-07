@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { BadgeCheck, CircleX, Mail, Phone } from '@lucide/vue';
+import {
+    BadgeCheck,
+    Briefcase,
+    CircleX,
+    Mail,
+    Phone,
+    UserRound,
+    UsersRound,
+} from '@lucide/vue';
 import { computed } from 'vue';
 import InputError from '@/components/InputError.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -14,6 +22,7 @@ import {
 import { useInitials } from '@/composables/useInitials';
 import { useLanguage } from '@/composables/useLanguage';
 import type {
+    CompanyStructureManagerOption,
     ManagedProfileFormState,
     ManagedProfileSaveState,
     ManagedUserProfile,
@@ -22,6 +31,7 @@ import type {
 type Props = {
     open: boolean;
     user: ManagedUserProfile | null;
+    managerOptions?: CompanyStructureManagerOption[];
     canEdit?: boolean;
     saveState?: ManagedProfileSaveState;
 };
@@ -43,6 +53,12 @@ const avatarStyle = computed(() => ({
     objectPosition: 'center',
     transform: `scale(${props.user?.avatar_scale ?? 1})`,
 }));
+
+const availableManagerOptions = computed(() => {
+    return (props.managerOptions ?? []).filter(
+        (option) => option.id !== props.user?.id,
+    );
+});
 
 const formatDateTime = (value: string | null): string => {
     if (!value) {
@@ -67,6 +83,19 @@ const formatUserName = (person: {
     }
 
     return [person.name, person.last_name].filter(Boolean).join(' ');
+};
+
+const formatStructureUser = (person: {
+    full_name: string;
+    position: string | null;
+} | null): string => {
+    if (!person) {
+        return t.value.company_structure.no_manager;
+    }
+
+    return person.position
+        ? `${person.full_name} · ${person.position}`
+        : person.full_name;
 };
 </script>
 
@@ -203,6 +232,70 @@ const formatUserName = (person: {
                             {{ user?.phone ?? t.common.not_specified }}
                         </div>
                     </div>
+
+                    <div class="rounded-2xl border border-border bg-card p-4">
+                        <div
+                            class="mb-1 flex items-center gap-2 text-sm text-muted-foreground"
+                        >
+                            <Briefcase class="size-4" />
+                            {{ t.company_structure.position }}
+                        </div>
+                        <template v-if="canEdit">
+                            <Input
+                                v-model="form.position"
+                                class="mt-2"
+                                autocomplete="organization-title"
+                                :placeholder="t.company_structure.no_position"
+                            />
+                            <InputError
+                                class="mt-2"
+                                :message="form.errors.position"
+                            />
+                        </template>
+                        <div v-else class="font-medium">
+                            {{
+                                user?.position ??
+                                t.company_structure.no_position
+                            }}
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-border bg-card p-4">
+                        <div
+                            class="mb-1 flex items-center gap-2 text-sm text-muted-foreground"
+                        >
+                            <UserRound class="size-4" />
+                            {{ t.company_structure.manager }}
+                        </div>
+                        <template v-if="canEdit">
+                            <select
+                                v-model="form.manager_id"
+                                class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            >
+                                <option value="">
+                                    {{ t.company_structure.no_manager }}
+                                </option>
+                                <option
+                                    v-for="option in availableManagerOptions"
+                                    :key="option.id"
+                                    :value="option.id"
+                                >
+                                    {{
+                                        option.position
+                                            ? `${option.full_name} · ${option.position}`
+                                            : option.full_name
+                                    }}
+                                </option>
+                            </select>
+                            <InputError
+                                class="mt-2"
+                                :message="form.errors.manager_id"
+                            />
+                        </template>
+                        <div v-else class="font-medium">
+                            {{ formatStructureUser(user?.manager ?? null) }}
+                        </div>
+                    </div>
                 </div>
 
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -272,6 +365,36 @@ const formatUserName = (person: {
                                     ? t.admin.verified
                                     : t.admin.not_verified
                             }}
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-2xl border border-border bg-card p-4 sm:col-span-2"
+                    >
+                        <div
+                            class="mb-2 flex items-center gap-2 text-sm text-muted-foreground"
+                        >
+                            <UsersRound class="size-4" />
+                            {{ t.company_structure.subordinates }}
+                        </div>
+                        <div
+                            v-if="user?.subordinates.length"
+                            class="flex flex-wrap gap-2"
+                        >
+                            <span
+                                v-for="subordinate in user.subordinates"
+                                :key="subordinate.id"
+                                class="rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-foreground"
+                            >
+                                {{
+                                    subordinate.position
+                                        ? `${subordinate.full_name} · ${subordinate.position}`
+                                        : subordinate.full_name
+                                }}
+                            </span>
+                        </div>
+                        <div v-else class="mt-1 font-medium">
+                            {{ t.company_structure.no_subordinates }}
                         </div>
                     </div>
 

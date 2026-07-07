@@ -6,6 +6,7 @@ use App\Models\PortalForm;
 use App\Models\PortalSetting;
 use App\Models\PortalWebhook;
 use App\Models\User;
+use App\Models\Warehouse;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('only super admin can open module settings', function () {
@@ -127,6 +128,21 @@ test('disabled forms module also blocks public forms', function () {
     $form = PortalForm::factory()->create();
 
     $this->get(route('forms.public.show', $form->public_token))
+        ->assertNotFound();
+});
+
+test('disabled warehouses module also blocks warehouse detail pages', function () {
+    PortalSetting::current()->update([
+        'disabled_modules' => ['warehouses'],
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+    $warehouse = Warehouse::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('warehouses.show', $warehouse))
         ->assertNotFound();
 });
 

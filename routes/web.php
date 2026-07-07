@@ -3,6 +3,7 @@
 use App\Http\Controllers\ChatMessageController;
 use App\Http\Controllers\ChatPageController;
 use App\Http\Controllers\ChatSidebarController;
+use App\Http\Controllers\CompanyStructureController;
 use App\Http\Controllers\ContactCommentController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CrmFunnelController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\NewsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationPageController;
 use App\Http\Controllers\PortalFormController;
+use App\Http\Controllers\PortalWebhookCompanyStructureController;
 use App\Http\Controllers\PortalWebhookContactController;
 use App\Http\Controllers\PortalWebhookEdoController;
 use App\Http\Controllers\PortalWebhookEquipmentController;
@@ -49,6 +51,12 @@ Route::get('portal-webhooks/{portalWebhook}/users', [PortalWebhookUserController
 Route::get('portal-webhooks/{portalWebhook}/users/{user}', [PortalWebhookUserController::class, 'show'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:users.read'])
     ->name('portal-webhooks.users.show');
+Route::get('portal-webhooks/{portalWebhook}/company-structure', [PortalWebhookCompanyStructureController::class, 'index'])
+    ->middleware(['module.enabled:webhooks', 'module.enabled:company-structure', 'throttle:30,1', 'portal.webhook:company-structure.read'])
+    ->name('portal-webhooks.company-structure.index');
+Route::get('portal-webhooks/{portalWebhook}/company-structure/users/{user}', [PortalWebhookCompanyStructureController::class, 'show'])
+    ->middleware(['module.enabled:webhooks', 'module.enabled:company-structure', 'throttle:30,1', 'portal.webhook:company-structure.read'])
+    ->name('portal-webhooks.company-structure.show');
 Route::get('portal-webhooks/{portalWebhook}/contacts', [PortalWebhookContactController::class, 'index'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:contacts.read', 'module.enabled:contacts'])
     ->name('portal-webhooks.contacts.index');
@@ -85,6 +93,9 @@ Route::get('portal-webhooks/{portalWebhook}/warehouses', [PortalWebhookWarehouse
 Route::get('portal-webhooks/{portalWebhook}/warehouses/{warehouse}', [PortalWebhookWarehouseController::class, 'show'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:warehouses.read', 'module.enabled:warehouses'])
     ->name('portal-webhooks.warehouses.show');
+Route::get('portal-webhooks/{portalWebhook}/warehouses/{warehouse}/items', [PortalWebhookWarehouseController::class, 'items'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:warehouses.read', 'module.enabled:warehouses'])
+    ->name('portal-webhooks.warehouses.items');
 Route::post('portal-webhooks/{portalWebhook}/warehouses', [PortalWebhookWarehouseController::class, 'store'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:warehouses.write', 'module.enabled:warehouses'])
     ->name('portal-webhooks.warehouses.store');
@@ -138,6 +149,10 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::middleware('module.enabled:company-structure')->group(function () {
+        Route::get('company-structure', CompanyStructureController::class)->name('company-structure.index');
+    });
+
     Route::middleware('module.enabled:forms')->group(function () {
         Route::get('forms', [PortalFormController::class, 'index'])->name('forms.index');
         Route::post('forms', [PortalFormController::class, 'store'])->name('forms.store');
@@ -257,7 +272,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('module.enabled:warehouses')->group(function () {
         Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
+        Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show'])->name('warehouses.show');
         Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
+        Route::post('warehouses/scan', [WarehouseController::class, 'scan'])->name('warehouses.scan');
     });
 
     Route::middleware('module.enabled:equipment')->group(function () {

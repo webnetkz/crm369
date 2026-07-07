@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreWarehouseRequest;
 use App\Http\Requests\UpdateWarehouseRequest;
+use App\Http\Resources\ApiWarehouseItemResource;
 use App\Http\Resources\ApiWarehouseResource;
 use App\Models\Warehouse;
+use App\Models\WarehouseItem;
 use App\Support\WarehouseHierarchyManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -52,6 +54,32 @@ class WarehouseController extends Controller
 
         return response()->json([
             'data' => (new ApiWarehouseResource($warehouse))->resolve(),
+        ]);
+    }
+
+    public function items(Request $request, Warehouse $warehouse): JsonResponse
+    {
+        $perPage = max(1, min((int) $request->integer('per_page', 25), 100));
+
+        $warehouseItems = WarehouseItem::query()
+            ->with('place.floor.column.row.warehouse')
+            ->whereHas('place.floor.column.row', fn ($query) => $query->where('warehouse_id', $warehouse->id))
+            ->orderBy('name')
+            ->orderBy('id')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return response()->json([
+            'data' => collect($warehouseItems->items())
+                ->map(fn (WarehouseItem $warehouseItem): array => (new ApiWarehouseItemResource($warehouseItem))->resolve())
+                ->values()
+                ->all(),
+            'meta' => [
+                'current_page' => $warehouseItems->currentPage(),
+                'last_page' => $warehouseItems->lastPage(),
+                'per_page' => $warehouseItems->perPage(),
+                'total' => $warehouseItems->total(),
+            ],
         ]);
     }
 

@@ -46,6 +46,15 @@ class ApiCatalog
                 ],
             ],
             [
+                'title' => __('ui.api.section_company_structure'),
+                'description' => __('ui.api.section_company_structure_description'),
+                'notes' => [],
+                'endpoints' => [
+                    $this->endpoint('GET', '/api/v1/company-structure', 'ui.api.endpoint_company_structure_index', ApiAccessToken::PERMISSION_COMPANY_STRUCTURE_READ, 'ui.api.access_scope_based'),
+                    $this->endpoint('GET', '/api/v1/company-structure/users/{user}', 'ui.api.endpoint_company_structure_show', ApiAccessToken::PERMISSION_COMPANY_STRUCTURE_READ, 'ui.api.access_scope_based'),
+                ],
+            ],
+            [
                 'title' => __('ui.api.section_contacts'),
                 'description' => __('ui.api.section_contacts_description'),
                 'notes' => [],
@@ -122,6 +131,7 @@ class ApiCatalog
                 'endpoints' => [
                     $this->endpoint('GET', '/api/v1/warehouses', 'ui.api.endpoint_warehouses_index', ApiAccessToken::PERMISSION_WAREHOUSES_READ, 'ui.api.access_scope_based'),
                     $this->endpoint('GET', '/api/v1/warehouses/{warehouse}', 'ui.api.endpoint_warehouses_show', ApiAccessToken::PERMISSION_WAREHOUSES_READ, 'ui.api.access_scope_based'),
+                    $this->endpoint('GET', '/api/v1/warehouses/{warehouse}/items', 'ui.api.endpoint_warehouses_items', ApiAccessToken::PERMISSION_WAREHOUSES_READ, 'ui.api.access_scope_based'),
                     $this->endpoint('POST', '/api/v1/warehouses', 'ui.api.endpoint_warehouses_store', ApiAccessToken::PERMISSION_WAREHOUSES_WRITE, 'ui.api.access_scope_based'),
                     $this->endpoint('PATCH', '/api/v1/warehouses/{warehouse}', 'ui.api.endpoint_warehouses_update', ApiAccessToken::PERMISSION_WAREHOUSES_WRITE, 'ui.api.access_scope_based'),
                     $this->endpoint('DELETE', '/api/v1/warehouses/{warehouse}', 'ui.api.endpoint_warehouses_destroy', ApiAccessToken::PERMISSION_WAREHOUSES_WRITE, 'ui.api.access_scope_based'),

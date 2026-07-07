@@ -58,6 +58,10 @@ class PortalSetting extends Model
                 'title_key' => 'ui.chat.title',
                 'description_key' => 'ui.chat.description',
             ],
+            'company-structure' => [
+                'title_key' => 'ui.company_structure.title',
+                'description_key' => 'ui.company_structure.description',
+            ],
             'knowledge-bases' => [
                 'title_key' => 'ui.knowledge.title',
                 'description_key' => 'ui.knowledge.description',

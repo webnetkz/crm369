@@ -10,6 +10,7 @@ import {
     LayoutGrid,
     LayoutDashboard,
     MessageSquareMore,
+    Network,
     Newspaper,
     Package,
     QrCode,
@@ -17,7 +18,7 @@ import {
     ListTodo,
     Users,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { index as funnelsIndex } from '@/actions/App/Http/Controllers/CrmFunnelController';
 import {
     index as knowledgeBasesIndex,
@@ -39,6 +40,7 @@ import { useLanguage } from '@/composables/useLanguage';
 import { useSettingsNavigation } from '@/composables/useSettingsNavigation';
 import { resolveMenuIcon } from '@/lib/menuIcons';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
+import { index as companyStructureIndex } from '@/routes/company-structure';
 import { dashboard } from '@/routes';
 import { index as chatsIndex } from '@/routes/chats';
 import { index as contactsIndex } from '@/routes/contacts';
@@ -59,11 +61,18 @@ import { index as tsdIndex } from '@/routes/tsd';
 import { index as warehousesIndex } from '@/routes/warehouses';
 import type { MenuCustomItem, MenuKnowledgeBaseItem, NavItem } from '@/types';
 
+type MenuState = {
+    order?: string[];
+};
+
 const page = usePage();
 const { t } = useLanguage();
 const settingsNavItems = useSettingsNavigation();
 const savingMenuOrder = ref(false);
-let menuOrderRequestId = 0;
+const optimisticMenuOrder = ref<string[]>([]);
+let queuedMenuOrder: string[] | null = null;
+let inFlightMenuOrder: string[] | null = null;
+let confirmedMenuOrder: string[] = [];
 
 const hiddenMenuItems = computed(() => {
     const hiddenItems = Array.isArray(page.props.menu?.hiddenItems)
@@ -122,6 +131,16 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                       title: t.value.common.dashboard,
                       href: dashboard(),
                       icon: LayoutDashboard,
+                  },
+              ]
+            : []),
+        ...(isMenuItemVisible('company-structure')
+            ? [
+                  {
+                      key: 'company-structure',
+                      title: t.value.company_structure.title,
+                      href: companyStructureIndex(),
+                      icon: Network,
                   },
               ]
             : []),
@@ -326,7 +345,7 @@ const baseMainNavItems = computed<NavItem[]>(() => {
 
 const mainNavItems = computed<NavItem[]>(() => {
     const orderMap = new Map(
-        menuOrder.value.map((key, index) => [key, index] as const),
+        optimisticMenuOrder.value.map((key, index) => [key, index] as const),
     );
 
     return baseMainNavItems.value
@@ -373,13 +392,37 @@ const normalizeMenuOrder = (keys: string[]): string[] => {
     });
 };
 
-const persistMenuOrder = async (keys: string[]): Promise<void> => {
-    const nextOrder = normalizeMenuOrder(keys);
-    const currentOrder = [...menuOrder.value];
-    const menu = page.props.menu as MenuState;
-    const requestId = ++menuOrderRequestId;
+const isSameOrder = (first: string[], second: string[]): boolean => {
+    return (
+        first.length === second.length &&
+        first.every((value, index) => value === second[index])
+    );
+};
 
-    menu.order = nextOrder;
+watch(
+    menuOrder,
+    (value) => {
+        const normalizedOrder = normalizeMenuOrder(value);
+
+        confirmedMenuOrder = [...normalizedOrder];
+
+        if (queuedMenuOrder === null && inFlightMenuOrder === null) {
+            optimisticMenuOrder.value = normalizedOrder;
+        }
+    },
+    {
+        immediate: true,
+    },
+);
+
+const persistQueuedMenuOrder = async (): Promise<void> => {
+    if (savingMenuOrder.value || queuedMenuOrder === null) {
+        return;
+    }
+
+    const nextOrder = [...queuedMenuOrder];
+    queuedMenuOrder = null;
+    inFlightMenuOrder = nextOrder;
     savingMenuOrder.value = true;
 
     try {
@@ -393,20 +436,48 @@ const persistMenuOrder = async (keys: string[]): Promise<void> => {
             },
         );
 
-        if (requestId === menuOrderRequestId) {
-            menu.order = response.order;
+        const resolvedOrder = normalizeMenuOrder(response.order);
+        const menu = page.props.menu as MenuState | undefined;
+
+        confirmedMenuOrder = [...resolvedOrder];
+
+        if (menu) {
+            menu.order = resolvedOrder;
+        }
+
+        if (queuedMenuOrder === null) {
+            optimisticMenuOrder.value = resolvedOrder;
         }
     } catch (error) {
         console.error(error);
 
-        if (requestId === menuOrderRequestId) {
-            menu.order = currentOrder;
+        if (queuedMenuOrder === null) {
+            optimisticMenuOrder.value = [...confirmedMenuOrder];
         }
     } finally {
-        if (requestId === menuOrderRequestId) {
-            savingMenuOrder.value = false;
+        inFlightMenuOrder = null;
+        savingMenuOrder.value = false;
+
+        if (queuedMenuOrder !== null) {
+            void persistQueuedMenuOrder();
         }
     }
+};
+
+const persistMenuOrder = (keys: string[]): void => {
+    const nextOrder = normalizeMenuOrder(keys);
+
+    if (
+        isSameOrder(nextOrder, optimisticMenuOrder.value) &&
+        queuedMenuOrder === null &&
+        inFlightMenuOrder === null
+    ) {
+        return;
+    }
+
+    optimisticMenuOrder.value = nextOrder;
+    queuedMenuOrder = [...nextOrder];
+    void persistQueuedMenuOrder();
 };
 </script>
 
@@ -428,7 +499,6 @@ const persistMenuOrder = async (keys: string[]): Promise<void> => {
             <NavMain
                 :items="mainNavItems"
                 :reorderable="true"
-                :reordering="savingMenuOrder"
                 @reorder="persistMenuOrder"
             />
         </SidebarContent>

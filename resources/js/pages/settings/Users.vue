@@ -45,6 +45,7 @@ import { store as startUserImpersonation } from '@/routes/settings/users/imperso
 import { reset as resetUserPassword } from '@/routes/settings/users/password';
 import { update as updateUserProfile } from '@/routes/settings/users/profile';
 import type {
+    CompanyStructureManagerOption,
     ManagedProfileSaveState,
     ManagedUserProfile,
     PaginatedCollection,
@@ -60,6 +61,8 @@ type ManagedProfilePayload = {
     last_name: string;
     email: string;
     phone: string;
+    position: string;
+    manager_id: number | null;
 };
 
 type UserFilters = {
@@ -82,6 +85,7 @@ const props = defineProps<{
     groups: UserGroupOption[];
     filters: UserFilters;
     perPageOptions: number[];
+    managerOptions: CompanyStructureManagerOption[];
 }>();
 
 const page = usePage();
@@ -123,6 +127,8 @@ const managedProfileForm = useForm({
     last_name: '',
     email: '',
     phone: defaultKazakhstanPhonePrefix,
+    position: '',
+    manager_id: '' as number | '',
 });
 
 const filtersForm = useForm<UserFilters>({
@@ -334,6 +340,11 @@ const managedProfilePayload = (): ManagedProfilePayload => ({
     last_name: managedProfileForm.last_name,
     email: managedProfileForm.email,
     phone: managedProfileForm.phone,
+    position: managedProfileForm.position,
+    manager_id:
+        managedProfileForm.manager_id === ''
+            ? null
+            : managedProfileForm.manager_id,
 });
 
 const clearManagedProfileSaveTimeout = (): void => {
@@ -417,6 +428,8 @@ const syncManagedProfileForm = (user: UserRow | null): void => {
     managedProfileForm.last_name = user?.last_name ?? '';
     managedProfileForm.email = user?.email ?? '';
     managedProfileForm.phone = formatKazakhstanPhone(user?.phone);
+    managedProfileForm.position = user?.position ?? '';
+    managedProfileForm.manager_id = user?.manager_id ?? '';
 
     managedProfileSnapshot.value = managedProfilePayload();
     managedProfileSaveState.value = 'idle';
@@ -568,6 +581,8 @@ watch(
         managedProfileForm.last_name,
         managedProfileForm.email,
         managedProfileForm.phone,
+        managedProfileForm.position,
+        managedProfileForm.manager_id,
     ],
     () => {
         if (
@@ -596,6 +611,18 @@ onBeforeUnmount(() => {
     clearManagedProfileSaveTimeout();
     clearFilterSearchTimeout();
 });
+
+const formatStructureSummary = (
+    person: UserRow['manager'] | CompanyStructureManagerOption | null,
+): string => {
+    if (!person) {
+        return t.value.company_structure.no_manager;
+    }
+
+    return person.position
+        ? `${person.full_name} · ${person.position}`
+        : person.full_name;
+};
 </script>
 
 <template>
@@ -865,6 +892,12 @@ onBeforeUnmount(() => {
                         @click="openProfile(user)"
                     >
                         <div class="truncate font-medium">{{ user.name }}</div>
+                        <div class="text-sm text-muted-foreground">
+                            {{
+                                user.position ??
+                                t.company_structure.no_position
+                            }}
+                        </div>
                         <div class="text-sm break-all text-muted-foreground">
                             {{ user.email }}
                         </div>
@@ -926,6 +959,15 @@ onBeforeUnmount(() => {
                                     }}
                                 </span>
                             </span>
+                        </dd>
+                    </div>
+
+                    <div class="grid gap-2">
+                        <dt class="text-muted-foreground">
+                            {{ t.company_structure.manager }}
+                        </dt>
+                        <dd>
+                            {{ formatStructureSummary(user.manager) }}
                         </dd>
                     </div>
 
@@ -1025,16 +1067,22 @@ onBeforeUnmount(() => {
             <table class="w-full min-w-[1020px] table-fixed text-sm">
                 <thead class="bg-muted/50 text-left">
                     <tr class="divide-x divide-border">
-                        <th class="w-[20%] px-4 py-3 font-medium">
+                        <th class="w-[18%] px-4 py-3 font-medium">
                             {{ t.common.name }}
                         </th>
-                        <th class="w-[24%] px-4 py-3 font-medium">
+                        <th class="w-[18%] px-4 py-3 font-medium">
+                            {{ t.company_structure.position }}
+                        </th>
+                        <th class="w-[20%] px-4 py-3 font-medium">
+                            {{ t.company_structure.manager }}
+                        </th>
+                        <th class="w-[20%] px-4 py-3 font-medium">
                             {{ t.common.email }}
                         </th>
-                        <th class="w-[12%] px-4 py-3 font-medium">
+                        <th class="w-[10%] px-4 py-3 font-medium">
                             {{ t.admin.status }}
                         </th>
-                        <th class="w-[10%] px-4 py-3 text-center font-medium">
+                        <th class="w-[8%] px-4 py-3 text-center font-medium">
                             {{ t.admin.email_verified }}
                         </th>
                         <th class="px-4 py-3 font-medium">
@@ -1075,6 +1123,15 @@ onBeforeUnmount(() => {
                                     {{ t.admin.super_admin }}
                                 </div>
                             </button>
+                        </td>
+                        <td class="px-4 py-3 text-muted-foreground">
+                            {{
+                                user.position ??
+                                t.company_structure.no_position
+                            }}
+                        </td>
+                        <td class="px-4 py-3 text-muted-foreground">
+                            {{ formatStructureSummary(user.manager) }}
                         </td>
                         <td class="px-4 py-3 text-muted-foreground">
                             <span class="break-all">{{ user.email }}</span>
@@ -1294,6 +1351,7 @@ onBeforeUnmount(() => {
             :user="selectedProfileUser"
             :can-edit="canEditProfile(selectedProfileUser)"
             :save-state="managedProfileSaveState"
+            :manager-options="managerOptions"
             v-model:form="managedProfileForm"
             @update:open="(isOpen) => !isOpen && closeProfile()"
         />

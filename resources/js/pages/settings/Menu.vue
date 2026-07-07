@@ -16,7 +16,7 @@ import {
     PencilLine,
     Trash2,
 } from '@lucide/vue';
-import { computed, ref, watchEffect } from 'vue';
+import { computed, ref, watch, watchEffect } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -96,6 +96,7 @@ const sidebarBuiltInKeys = [
     'news',
     'notifications',
     'dashboard',
+    'company-structure',
     'projects',
     'chats',
     'knowledge-bases',
@@ -112,7 +113,10 @@ const sidebarBuiltInKeys = [
 const page = usePage();
 const { t } = useLanguage();
 const savingSidebarOrder = ref(false);
-let sidebarOrderRequestId = 0;
+const optimisticSidebarOrder = ref<string[]>([]);
+let queuedSidebarOrder: string[] | null = null;
+let inFlightSidebarOrder: string[] | null = null;
+let confirmedSidebarOrder: string[] = [];
 
 const isChecked = (value: CheckboxValue): boolean => {
     return value === true;
@@ -337,7 +341,7 @@ const sidebarItems = computed<SidebarOrderItem[]>(() => {
 
 const orderedSidebarItems = computed<SidebarOrderItem[]>(() => {
     const orderMap = new Map(
-        sidebarOrder.value.map((key, index) => [key, index] as const),
+        optimisticSidebarOrder.value.map((key, index) => [key, index] as const),
     );
 
     return sidebarItems.value
@@ -375,17 +379,37 @@ const normalizeSidebarOrder = (keys: string[]): string[] => {
     });
 };
 
-const persistSidebarOrder = async (keys: string[]): Promise<void> => {
-    const nextOrder = normalizeSidebarOrder(keys);
-    const currentOrder = [...sidebarOrder.value];
-    const menu = page.props.menu as MenuState | undefined;
-    const requestId = ++sidebarOrderRequestId;
+const isSameOrder = (first: string[], second: string[]): boolean => {
+    return (
+        first.length === second.length &&
+        first.every((value, index) => value === second[index])
+    );
+};
 
-    if (!menu) {
+watch(
+    sidebarOrder,
+    (value) => {
+        const normalizedOrder = normalizeSidebarOrder(value);
+
+        confirmedSidebarOrder = [...normalizedOrder];
+
+        if (queuedSidebarOrder === null && inFlightSidebarOrder === null) {
+            optimisticSidebarOrder.value = normalizedOrder;
+        }
+    },
+    {
+        immediate: true,
+    },
+);
+
+const persistQueuedSidebarOrder = async (): Promise<void> => {
+    if (savingSidebarOrder.value || queuedSidebarOrder === null) {
         return;
     }
 
-    menu.order = nextOrder;
+    const nextOrder = [...queuedSidebarOrder];
+    queuedSidebarOrder = null;
+    inFlightSidebarOrder = nextOrder;
     savingSidebarOrder.value = true;
 
     try {
@@ -399,27 +423,51 @@ const persistSidebarOrder = async (keys: string[]): Promise<void> => {
             },
         );
 
-        if (requestId === sidebarOrderRequestId) {
-            menu.order = response.order;
+        const resolvedOrder = normalizeSidebarOrder(response.order);
+        const menu = page.props.menu as MenuState | undefined;
+
+        confirmedSidebarOrder = [...resolvedOrder];
+
+        if (menu) {
+            menu.order = resolvedOrder;
+        }
+
+        if (queuedSidebarOrder === null) {
+            optimisticSidebarOrder.value = resolvedOrder;
         }
     } catch (error) {
         console.error(error);
 
-        if (requestId === sidebarOrderRequestId) {
-            menu.order = currentOrder;
+        if (queuedSidebarOrder === null) {
+            optimisticSidebarOrder.value = [...confirmedSidebarOrder];
         }
     } finally {
-        if (requestId === sidebarOrderRequestId) {
-            savingSidebarOrder.value = false;
+        inFlightSidebarOrder = null;
+        savingSidebarOrder.value = false;
+
+        if (queuedSidebarOrder !== null) {
+            void persistQueuedSidebarOrder();
         }
     }
 };
 
-const moveSidebarItem = (itemKey: string, direction: 'up' | 'down'): void => {
-    if (savingSidebarOrder.value) {
+const persistSidebarOrder = (keys: string[]): void => {
+    const nextOrder = normalizeSidebarOrder(keys);
+
+    if (
+        isSameOrder(nextOrder, optimisticSidebarOrder.value) &&
+        queuedSidebarOrder === null &&
+        inFlightSidebarOrder === null
+    ) {
         return;
     }
 
+    optimisticSidebarOrder.value = nextOrder;
+    queuedSidebarOrder = [...nextOrder];
+    void persistQueuedSidebarOrder();
+};
+
+const moveSidebarItem = (itemKey: string, direction: 'up' | 'down'): void => {
     const keys = orderedSidebarItems.value.map((item) => item.key);
     const itemIndex = keys.indexOf(itemKey);
 
@@ -595,10 +643,7 @@ const isLastSidebarItem = (itemKey: string): boolean => {
                                 type="button"
                                 variant="outline"
                                 size="icon-sm"
-                                :disabled="
-                                    savingSidebarOrder ||
-                                    isFirstSidebarItem(item.key)
-                                "
+                                :disabled="isFirstSidebarItem(item.key)"
                                 :title="t.menu.move_up"
                                 @click="moveSidebarItem(item.key, 'up')"
                             >
@@ -612,10 +657,7 @@ const isLastSidebarItem = (itemKey: string): boolean => {
                                 type="button"
                                 variant="outline"
                                 size="icon-sm"
-                                :disabled="
-                                    savingSidebarOrder ||
-                                    isLastSidebarItem(item.key)
-                                "
+                                :disabled="isLastSidebarItem(item.key)"
                                 :title="t.menu.move_down"
                                 @click="moveSidebarItem(item.key, 'down')"
                             >

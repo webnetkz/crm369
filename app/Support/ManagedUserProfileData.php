@@ -16,6 +16,13 @@ class ManagedUserProfileData
         $group = $user->relationLoaded('group')
             ? $user->group
             : $user->group()->select(['id', 'name'])->first();
+        $manager = $user->relationLoaded('manager')
+            ? $user->manager
+            : $user->manager()->select(['id', 'name', 'last_name', 'email', 'position', 'avatar_path', 'avatar_scale', 'is_active'])->first();
+        /** @var Collection<int, User> $subordinates */
+        $subordinates = $user->relationLoaded('subordinates')
+            ? $user->subordinates
+            : $user->subordinates()->select(['id', 'name', 'last_name', 'email', 'position', 'avatar_path', 'avatar_scale', 'is_active', 'manager_id'])->get();
 
         return [
             'id' => $user->id,
@@ -23,6 +30,7 @@ class ManagedUserProfileData
             'last_name' => $user->last_name,
             'email' => $user->email,
             'phone' => $user->phone,
+            'position' => $user->position,
             'email_verified_at' => $user->email_verified_at?->toISOString(),
             'avatar' => $user->avatar,
             'avatar_scale' => $user->avatar_scale,
@@ -39,6 +47,13 @@ class ManagedUserProfileData
                     'display_name' => $group->displayName(),
                 ]
                 : null,
+            'manager_id' => $manager?->id,
+            'manager' => $manager ? $this->serializeStructureUser($manager) : null,
+            'subordinates_count' => $subordinates->count(),
+            'subordinates' => $subordinates
+                ->map(fn (User $subordinate): array => $this->serializeStructureUser($subordinate))
+                ->values()
+                ->all(),
         ];
     }
 
@@ -86,5 +101,25 @@ class ManagedUserProfileData
         }
 
         return ! $user->isSuperAdmin() || $viewer->isSuperAdmin();
+    }
+
+    /**
+     * @return array{id: int, name: string, last_name: string|null, full_name: string, email: string, position: string|null, avatar: string|null, avatar_scale: float, is_active: bool}
+     */
+    private function serializeStructureUser(User $user): array
+    {
+        $fullName = trim($user->name.' '.($user->last_name ?? ''));
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'last_name' => $user->last_name,
+            'full_name' => $fullName !== '' ? $fullName : $user->email,
+            'email' => $user->email,
+            'position' => $user->position,
+            'avatar' => $user->avatar,
+            'avatar_scale' => $user->avatar_scale,
+            'is_active' => $user->is_active,
+        ];
     }
 }

@@ -3,7 +3,10 @@
 use App\Models\ApiAccessToken;
 use App\Models\User;
 use App\Models\UserGroup;
+use App\Models\WarehouseItem;
+use App\Models\WarehousePlace;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Inertia\Testing\AssertableInertia;
 
 function warehouseApiAdministratorsGroup(): UserGroup
 {
@@ -82,6 +85,25 @@ test('warehouse api endpoints create read update and delete warehouse hierarchie
         ->assertOk()
         ->assertJsonPath('data.rows.1.columns.0.floors.0.places.0.name', 'B-02-1-001');
 
+    $place = WarehousePlace::query()->where('name', 'A-01-1-001')->firstOrFail();
+
+    WarehouseItem::factory()->forPlace($place)->create([
+        'name' => 'Шкаф приводов',
+        'sku' => 'DRV-101',
+        'qr_code' => 'WI-DRV-101',
+        'quantity' => 2,
+    ]);
+
+    $this->withHeaders(warehouseApiHeadersFor($token))
+        ->getJson(route('api.v1.warehouses.items', $warehouseId))
+        ->assertOk()
+        ->assertJson(fn (AssertableJson $json) => $json
+            ->where('meta.total', 1)
+            ->where('data.0.name', 'Шкаф приводов')
+            ->where('data.0.location.path', 'API склад / Ряд A / Колонка 01 / Этаж 1 / A-01-1-001')
+            ->etc()
+        );
+
     $this->withHeaders(warehouseApiHeadersFor($token))
         ->patchJson(route('api.v1.warehouses.update', $warehouseId), [
             'area_sqm' => 1045.25,
@@ -133,4 +155,25 @@ test('warehouse api write actions are blocked without write permission', functio
     $this->withHeaders(warehouseApiHeadersFor($token))
         ->postJson(route('api.v1.warehouses.store'), warehouseHierarchyPayload('Только чтение'))
         ->assertForbidden();
+});
+
+test('api settings include warehouse item qr endpoint in documentation', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'user_group_id' => warehouseApiAdministratorsGroup()->id,
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('settings.api.documentation.edit'))
+        ->assertSuccessful()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('settings/ApiDocumentation')
+            ->where('documentation', fn ($documentation): bool => collect($documentation)->contains(
+                fn (array $section): bool => $section['title'] === __('ui.api.section_warehouses')
+                    && collect($section['endpoints'])->contains(
+                        fn (array $endpoint): bool => $endpoint['path'] === '/api/v1/warehouses/{warehouse}/items'
+                            && $endpoint['permission'] === ApiAccessToken::PERMISSION_WAREHOUSES_READ
+                    )
+            ))
+        );
 });

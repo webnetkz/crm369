@@ -6,6 +6,7 @@ return [
     'auth' => require __DIR__.'/ui/auth.php',
     'settings' => require __DIR__.'/ui/settings.php',
     'admin' => require __DIR__.'/ui/admin.php',
+    'company_structure' => require __DIR__.'/ui/company_structure.php',
     'portal' => require __DIR__.'/ui/portal.php',
     'menu' => require __DIR__.'/ui/menu.php',
     'modules' => require __DIR__.'/ui/modules.php',

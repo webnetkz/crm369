@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreWarehouseRequest;
 use App\Http\Requests\UpdateWarehouseRequest;
+use App\Http\Resources\ApiWarehouseItemResource;
 use App\Http\Resources\ApiWarehouseResource;
 use App\Models\PortalWebhook;
 use App\Models\Warehouse;
+use App\Models\WarehouseItem;
 use App\Support\WarehouseHierarchyManager;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PortalWebhookWarehouseController extends Controller
 {
@@ -54,6 +57,38 @@ class PortalWebhookWarehouseController extends Controller
                 'name' => $portalWebhook->name,
             ],
             'data' => (new ApiWarehouseResource($warehouse))->resolve(),
+        ]);
+    }
+
+    public function items(Request $request, PortalWebhook $portalWebhook, Warehouse $warehouse): JsonResponse
+    {
+        /** @var PortalWebhook $resolvedWebhook */
+        $resolvedWebhook = $request->attributes->get('portal_webhook', $portalWebhook);
+        $perPage = max(1, min((int) $request->integer('per_page', 25), 100));
+
+        $warehouseItems = WarehouseItem::query()
+            ->with('place.floor.column.row.warehouse')
+            ->whereHas('place.floor.column.row', fn ($query) => $query->where('warehouse_id', $warehouse->id))
+            ->orderBy('name')
+            ->orderBy('id')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return response()->json([
+            'webhook' => [
+                'id' => $resolvedWebhook->id,
+                'name' => $resolvedWebhook->name,
+            ],
+            'data' => collect($warehouseItems->items())
+                ->map(fn (WarehouseItem $warehouseItem): array => (new ApiWarehouseItemResource($warehouseItem))->resolve())
+                ->values()
+                ->all(),
+            'meta' => [
+                'current_page' => $warehouseItems->currentPage(),
+                'last_page' => $warehouseItems->lastPage(),
+                'per_page' => $warehouseItems->perPage(),
+                'total' => $warehouseItems->total(),
+            ],
         ]);
     }
 

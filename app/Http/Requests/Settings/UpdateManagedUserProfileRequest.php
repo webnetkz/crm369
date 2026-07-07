@@ -6,6 +6,9 @@ use App\Concerns\ProfileValidationRules;
 use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateManagedUserProfileRequest extends FormRequest
 {
@@ -30,12 +33,18 @@ class UpdateManagedUserProfileRequest extends FormRequest
     {
         $lastName = $this->input('last_name');
         $phone = $this->input('phone');
+        $position = $this->input('position');
+        $managerId = $this->input('manager_id');
 
         $this->merge([
             'last_name' => is_string($lastName) && trim($lastName) !== ''
                 ? trim($lastName)
                 : null,
             'phone' => $this->normalizeKazakhstanPhone(is_string($phone) ? $phone : null),
+            'position' => is_string($position) && trim($position) !== ''
+                ? trim($position)
+                : null,
+            'manager_id' => is_numeric($managerId) ? (int) $managerId : null,
         ]);
     }
 
@@ -48,7 +57,38 @@ class UpdateManagedUserProfileRequest extends FormRequest
     {
         $targetUser = $this->route('user');
 
-        return $this->profileRules($targetUser instanceof User ? $targetUser->id : null);
+        return [
+            ...$this->profileRules($targetUser instanceof User ? $targetUser->id : null),
+            'position' => ['nullable', 'string', 'max:255'],
+            'manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+        ];
+    }
+
+    /**
+     * @return array<int, callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                $targetUser = $this->route('user');
+                $managerId = $this->validated('manager_id');
+
+                if (! $targetUser instanceof User || ! is_int($managerId)) {
+                    return;
+                }
+
+                if ($managerId === $targetUser->id) {
+                    $validator->errors()->add('manager_id', __('ui.admin.manager_cycle_error'));
+
+                    return;
+                }
+
+                if ($this->managerCreatesCycle($targetUser, $managerId)) {
+                    $validator->errors()->add('manager_id', __('ui.admin.manager_cycle_error'));
+                }
+            },
+        ];
     }
 
     private function normalizeKazakhstanPhone(?string $phone): ?string
@@ -76,5 +116,26 @@ class UpdateManagedUserProfileRequest extends FormRequest
         }
 
         return '+'.$digits;
+    }
+
+    private function managerCreatesCycle(User $targetUser, int $managerId): bool
+    {
+        /** @var Collection<int, int> $visitedIds */
+        $visitedIds = collect();
+        $cursorId = $managerId;
+
+        while ($cursorId > 0 && ! $visitedIds->contains($cursorId)) {
+            if ($cursorId === $targetUser->id) {
+                return true;
+            }
+
+            $visitedIds->push($cursorId);
+
+            $cursorId = (int) (User::query()
+                ->whereKey($cursorId)
+                ->value('manager_id') ?? 0);
+        }
+
+        return false;
     }
 }

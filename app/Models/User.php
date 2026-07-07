@@ -26,6 +26,8 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string|null $last_name
  * @property string $email
  * @property string|null $phone
+ * @property string|null $position
+ * @property int|null $manager_id
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $appearance
@@ -52,7 +54,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'last_name', 'email', 'phone', 'password', 'appearance', 'language', 'has_selected_language', 'background_color', 'background_image_path', 'background_blur', 'hidden_menu_item_keys', 'hidden_menu_item_ids', 'menu_item_order', 'avatar_path', 'avatar_position_x', 'avatar_position_y', 'avatar_scale', 'user_group_id', 'is_active', 'deactivated_at'])]
+#[Fillable(['name', 'last_name', 'email', 'phone', 'position', 'manager_id', 'password', 'appearance', 'language', 'has_selected_language', 'background_color', 'background_image_path', 'background_blur', 'hidden_menu_item_keys', 'hidden_menu_item_ids', 'menu_item_order', 'avatar_path', 'avatar_position_x', 'avatar_position_y', 'avatar_scale', 'user_group_id', 'is_active', 'deactivated_at'])]
 #[Hidden(['password', 'avatar_path', 'background_image_path', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
@@ -81,6 +83,7 @@ class User extends Authenticatable implements PasskeyUser
             'avatar_position_x' => 'integer',
             'avatar_position_y' => 'integer',
             'avatar_scale' => 'float',
+            'manager_id' => 'integer',
             'is_active' => 'boolean',
             'deactivated_at' => 'datetime',
             'password' => 'hashed',
@@ -149,6 +152,24 @@ class User extends Authenticatable implements PasskeyUser
     public function group(): BelongsTo
     {
         return $this->belongsTo(UserGroup::class, 'user_group_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'manager_id');
+    }
+
+    /**
+     * @return HasMany<User, $this>
+     */
+    public function subordinates(): HasMany
+    {
+        return $this->hasMany(self::class, 'manager_id')
+            ->orderBy('name')
+            ->orderBy('last_name');
     }
 
     /**

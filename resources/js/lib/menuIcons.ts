@@ -13,6 +13,7 @@ import {
     Newspaper,
     Rocket,
     ShieldCheck,
+    Users,
 } from '@lucide/vue';
 
 export const menuIconMap = {
@@ -25,6 +26,7 @@ export const menuIconMap = {
     clipboard: ClipboardList,
     message: MessageSquareMore,
     news: Newspaper,
+    users: Users,
     tasks: ListTodo,
     bell: BellRing,
     shield: ShieldCheck,

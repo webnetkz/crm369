@@ -14,6 +14,7 @@ use App\Models\EquipmentItem;
 use App\Models\PortalWebhook;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Support\CompanyStructureData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -34,6 +35,7 @@ class PortalWebhookInvokeController extends Controller
             'expires_at' => $resolvedWebhook->expires_at?->toISOString(),
             'last_used_at' => $resolvedWebhook->last_used_at?->toISOString(),
             'users' => $this->usersPayload($resolvedWebhook),
+            'company_structure' => $this->companyStructurePayload($resolvedWebhook),
             'contacts' => $this->contactsPayload($resolvedWebhook),
             'edo_documents' => $this->edoPayload($resolvedWebhook),
             'equipment_items' => $this->equipmentPayload($resolvedWebhook),
@@ -53,6 +55,16 @@ class PortalWebhookInvokeController extends Controller
             $endpoints['users'] = [
                 'index' => route('portal-webhooks.users.index', $portalWebhook).'?token='.urlencode($plainTextToken),
                 'show_template' => route('portal-webhooks.users.show', [
+                    'portalWebhook' => $portalWebhook,
+                    'user' => '__USER_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_COMPANY_STRUCTURE_READ)) {
+            $endpoints['company_structure'] = [
+                'index' => route('portal-webhooks.company-structure.index', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'show_template' => route('portal-webhooks.company-structure.show', [
                     'portalWebhook' => $portalWebhook,
                     'user' => '__USER_ID__',
                 ]).'?token='.urlencode($plainTextToken),
@@ -146,6 +158,10 @@ class PortalWebhookInvokeController extends Controller
                     'portalWebhook' => $portalWebhook,
                     'warehouse' => '__WAREHOUSE_ID__',
                 ]).'?token='.urlencode($plainTextToken),
+                'items_template' => route('portal-webhooks.warehouses.items', [
+                    'portalWebhook' => $portalWebhook,
+                    'warehouse' => '__WAREHOUSE_ID__',
+                ]).'?token='.urlencode($plainTextToken),
             ];
         }
 
@@ -204,6 +220,18 @@ class PortalWebhookInvokeController extends Controller
             ->map(fn (User $user): array => (new ApiUserResource($user))->resolve())
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function companyStructurePayload(PortalWebhook $portalWebhook): ?array
+    {
+        if (! $portalWebhook->hasPermission(PortalWebhook::PERMISSION_COMPANY_STRUCTURE_READ)) {
+            return null;
+        }
+
+        return app(CompanyStructureData::class)->webhookData();
     }
 
     /**

@@ -69,6 +69,7 @@ class MenuItem extends Model
             'clipboard' => ['label_key' => 'ui.menu.icons.clipboard'],
             'message' => ['label_key' => 'ui.menu.icons.message'],
             'news' => ['label_key' => 'ui.menu.icons.news'],
+            'users' => ['label_key' => 'ui.menu.icons.users'],
             'tasks' => ['label_key' => 'ui.menu.icons.tasks'],
             'bell' => ['label_key' => 'ui.menu.icons.bell'],
             'shield' => ['label_key' => 'ui.menu.icons.shield'],
@@ -107,6 +108,12 @@ class MenuItem extends Model
                 'fallback_title' => 'Dashboard',
                 'url' => '/dashboard',
                 'sort_order' => 30,
+            ],
+            'company-structure' => [
+                'title_key' => 'ui.company_structure.title',
+                'fallback_title' => 'Company structure',
+                'url' => '/company-structure',
+                'sort_order' => 35,
             ],
             'projects' => [
                 'title_key' => 'ui.projects.title',
@@ -258,6 +265,7 @@ class MenuItem extends Model
             'news',
             'notifications',
             'dashboard',
+            'company-structure',
             'projects',
             'chats',
             'knowledge-bases',

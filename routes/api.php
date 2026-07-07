@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\ChatController;
+use App\Http\Controllers\Api\V1\CompanyStructureController as ApiCompanyStructureController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\EdoDocumentController as ApiEdoDocumentController;
 use App\Http\Controllers\Api\V1\EquipmentController;
@@ -53,6 +54,15 @@ Route::prefix('v1')->middleware(['module.enabled:api', 'auth:api', ResolveApiSub
         Route::post('chats/{chatConversation}/messages', [ChatController::class, 'storeMessage'])
             ->middleware('api.token:chat.write')
             ->name('api.v1.chats.messages.store');
+    });
+
+    Route::middleware('module.enabled:company-structure')->group(function (): void {
+        Route::get('company-structure', [ApiCompanyStructureController::class, 'index'])
+            ->middleware('api.token:company-structure.read')
+            ->name('api.v1.company-structure.index');
+        Route::get('company-structure/users/{user}', [ApiCompanyStructureController::class, 'show'])
+            ->middleware('api.token:company-structure.read')
+            ->name('api.v1.company-structure.show');
     });
 
     Route::middleware('module.enabled:contacts')->group(function (): void {
@@ -162,6 +172,9 @@ Route::prefix('v1')->middleware(['module.enabled:api', 'auth:api', ResolveApiSub
         Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show'])
             ->middleware('api.token:warehouses.read')
             ->name('api.v1.warehouses.show');
+        Route::get('warehouses/{warehouse}/items', [WarehouseController::class, 'items'])
+            ->middleware('api.token:warehouses.read')
+            ->name('api.v1.warehouses.items');
         Route::post('warehouses', [WarehouseController::class, 'store'])
             ->middleware('api.token:warehouses.write')
             ->name('api.v1.warehouses.store');

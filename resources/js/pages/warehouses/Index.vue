@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { Boxes, Building2, Package, Plus, QrCode, Rows3 } from '@lucide/vue';
+import { Head, Link, setLayoutProps, useForm, usePage } from '@inertiajs/vue3';
+import { ArrowRight, Boxes, Building2, Package, Plus, QrCode, ScanLine } from '@lucide/vue';
 import { computed, ref, watchEffect } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
@@ -18,45 +18,10 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/composables/useLanguage';
 import {
     index as warehousesIndex,
+    scan as scanWarehouse,
+    show as showWarehouse,
     store as storeWarehouse,
 } from '@/routes/warehouses';
-
-type WarehousePlace = {
-    id: number;
-    name: string;
-    qr_code: string;
-    sort_order: number;
-};
-
-type WarehouseFloor = {
-    id: number;
-    name: string;
-    qr_code: string;
-    sort_order: number;
-    place_count: number;
-    places: WarehousePlace[];
-};
-
-type WarehouseColumn = {
-    id: number;
-    name: string;
-    qr_code: string;
-    sort_order: number;
-    floor_count: number;
-    place_count: number;
-    floors: WarehouseFloor[];
-};
-
-type WarehouseRow = {
-    id: number;
-    name: string;
-    qr_code: string;
-    sort_order: number;
-    column_count: number;
-    floor_count: number;
-    place_count: number;
-    columns: WarehouseColumn[];
-};
 
 type WarehouseRecord = {
     id: number;
@@ -67,7 +32,6 @@ type WarehouseRecord = {
     column_count: number;
     floor_count: number;
     place_count: number;
-    rows: WarehouseRow[];
 };
 
 type Summary = {
@@ -97,22 +61,51 @@ type WarehousePayload = {
     }>;
 };
 
+type ResolvedScanResult = {
+    entity_type: string;
+    entity_type_label: string;
+    title: string;
+    qr_code: string;
+    location: {
+        path: string;
+    };
+    warehouse: {
+        name: string;
+    };
+    details: {
+        quantity?: number | null;
+        sku?: string | null;
+    };
+} | null;
+
+type PageProps = {
+    flash?: {
+        warehouseScanResult?: ResolvedScanResult;
+    };
+};
+
 const props = defineProps<{
     warehouses: WarehouseRecord[];
     summary: Summary;
 }>();
 
+const page = usePage<PageProps>();
 const { language, t } = useLanguage();
 
-const dialogOpen = ref(false);
+const createDialogOpen = ref(false);
+const scanDialogOpen = ref(false);
 
-const form = useForm({
+const createForm = useForm({
     name: '',
     area_sqm: 0,
     rows_count: 1,
     columns_per_row: 1,
     floors_per_column: 1,
     places_per_floor: 1,
+});
+
+const scanForm = useForm({
+    qr_code: '',
 });
 
 const formatNumber = (value: number): string => {
@@ -122,7 +115,7 @@ const formatNumber = (value: number): string => {
 };
 
 const normalizePositiveCount = (value: number): number => {
-    if (! Number.isFinite(value)) {
+    if (!Number.isFinite(value)) {
         return 1;
     }
 
@@ -153,18 +146,26 @@ const summaryCards = computed(() => [
 ]);
 
 const placesPreview = computed(() => {
-    return normalizePositiveCount(form.rows_count)
-        * normalizePositiveCount(form.columns_per_row)
-        * normalizePositiveCount(form.floors_per_column)
-        * normalizePositiveCount(form.places_per_floor);
+    return normalizePositiveCount(createForm.rows_count)
+        * normalizePositiveCount(createForm.columns_per_row)
+        * normalizePositiveCount(createForm.floors_per_column)
+        * normalizePositiveCount(createForm.places_per_floor);
 });
 
 const qrCodesPreview = computed(() => {
     return 1
-        + normalizePositiveCount(form.rows_count)
-        + (normalizePositiveCount(form.rows_count) * normalizePositiveCount(form.columns_per_row))
-        + (normalizePositiveCount(form.rows_count) * normalizePositiveCount(form.columns_per_row) * normalizePositiveCount(form.floors_per_column))
+        + normalizePositiveCount(createForm.rows_count)
+        + (normalizePositiveCount(createForm.rows_count) * normalizePositiveCount(createForm.columns_per_row))
+        + (normalizePositiveCount(createForm.rows_count) * normalizePositiveCount(createForm.columns_per_row) * normalizePositiveCount(createForm.floors_per_column))
         + placesPreview.value;
+});
+
+const resolvedScanResult = computed<ResolvedScanResult>(() => {
+    const flashFromPage = (page as typeof page & {
+        flash?: { warehouseScanResult?: ResolvedScanResult };
+    }).flash?.warehouseScanResult;
+
+    return flashFromPage ?? page.props.flash?.warehouseScanResult ?? null;
 });
 
 watchEffect(() => {
@@ -178,35 +179,47 @@ watchEffect(() => {
     });
 });
 
-const resetForm = (): void => {
-    form.name = '';
-    form.area_sqm = 0;
-    form.rows_count = 1;
-    form.columns_per_row = 1;
-    form.floors_per_column = 1;
-    form.places_per_floor = 1;
-    form.clearErrors();
+const resetCreateForm = (): void => {
+    createForm.name = '';
+    createForm.area_sqm = 0;
+    createForm.rows_count = 1;
+    createForm.columns_per_row = 1;
+    createForm.floors_per_column = 1;
+    createForm.places_per_floor = 1;
+    createForm.clearErrors();
 };
 
-const closeDialog = (): void => {
-    dialogOpen.value = false;
-    resetForm();
+const closeCreateDialog = (): void => {
+    createDialogOpen.value = false;
+    resetCreateForm();
 };
 
 const openCreateDialog = (): void => {
-    resetForm();
-    dialogOpen.value = true;
+    resetCreateForm();
+    createDialogOpen.value = true;
+};
+
+const closeScanDialog = (): void => {
+    scanDialogOpen.value = false;
+    scanForm.reset();
+    scanForm.clearErrors();
+};
+
+const openScanDialog = (): void => {
+    scanForm.reset();
+    scanForm.clearErrors();
+    scanDialogOpen.value = true;
 };
 
 const buildWarehousePayload = (): WarehousePayload => {
-    const rowsCount = normalizePositiveCount(form.rows_count);
-    const columnsPerRow = normalizePositiveCount(form.columns_per_row);
-    const floorsPerColumn = normalizePositiveCount(form.floors_per_column);
-    const placesPerFloor = normalizePositiveCount(form.places_per_floor);
+    const rowsCount = normalizePositiveCount(createForm.rows_count);
+    const columnsPerRow = normalizePositiveCount(createForm.columns_per_row);
+    const floorsPerColumn = normalizePositiveCount(createForm.floors_per_column);
+    const placesPerFloor = normalizePositiveCount(createForm.places_per_floor);
 
     return {
-        name: form.name,
-        area_sqm: Number(form.area_sqm),
+        name: createForm.name,
+        area_sqm: Number(createForm.area_sqm),
         rows: Array.from({ length: rowsCount }, (_, rowIndex) => ({
             name: `Ряд ${String.fromCharCode(65 + rowIndex)}`,
             columns: Array.from({ length: columnsPerRow }, (_, columnIndex) => ({
@@ -222,15 +235,24 @@ const buildWarehousePayload = (): WarehousePayload => {
     };
 };
 
-const submitForm = (): void => {
-    form
+const submitCreateForm = (): void => {
+    createForm
         .transform(() => buildWarehousePayload())
         .post(storeWarehouse.url(), {
             preserveScroll: true,
             onSuccess: () => {
-                closeDialog();
+                closeCreateDialog();
             },
         });
+};
+
+const submitScanForm = (): void => {
+    scanForm.post(scanWarehouse.url(), {
+        preserveScroll: true,
+        onSuccess: () => {
+            closeScanDialog();
+        },
+    });
 };
 </script>
 
@@ -259,10 +281,16 @@ const submitForm = (): void => {
                         </p>
                     </div>
 
-                    <Button type="button" class="gap-2" @click="openCreateDialog">
-                        <Plus class="size-4" />
-                        <span>{{ t.warehouses.create_warehouse }}</span>
-                    </Button>
+                    <div class="flex flex-wrap gap-3">
+                        <Button type="button" class="gap-2" @click="openCreateDialog">
+                            <Plus class="size-4" />
+                            <span>{{ t.warehouses.create_warehouse }}</span>
+                        </Button>
+                        <Button type="button" variant="outline" class="gap-2" @click="openScanDialog">
+                            <ScanLine class="size-4" />
+                            <span>{{ t.warehouses.scan_open }}</span>
+                        </Button>
+                    </div>
                 </div>
 
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
@@ -283,42 +311,52 @@ const submitForm = (): void => {
             </div>
         </section>
 
-        <section class="rounded-3xl border border-border bg-card p-6">
-            <Heading
-                variant="small"
-                :title="t.warehouses.list_title"
-                :description="t.warehouses.list_description"
-            />
+        <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div class="rounded-3xl border border-border bg-card p-6">
+                <Heading
+                    variant="small"
+                    :title="t.warehouses.list_title"
+                    :description="t.warehouses.list_description"
+                />
 
-            <div
-                v-if="warehouses.length === 0"
-                class="mt-6 rounded-2xl border border-dashed border-border bg-background/70 px-6 py-10 text-center"
-            >
-                <div class="text-lg font-semibold">{{ t.warehouses.empty_title }}</div>
-                <p class="mt-2 text-sm leading-6 text-muted-foreground">
-                    {{ t.warehouses.empty_description }}
-                </p>
-            </div>
-
-            <div v-else class="mt-6 space-y-6">
-                <article
-                    v-for="warehouse in warehouses"
-                    :key="warehouse.id"
-                    class="rounded-3xl border border-border bg-background/70 p-5"
+                <div
+                    v-if="warehouses.length === 0"
+                    class="mt-6 rounded-2xl border border-dashed border-border bg-background/70 px-6 py-10 text-center"
                 >
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div class="space-y-2">
-                            <div class="flex items-center gap-2 text-sm font-medium text-primary">
-                                <Building2 class="size-4" />
-                                <span>{{ warehouse.name }}</span>
+                    <div class="text-lg font-semibold">{{ t.warehouses.empty_title }}</div>
+                    <p class="mt-2 text-sm leading-6 text-muted-foreground">
+                        {{ t.warehouses.empty_description }}
+                    </p>
+                </div>
+
+                <div v-else class="mt-6 grid gap-5 xl:grid-cols-2">
+                    <article
+                        v-for="warehouse in warehouses"
+                        :key="warehouse.id"
+                        class="rounded-3xl border border-border bg-background/70 p-5"
+                    >
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="space-y-2">
+                                <div class="flex items-center gap-2 text-sm font-medium text-primary">
+                                    <Building2 class="size-4" />
+                                    <span>{{ warehouse.name }}</span>
+                                </div>
+                                <p class="text-sm text-muted-foreground">
+                                    {{ t.warehouses.warehouse_qr }}:
+                                    <span class="font-mono text-foreground">{{ warehouse.qr_code }}</span>
+                                </p>
                             </div>
-                            <p class="text-sm text-muted-foreground">
-                                {{ t.warehouses.warehouse_qr }}:
-                                <span class="font-mono text-foreground">{{ warehouse.qr_code }}</span>
-                            </p>
+
+                            <Link
+                                :href="showWarehouse.url(warehouse.id)"
+                                class="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15"
+                            >
+                                <span>{{ t.warehouses.open_warehouse }}</span>
+                                <ArrowRight class="size-4" />
+                            </Link>
                         </div>
 
-                        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                        <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                             <div class="rounded-2xl border border-border bg-card px-4 py-3 text-sm">
                                 <div class="text-muted-foreground">{{ t.warehouses.metric_area }}</div>
                                 <div class="mt-1 font-semibold">{{ formatNumber(warehouse.area_sqm) }} m²</div>
@@ -340,91 +378,77 @@ const submitForm = (): void => {
                                 <div class="mt-1 font-semibold">{{ formatNumber(warehouse.place_count) }}</div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="mt-5 space-y-4">
-                        <section
-                            v-for="row in warehouse.rows"
-                            :key="row.id"
-                            class="rounded-2xl border border-border bg-card/80 p-4"
-                        >
-                            <div class="flex items-center justify-between gap-3">
-                                <div>
-                                    <div class="flex items-center gap-2 font-medium">
-                                        <Rows3 class="size-4 text-primary" />
-                                        <span>{{ row.name }}</span>
-                                    </div>
-                                    <div class="mt-1 text-xs text-muted-foreground">
-                                        {{ t.warehouses.row_qr }}:
-                                        <span class="font-mono text-foreground">{{ row.qr_code }}</span>
-                                    </div>
-                                </div>
-
-                                <div class="text-sm text-muted-foreground">
-                                    {{ t.warehouses.metric_columns }}: {{ formatNumber(row.column_count) }} ·
-                                    {{ t.warehouses.metric_floors }}: {{ formatNumber(row.floor_count) }} ·
-                                    {{ t.warehouses.metric_places }}: {{ formatNumber(row.place_count) }}
-                                </div>
-                            </div>
-
-                            <div class="mt-4 grid gap-4 xl:grid-cols-2">
-                                <section
-                                    v-for="column in row.columns"
-                                    :key="column.id"
-                                    class="rounded-2xl border border-border bg-background px-4 py-4"
-                                >
-                                    <div class="font-medium">{{ column.name }}</div>
-                                    <div class="mt-1 text-xs text-muted-foreground">
-                                        {{ t.warehouses.column_qr }}:
-                                        <span class="font-mono text-foreground">{{ column.qr_code }}</span>
-                                    </div>
-
-                                    <div class="mt-3 space-y-3">
-                                        <div
-                                            v-for="floor in column.floors"
-                                            :key="floor.id"
-                                            class="rounded-xl border border-border bg-card px-3 py-3"
-                                        >
-                                            <div class="flex items-center justify-between gap-3">
-                                                <div>
-                                                    <div class="font-medium">{{ floor.name }}</div>
-                                                    <div class="text-xs text-muted-foreground">
-                                                        {{ t.warehouses.floor_qr }}:
-                                                        <span class="font-mono text-foreground">{{ floor.qr_code }}</span>
-                                                    </div>
-                                                </div>
-
-                                                <div class="text-xs text-muted-foreground">
-                                                    {{ t.warehouses.metric_places }}:
-                                                    {{ formatNumber(floor.place_count) }}
-                                                </div>
-                                            </div>
-
-                                            <div class="mt-3 flex flex-wrap gap-2">
-                                                <div
-                                                    v-for="place in floor.places"
-                                                    :key="place.id"
-                                                    class="rounded-full border border-border bg-background px-3 py-1.5 text-xs"
-                                                >
-                                                    <div class="font-medium text-foreground">{{ place.name }}</div>
-                                                    <div class="text-[11px] text-muted-foreground">
-                                                        {{ t.warehouses.place_qr }}:
-                                                        <span class="font-mono text-foreground">{{ place.qr_code }}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </section>
-                            </div>
-                        </section>
-                    </div>
-                </article>
+                    </article>
+                </div>
             </div>
+
+            <aside class="rounded-3xl border border-border bg-card p-6">
+                <Heading
+                    variant="small"
+                    :title="t.warehouses.scan_result_title"
+                    :description="t.warehouses.scan_result_description"
+                />
+
+                <div
+                    v-if="resolvedScanResult"
+                    class="mt-6 space-y-4 rounded-2xl border border-border bg-background/70 p-4"
+                >
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                {{ t.warehouses.scan_entity }}
+                            </div>
+                            <div class="mt-1 font-semibold">{{ resolvedScanResult.entity_type_label }}</div>
+                        </div>
+                        <div class="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                            {{ resolvedScanResult.warehouse.name }}
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-border bg-card p-4">
+                        <div class="font-semibold">{{ resolvedScanResult.title }}</div>
+                        <div class="mt-2 text-sm text-muted-foreground">
+                            {{ t.warehouses.scan_matched_qr }}:
+                            <span class="font-mono text-foreground">{{ resolvedScanResult.qr_code }}</span>
+                        </div>
+                        <div class="mt-2 text-sm text-muted-foreground">
+                            {{ t.warehouses.scan_location }}:
+                            <span class="text-foreground">{{ resolvedScanResult.location.path }}</span>
+                        </div>
+                        <div
+                            v-if="resolvedScanResult.details?.sku || resolvedScanResult.details?.quantity"
+                            class="mt-3 flex flex-wrap gap-2 text-xs"
+                        >
+                            <div
+                                v-if="resolvedScanResult.details?.sku"
+                                class="rounded-full border border-border bg-background px-3 py-1.5"
+                            >
+                                {{ t.warehouses.sku }}: {{ resolvedScanResult.details.sku }}
+                            </div>
+                            <div
+                                v-if="resolvedScanResult.details?.quantity"
+                                class="rounded-full border border-border bg-background px-3 py-1.5"
+                            >
+                                {{ t.warehouses.quantity }}: {{ resolvedScanResult.details.quantity }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    v-else
+                    class="mt-6 rounded-2xl border border-dashed border-border bg-background/70 px-5 py-8 text-center"
+                >
+                    <div class="text-base font-semibold">{{ t.warehouses.scan_result_empty }}</div>
+                    <p class="mt-2 text-sm leading-6 text-muted-foreground">
+                        {{ t.warehouses.scan_result_empty_description }}
+                    </p>
+                </div>
+            </aside>
         </section>
     </div>
 
-    <Dialog :open="dialogOpen" @update:open="(value) => (value ? (dialogOpen = true) : closeDialog())">
+    <Dialog :open="createDialogOpen" @update:open="(value) => (value ? (createDialogOpen = true) : closeCreateDialog())">
         <DialogContent class="sm:max-w-2xl">
             <DialogHeader>
                 <DialogTitle>{{ t.warehouses.create_warehouse }}</DialogTitle>
@@ -433,36 +457,36 @@ const submitForm = (): void => {
                 </DialogDescription>
             </DialogHeader>
 
-            <form class="space-y-5" @submit.prevent="submitForm">
+            <form class="space-y-5" @submit.prevent="submitCreateForm">
                 <div class="grid gap-5 md:grid-cols-2">
                     <div class="grid gap-2 md:col-span-2">
                         <Label for="warehouse-name">{{ t.warehouses.name }}</Label>
                         <Input
                             id="warehouse-name"
-                            v-model="form.name"
+                            v-model="createForm.name"
                             :placeholder="t.warehouses.name_placeholder"
                             autocomplete="off"
                         />
-                        <InputError :message="form.errors.name" />
+                        <InputError :message="createForm.errors.name" />
                     </div>
 
                     <div class="grid gap-2">
                         <Label for="warehouse-area">{{ t.warehouses.area_sqm }}</Label>
                         <Input
                             id="warehouse-area"
-                            v-model.number="form.area_sqm"
+                            v-model.number="createForm.area_sqm"
                             type="number"
                             min="0"
                             step="0.01"
                         />
-                        <InputError :message="form.errors.area_sqm" />
+                        <InputError :message="createForm.errors.area_sqm" />
                     </div>
 
                     <div class="grid gap-2">
                         <Label for="warehouse-rows">{{ t.warehouses.rows_count }}</Label>
                         <Input
                             id="warehouse-rows"
-                            v-model.number="form.rows_count"
+                            v-model.number="createForm.rows_count"
                             type="number"
                             min="1"
                             step="1"
@@ -473,7 +497,7 @@ const submitForm = (): void => {
                         <Label for="warehouse-columns">{{ t.warehouses.columns_per_row }}</Label>
                         <Input
                             id="warehouse-columns"
-                            v-model.number="form.columns_per_row"
+                            v-model.number="createForm.columns_per_row"
                             type="number"
                             min="1"
                             step="1"
@@ -484,7 +508,7 @@ const submitForm = (): void => {
                         <Label for="warehouse-floors">{{ t.warehouses.floors_per_column }}</Label>
                         <Input
                             id="warehouse-floors"
-                            v-model.number="form.floors_per_column"
+                            v-model.number="createForm.floors_per_column"
                             type="number"
                             min="1"
                             step="1"
@@ -495,7 +519,7 @@ const submitForm = (): void => {
                         <Label for="warehouse-places">{{ t.warehouses.places_per_floor }}</Label>
                         <Input
                             id="warehouse-places"
-                            v-model.number="form.places_per_floor"
+                            v-model.number="createForm.places_per_floor"
                             type="number"
                             min="1"
                             step="1"
@@ -503,7 +527,7 @@ const submitForm = (): void => {
                     </div>
                 </div>
 
-                <InputError :message="form.errors.rows" />
+                <InputError :message="createForm.errors.rows" />
 
                 <div class="grid gap-4 rounded-2xl border border-border bg-muted/20 p-4 md:grid-cols-2">
                     <div>
@@ -526,11 +550,44 @@ const submitForm = (): void => {
                 </div>
 
                 <DialogFooter>
-                    <Button type="button" variant="outline" @click="closeDialog">
+                    <Button type="button" variant="outline" @click="closeCreateDialog">
                         {{ t.warehouses.cancel }}
                     </Button>
-                    <Button type="submit" :disabled="form.processing">
+                    <Button type="submit" :disabled="createForm.processing">
                         {{ t.warehouses.save }}
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog :open="scanDialogOpen" @update:open="(value) => (value ? (scanDialogOpen = true) : closeScanDialog())">
+        <DialogContent class="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>{{ t.warehouses.scan_title }}</DialogTitle>
+                <DialogDescription>
+                    {{ t.warehouses.scan_description }}
+                </DialogDescription>
+            </DialogHeader>
+
+            <form class="space-y-5" @submit.prevent="submitScanForm">
+                <div class="grid gap-2">
+                    <Label for="warehouse-scan-qr">{{ t.tsd.qr_code }}</Label>
+                    <Input
+                        id="warehouse-scan-qr"
+                        v-model="scanForm.qr_code"
+                        :placeholder="t.tsd.qr_code_placeholder"
+                        autocomplete="off"
+                    />
+                    <InputError :message="scanForm.errors.qr_code" />
+                </div>
+
+                <DialogFooter>
+                    <Button type="button" variant="outline" @click="closeScanDialog">
+                        {{ t.warehouses.cancel }}
+                    </Button>
+                    <Button type="submit" :disabled="scanForm.processing">
+                        {{ t.warehouses.scan_submit }}
                     </Button>
                 </DialogFooter>
             </form>

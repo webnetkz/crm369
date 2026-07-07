@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreTsdQrScanRequest;
+use App\Http\Resources\ApiResolvedQrCodeResource;
 use App\Http\Resources\ApiTsdQrScanResource;
 use App\Models\PortalWebhook;
 use App\Models\TsdQrScan;
+use App\Support\QrCodeResolver;
 use App\Support\TsdQrScanManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,6 +45,7 @@ class PortalWebhookTsdController extends Controller
         StoreTsdQrScanRequest $request,
         PortalWebhook $portalWebhook,
         TsdQrScanManager $scanManager,
+        QrCodeResolver $qrCodeResolver,
     ): JsonResponse {
         /** @var PortalWebhook $resolvedWebhook */
         $resolvedWebhook = $request->attributes->get('portal_webhook', $portalWebhook);
@@ -58,6 +61,9 @@ class PortalWebhookTsdController extends Controller
         return response()->json([
             'message' => __('ui.tsd.created_success'),
             'data' => (new ApiTsdQrScanResource($scan))->resolve(),
+            'resolved' => ($resolvedQrCode = $qrCodeResolver->resolve($scan->qr_code)) !== null
+                ? (new ApiResolvedQrCodeResource($resolvedQrCode))->resolve()
+                : null,
         ], 201);
     }
 }

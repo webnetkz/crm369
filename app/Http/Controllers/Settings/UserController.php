@@ -35,6 +35,8 @@ class UserController extends Controller
         $users = User::query()
             ->with([
                 'group:id,name',
+                'manager:id,name,last_name,email,position,avatar_path,avatar_scale,is_active',
+                'subordinates:id,name,last_name,email,position,avatar_path,avatar_scale,is_active,manager_id',
                 ...$this->issuedEquipmentRelations(),
             ])
             ->select([
@@ -43,6 +45,8 @@ class UserController extends Controller
                 'last_name',
                 'email',
                 'phone',
+                'position',
+                'manager_id',
                 'email_verified_at',
                 'avatar_path',
                 'avatar_scale',
@@ -100,6 +104,26 @@ class UserController extends Controller
                     ->values()
                 : [],
             'perPageOptions' => PerPageOptions::allowed(),
+            'managerOptions' => $viewer?->canManageUserAccounts()
+                ? User::query()
+                    ->select(['id', 'name', 'last_name', 'email', 'position'])
+                    ->orderBy('name')
+                    ->orderBy('last_name')
+                    ->get()
+                    ->map(function (User $user): array {
+                        $fullName = trim($user->name.' '.($user->last_name ?? ''));
+
+                        return [
+                            'id' => $user->id,
+                            'name' => $user->name,
+                            'last_name' => $user->last_name,
+                            'full_name' => $fullName !== '' ? $fullName : $user->email,
+                            'email' => $user->email,
+                            'position' => $user->position,
+                        ];
+                    })
+                    ->values()
+                : [],
         ]);
     }
 
@@ -108,6 +132,8 @@ class UserController extends Controller
         return response()->json([
             'data' => $managedUserProfileData->serialize($user->load([
                 'group:id,name',
+                'manager:id,name,last_name,email,position,avatar_path,avatar_scale,is_active',
+                'subordinates:id,name,last_name,email,position,avatar_path,avatar_scale,is_active,manager_id',
                 ...$this->issuedEquipmentRelations(),
             ])),
             'canEdit' => $managedUserProfileData->canEdit(request()->user(), $user),
@@ -143,7 +169,7 @@ class UserController extends Controller
     {
         $validated = $request->validated();
 
-        $user->fill(Arr::only($validated, ['name', 'last_name', 'email', 'phone']));
+        $user->fill(Arr::only($validated, ['name', 'last_name', 'email', 'phone', 'position', 'manager_id']));
 
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;

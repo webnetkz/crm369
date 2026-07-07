@@ -25,6 +25,7 @@ return [
         'clipboard' => 'Clipboard',
         'message' => 'Message',
         'news' => 'News',
+        'users' => 'Users',
         'tasks' => 'Tasks',
         'bell' => 'Notifications',
         'shield' => 'Shield',

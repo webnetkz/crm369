@@ -550,6 +550,41 @@ export type UserGroupOption = {
     display_name: string;
 };
 
+export type CompanyStructurePerson = {
+    id: number;
+    name: string;
+    last_name: string | null;
+    full_name: string;
+    email: string;
+    avatar: string | null;
+    avatar_scale: number;
+    position: string | null;
+    is_active: boolean;
+};
+
+export type CompanyStructureNode = CompanyStructurePerson & {
+    manager_id: number | null;
+    manager: CompanyStructurePerson | null;
+    subordinates_count: number;
+    subordinates: CompanyStructurePerson[];
+    children: CompanyStructureNode[];
+};
+
+export type CompanyStructureStats = {
+    total_users: number;
+    root_users: number;
+    managers: number;
+};
+
+export type CompanyStructureManagerOption = {
+    id: number;
+    name: string;
+    last_name: string | null;
+    full_name: string;
+    email: string;
+    position: string | null;
+};
+
 export type IssuedEquipmentSummary = {
     id: number;
     name: string;
@@ -572,6 +607,7 @@ export type ManagedUserProfile = {
     last_name: string | null;
     email: string;
     phone: string | null;
+    position: string | null;
     email_verified_at: string | null;
     avatar: string | null;
     avatar_scale: number;
@@ -582,6 +618,10 @@ export type ManagedUserProfile = {
     deactivated_at: string | null;
     issued_equipment: IssuedEquipmentSummary[];
     group: UserGroupOption | null;
+    manager_id: number | null;
+    manager: CompanyStructurePerson | null;
+    subordinates_count: number;
+    subordinates: CompanyStructurePerson[];
 };
 
 export type ManagedProfileSaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -591,6 +631,8 @@ export type ManagedProfileFormState = {
     last_name: string;
     email: string;
     phone: string;
+    position: string;
+    manager_id: number | '';
     errors: Record<string, string | undefined>;
 };
 

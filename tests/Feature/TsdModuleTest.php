@@ -5,6 +5,9 @@ use App\Models\PortalWebhook;
 use App\Models\TsdQrScan;
 use App\Models\User;
 use App\Models\UserGroup;
+use App\Models\WarehouseItem;
+use App\Models\WarehousePlace;
+use App\Support\WarehouseHierarchyManager;
 use Inertia\Testing\AssertableInertia as Assert;
 
 function tsdApiAdministratorsGroup(): UserGroup
@@ -145,6 +148,46 @@ test('api tokens can list and create tsd scans', function () {
     expect(TsdQrScan::query()->where('qr_code', 'PACK-2026-0007')->exists())->toBeTrue();
 });
 
+test('api tsd scans return resolved warehouse position when qr belongs to a warehouse item', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'user_group_id' => tsdApiAdministratorsGroup()->id,
+    ]);
+
+    app(WarehouseHierarchyManager::class)->create(
+        warehouseHierarchyPayload('Склад API'),
+        $user,
+    );
+
+    $place = WarehousePlace::query()->where('name', 'A-01-1-001')->firstOrFail();
+    $warehouseItem = WarehouseItem::factory()->forPlace($place)->create([
+        'name' => 'Серверный блок',
+        'sku' => 'SRV-001',
+        'qr_code' => 'WI-SRV-001',
+        'quantity' => 1,
+    ]);
+
+    $plainTextToken = ApiAccessToken::generatePlainTextToken();
+
+    ApiAccessToken::query()->create([
+        'user_id' => $user->id,
+        'name' => 'TSD resolve',
+        ...ApiAccessToken::tokenAttributes($plainTextToken),
+        'permissions' => [
+            ApiAccessToken::PERMISSION_TSD_WRITE,
+        ],
+    ]);
+
+    $this->withHeaders(tsdApiHeadersFor($plainTextToken))
+        ->postJson(route('api.v1.tsd.store'), [
+            'qr_code' => $warehouseItem->qr_code,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('resolved.entity_type', 'item')
+        ->assertJsonPath('resolved.title', 'Серверный блок')
+        ->assertJsonPath('resolved.location.path', 'Склад API / Ряд A / Колонка 01 / Этаж 1 / A-01-1-001');
+});
+
 test('webhook settings include tsd documentation and permissions', function () {
     $admin = User::factory()->create([
         'user_group_id' => tsdApiAdministratorsGroup()->id,
@@ -196,4 +239,36 @@ test('webhooks can list and create tsd scans', function () {
         ->assertJsonPath('data.source', TsdQrScan::SOURCE_WEBHOOK);
 
     expect(TsdQrScan::query()->where('qr_code', 'SHIP-QR-0091')->where('portal_webhook_id', $webhook->id)->exists())->toBeTrue();
+});
+
+test('webhook tsd scans return resolved warehouse position when qr belongs to a warehouse item', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    app(WarehouseHierarchyManager::class)->create(
+        warehouseHierarchyPayload('Склад webhook'),
+        $user,
+    );
+
+    $place = WarehousePlace::query()->where('name', 'A-01-1-001')->firstOrFail();
+    $warehouseItem = WarehouseItem::factory()->forPlace($place)->create([
+        'name' => 'Маршрутизатор',
+        'sku' => 'RTR-777',
+        'qr_code' => 'WI-RTR-777',
+        'quantity' => 3,
+    ]);
+
+    $webhook = PortalWebhook::factory()->create([
+        'permissions' => [PortalWebhook::PERMISSION_TSD_WRITE],
+    ]);
+    $webhook->issueToken('tsd-resolve-token');
+
+    $this->postJson(route('portal-webhooks.tsd.store', $webhook).'?token=tsd-resolve-token', [
+        'qr_code' => $warehouseItem->qr_code,
+    ])
+        ->assertCreated()
+        ->assertJsonPath('resolved.entity_type', 'item')
+        ->assertJsonPath('resolved.title', 'Маршрутизатор')
+        ->assertJsonPath('resolved.location.path', 'Склад webhook / Ряд A / Колонка 01 / Этаж 1 / A-01-1-001');
 });

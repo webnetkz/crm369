@@ -206,6 +206,14 @@ const handleDragOver = (event: DragEvent, item: NavItem): void => {
 
     const { top, height } = targetElement.getBoundingClientRect();
     const position = event.clientY - top > height / 2 ? 'after' : 'before';
+    const currentDropTarget = dropTarget.value;
+
+    if (
+        currentDropTarget?.key === item.key &&
+        currentDropTarget.position === position
+    ) {
+        return;
+    }
 
     dropTarget.value = {
         key: item.key,

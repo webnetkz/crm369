@@ -472,10 +472,13 @@ test('nav reorder handle appears after two second hover delay and renders six dr
         ->and($navMain)->toContain('}, 2000);')
         ->and($navMain)->toContain('v-for="dot in 6"')
         ->and($navMain)->toContain(':draggable="!props.reordering"')
+        ->and($navMain)->toContain('const currentDropTarget = dropTarget.value;')
         ->and($sidebar)->toContain(':reorderable="true"')
         ->and($sidebar)->toContain('@reorder="persistMenuOrder"')
+        ->and($sidebar)->toContain('const optimisticMenuOrder = ref<string[]>([]);')
+        ->and($sidebar)->toContain('let queuedMenuOrder: string[] | null = null;')
         ->and($sidebar)->toContain("method: 'PATCH'")
-        ->and($sidebar)->toContain('menu.order = response.order');
+        ->and($sidebar)->toContain('menu.order = resolvedOrder;');
 });
 
 test('menu settings page exposes explicit sidebar order controls including settings', function () {
@@ -486,6 +489,8 @@ test('menu settings page exposes explicit sidebar order controls including setti
     expect($menuPage)->toContain('const sidebarBuiltInKeys = [')
         ->and($menuPage)->toContain("key: 'settings'")
         ->and($menuPage)->toContain('const orderedSidebarItems = computed<SidebarOrderItem[]>(() => {')
+        ->and($menuPage)->toContain('const optimisticSidebarOrder = ref<string[]>([]);')
+        ->and($menuPage)->toContain('let queuedSidebarOrder: string[] | null = null;')
         ->and($menuPage)->toContain('updateMenuOrder.url()')
         ->and($menuPage)->toContain('@click="moveSidebarItem(item.key, \'up\')"')
         ->and($menuPage)->toContain('@click="moveSidebarItem(item.key, \'down\')"')

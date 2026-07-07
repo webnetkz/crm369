@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -49,5 +50,22 @@ class WarehousePlace extends Model
     public function floor(): BelongsTo
     {
         return $this->belongsTo(WarehouseFloor::class, 'warehouse_floor_id');
+    }
+
+    /**
+     * @return HasMany<WarehouseItem, $this>
+     */
+    public function items(): HasMany
+    {
+        return $this->hasMany(WarehouseItem::class)
+            ->orderBy('name')
+            ->orderBy('id');
+    }
+
+    public function itemCount(): int
+    {
+        return $this->relationLoaded('items')
+            ? $this->items->count()
+            : $this->items()->count();
     }
 }

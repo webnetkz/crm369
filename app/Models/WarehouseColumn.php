@@ -79,4 +79,17 @@ class WarehouseColumn extends Model
             ->whereIn('warehouse_floor_id', $this->floors()->select('id'))
             ->count();
     }
+
+    public function itemCount(): int
+    {
+        if ($this->relationLoaded('floors')) {
+            return $this->floors->sum(fn (WarehouseFloor $floor): int => $floor->itemCount());
+        }
+
+        return WarehouseItem::query()
+            ->whereIn('warehouse_place_id', WarehousePlace::query()
+                ->whereIn('warehouse_floor_id', $this->floors()->select('id'))
+                ->select('id'))
+            ->count();
+    }
 }

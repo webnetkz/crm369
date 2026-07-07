@@ -53,6 +53,7 @@ return [
     'super_admin' => 'Super admin',
     'inactive' => 'Inactive',
     'mark_email_verified' => 'Mark email as verified',
+    'manager_cycle_error' => 'You cannot assign a manager from the same reporting chain.',
     'logs_channel' => 'Channel',
     'logs_description' => 'Review application log entries gathered from every file in storage/logs.',
     'logs_empty' => 'No log entries have been recorded yet.',

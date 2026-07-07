@@ -68,4 +68,15 @@ class WarehouseFloor extends Model
             ? $this->places->count()
             : $this->places()->count();
     }
+
+    public function itemCount(): int
+    {
+        if ($this->relationLoaded('places')) {
+            return $this->places->sum(fn (WarehousePlace $place): int => $place->itemCount());
+        }
+
+        return WarehouseItem::query()
+            ->whereIn('warehouse_place_id', $this->places()->select('id'))
+            ->count();
+    }
 }

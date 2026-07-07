@@ -77,6 +77,8 @@ type WebhookDocumentation = {
     base_url: string;
     users_index_url: string;
     users_show_url: string;
+    company_structure_index_url: string;
+    company_structure_show_url: string;
     contacts_index_url: string;
     contacts_show_url: string;
     contacts_store_url: string;
@@ -95,6 +97,7 @@ type WebhookDocumentation = {
     tsd_store_url: string;
     warehouses_index_url: string;
     warehouses_show_url: string;
+    warehouses_items_url: string;
     warehouses_store_url: string;
     warehouses_update_url: string;
     warehouses_destroy_url: string;
@@ -188,6 +191,7 @@ const webhookHeaderValue = (token: string): string => {
 };
 
 const PortalWebhookUsersReadPermission = 'users.read';
+const PortalWebhookCompanyStructureReadPermission = 'company-structure.read';
 const PortalWebhookContactsReadPermission = 'contacts.read';
 const PortalWebhookContactsWritePermission = 'contacts.write';
 const PortalWebhookEquipmentReadPermission = 'equipment.read';
@@ -239,6 +243,22 @@ const endpointExamples = computed(() => [
         title: t.value.webhooks.documentation_endpoint_users_show_title,
         description: t.value.webhooks.documentation_endpoint_users_show_description,
         permission: PortalWebhookUsersReadPermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.company_structure_index_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_company_structure_index_title,
+        description:
+            t.value.webhooks.documentation_endpoint_company_structure_index_description,
+        permission: PortalWebhookCompanyStructureReadPermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.company_structure_show_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_company_structure_show_title,
+        description:
+            t.value.webhooks.documentation_endpoint_company_structure_show_description,
+        permission: PortalWebhookCompanyStructureReadPermission,
     },
     {
         method: 'GET',
@@ -366,6 +386,14 @@ const endpointExamples = computed(() => [
         title: t.value.webhooks.documentation_endpoint_warehouses_show_title,
         description:
             t.value.webhooks.documentation_endpoint_warehouses_show_description,
+        permission: PortalWebhookWarehousesReadPermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.warehouses_items_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_warehouses_items_title,
+        description:
+            t.value.webhooks.documentation_endpoint_warehouses_items_description,
         permission: PortalWebhookWarehousesReadPermission,
     },
     {

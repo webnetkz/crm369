@@ -32,6 +32,8 @@ class PortalWebhook extends Model
 
     public const string PERMISSION_USERS_WRITE = 'users.write';
 
+    public const string PERMISSION_COMPANY_STRUCTURE_READ = 'company-structure.read';
+
     public const string PERMISSION_CONTACTS_READ = 'contacts.read';
 
     public const string PERMISSION_CONTACTS_WRITE = 'contacts.write';
@@ -96,6 +98,10 @@ class PortalWebhook extends Model
             self::PERMISSION_USERS_WRITE => [
                 'label_key' => 'ui.webhooks.permission_users_write',
                 'description_key' => 'ui.webhooks.permission_users_write_description',
+            ],
+            self::PERMISSION_COMPANY_STRUCTURE_READ => [
+                'label_key' => 'ui.webhooks.permission_company_structure_read',
+                'description_key' => 'ui.webhooks.permission_company_structure_read_description',
             ],
             self::PERMISSION_CONTACTS_READ => [
                 'label_key' => 'ui.webhooks.permission_contacts_read',
