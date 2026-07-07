@@ -7,7 +7,6 @@ import {
     usePage,
 } from '@inertiajs/vue3';
 import {
-    BookText,
     CheckSquare2,
     Copy,
     KeyRound,
@@ -31,7 +30,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/composables/useLanguage';
-import { index as documentationIndex } from '@/routes/documentation';
 import {
     destroy,
     edit,
@@ -94,11 +92,6 @@ const props = defineProps<{
 
 const page = usePage<PageProps>();
 const { language, t } = useLanguage();
-const webhooksDocumentationUrl = documentationIndex.url({
-    query: {
-        section: 'webhooks',
-    },
-});
 const copiedWebhookToken = ref(false);
 const savingWebhookId = ref<number | null>(null);
 const webhookErrors = ref<Record<number, Record<string, string>>>({});
@@ -576,16 +569,6 @@ const selectWebhook = (webhookId: number): void => {
                         <p class="text-sm text-muted-foreground">
                             {{ t.webhooks.documentation_description }}
                         </p>
-
-                        <a
-                            :href="webhooksDocumentationUrl"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="mt-3 inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
-                        >
-                            <BookText class="size-4" />
-                            {{ t.settings.webhooks_documentation }}
-                        </a>
                     </div>
                 </section>
             </aside>

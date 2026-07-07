@@ -4,6 +4,7 @@ use App\Models\ChatConversation;
 use App\Models\ChatConversationParticipant;
 use App\Models\ChatMessage;
 use App\Models\User;
+use App\Models\UserGroup;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -82,7 +83,36 @@ test('chat profile endpoint returns the same managed profile fields used by the 
         ->assertJsonPath('data.last_name', 'Doe')
         ->assertJsonPath('data.phone', '+77771234567')
         ->assertJsonPath('data.email_verified_at', $recipient->email_verified_at?->toISOString())
+        ->assertJsonPath('managerOptions', [])
         ->assertJsonPath('canEdit', false);
+});
+
+test('chat profile endpoint returns manager options for viewers who can manage accounts', function () {
+    $administrators = UserGroup::query()->firstOrCreate([
+        'name' => UserGroup::ADMINISTRATORS_NAME,
+    ]);
+
+    $viewer = User::factory()->create([
+        'user_group_id' => $administrators->id,
+    ]);
+    $recipient = User::factory()->create();
+    $manager = User::factory()->create([
+        'name' => 'Aruzhan',
+        'last_name' => 'Sarsenova',
+        'middle_name' => 'Bauyrzhanovna',
+    ]);
+
+    $this->actingAs($viewer)
+        ->get(route('chats.users.show', $recipient))
+        ->assertSuccessful()
+        ->assertJsonPath('canEdit', true)
+        ->assertJsonPath('managerOptions.0.avatar_scale', fn (mixed $value): bool => is_numeric($value))
+        ->assertJsonPath('managerOptions', function (array $options) use ($manager): bool {
+            return collect($options)->contains(function (array $option) use ($manager): bool {
+                return $option['id'] === $manager->id
+                    && $option['full_name'] === 'Aruzhan Sarsenova Bauyrzhanovna';
+            });
+        });
 });
 
 test('opening a chat marks incoming messages as read and users can send replies', function () {
@@ -379,6 +409,8 @@ test('chat ui renders header trigger, sidebar dock, and sheet targeting hooks', 
         ->and($panel)->toContain('setChatCenterVisible(isActive)')
         ->and($panel)->toContain('showUserProfile.url')
         ->and($panel)->toContain('UserProfileSheet')
+        ->and($panel)->toContain(':manager-options="managerOptions"')
+        ->and($panel)->toContain('@open-user="openProfileById"')
         ->and($panel)->toContain('ChatMessageComposer')
         ->and($panel)->toContain('ChatMessageAttachments')
         ->and($panel)->toContain("formData.append('attachments[]', attachment)")

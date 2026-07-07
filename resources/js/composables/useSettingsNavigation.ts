@@ -1,6 +1,5 @@
 import { usePage } from '@inertiajs/vue3';
 import {
-    BookText,
     BadgeCheck,
     Building2,
     FileText,
@@ -19,7 +18,6 @@ import {
 import { computed } from 'vue';
 import type { ComputedRef } from 'vue';
 import { useLanguage } from '@/composables/useLanguage';
-import { index as documentationIndex } from '@/routes/documentation';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
@@ -35,14 +33,6 @@ import { index as rightsIndex } from '@/routes/settings/rights';
 import { index as usersIndex } from '@/routes/settings/users';
 import { edit as editWebhooks } from '@/routes/settings/webhooks';
 import type { NavItem } from '@/types';
-
-const documentationHref = (section: 'api' | 'webhooks'): string => {
-    return documentationIndex.url({
-        query: {
-            section,
-        },
-    });
-};
 
 export function useSettingsNavigation(): ComputedRef<NavItem[]> {
     const page = usePage();
@@ -189,12 +179,6 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                           href: editApi(),
                           icon: LockKeyhole,
                       },
-                      {
-                          key: 'settings.api.documentation',
-                          title: t.value.settings.api_documentation,
-                          href: documentationHref('api'),
-                          icon: BookText,
-                      },
                   ]
                 : []),
             ...(page.props.auth.canManageWebhooks &&
@@ -206,12 +190,6 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                           title: t.value.settings.webhooks,
                           href: editWebhooks(),
                           icon: Webhook,
-                      },
-                      {
-                          key: 'settings.webhooks.documentation',
-                          title: t.value.settings.webhooks_documentation,
-                          href: documentationHref('webhooks'),
-                          icon: BookText,
                       },
                   ]
                 : []),

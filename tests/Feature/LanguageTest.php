@@ -70,6 +70,7 @@ test('language preference is shared with inertia pages', function () {
             ->where('locale.messages.en.admin.permission_impersonate_users', 'Sign in as users')
             ->where('locale.messages.en.notifications.panel_title', 'Notifications')
             ->where('locale.messages.en.notifications.mark_all_as_read', 'Mark all as read')
+            ->where('locale.messages.en.documentation.title', 'Documentation')
             ->where('locale.messages.en.profile.update_profile', 'Profile')
             ->where('locale.messages.en.profile.phone_placeholder', '+7 777 123 45 67')
             ->where('locale.messages.en.profile.update_profile_description', 'Update your name and email address')
@@ -169,6 +170,7 @@ test('russian appearance settings translations are shared with inertia pages', f
             ->where('locale.messages.ru.admin.permission_impersonate_users', 'Авторизация от имени пользователей')
             ->where('locale.messages.ru.notifications.panel_title', 'Уведомления')
             ->where('locale.messages.ru.notifications.mark_all_as_read', 'Отметить все как прочитанные')
+            ->where('locale.messages.ru.documentation.title', 'Документация')
             ->where('locale.messages.ru.settings.light', 'Светлая')
             ->where('locale.messages.ru.settings.dark', 'Темная')
             ->where('locale.messages.ru.settings.system', 'Системная'),

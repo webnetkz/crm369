@@ -22,6 +22,7 @@ import {
 } from '@lucide/vue';
 import { useClipboard } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
+import { show as showManagedUser } from '@/actions/App/Http/Controllers/Settings/UserController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import PaginationControls from '@/components/PaginationControls.vue';
@@ -49,6 +50,7 @@ import { Label } from '@/components/ui/label';
 import UserProfileSheet from '@/components/UserProfileSheet.vue';
 import { useLanguage } from '@/composables/useLanguage';
 import { usePasswordGenerator } from '@/composables/usePasswordGenerator';
+import { fetchSameOriginJson } from '@/lib/sameOriginJson';
 import { index, store } from '@/routes/settings/users';
 import { update as updateUserActivation } from '@/routes/settings/users/activation';
 import { update as updateUserGroup } from '@/routes/settings/users/group';
@@ -145,6 +147,7 @@ const isSyncingFilters = ref(false);
 const defaultKazakhstanPhonePrefix = '+7';
 let managedProfileSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let filterSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+let managedProfileRequestSequence = 0;
 
 const createUserForm = useForm({
     name: '',
@@ -291,8 +294,29 @@ const openProfile = (user: UserRow): void => {
     selectedProfileUser.value = user;
 };
 
+const openManagedUserProfileById = async (userId: number): Promise<void> => {
+    const requestSequence = ++managedProfileRequestSequence;
+
+    try {
+        const response = await fetchSameOriginJson<{
+            data: UserRow;
+        }>(showManagedUser.url(userId), {
+            method: 'GET',
+        });
+
+        if (requestSequence !== managedProfileRequestSequence) {
+            return;
+        }
+
+        selectedProfileUser.value = response.data;
+    } catch (error) {
+        console.error(error);
+    }
+};
+
 const closeProfile = (): void => {
     clearManagedProfileSaveTimeout();
+    managedProfileRequestSequence += 1;
     selectedProfileUser.value = null;
     managedProfileSnapshot.value = null;
     managedProfileSaveState.value = 'idle';
@@ -1577,6 +1601,7 @@ const formatStructureSummary = (
             :manager-options="managerOptions"
             v-model:form="managedProfileForm"
             @update:open="(isOpen) => !isOpen && closeProfile()"
+            @open-user="openManagedUserProfileById"
         />
     </div>
 </template>

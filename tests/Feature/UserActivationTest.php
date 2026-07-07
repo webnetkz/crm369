@@ -339,6 +339,7 @@ test('users page shows profile details in a right sheet sidebar', function () {
         ->toContain('<UserProfileSheet')
         ->toContain('selectedProfileUser !== null')
         ->toContain('@click="openProfile(user)"')
+        ->toContain('@open-user="openManagedUserProfileById"')
         ->and($profileSheet)->toContain('t.admin.profile_description')
         ->and($profileSheet)->toContain('formatDateTime(')
         ->and($profileSheet)->toContain('t.admin.simple_user')
@@ -347,7 +348,9 @@ test('users page shows profile details in a right sheet sidebar', function () {
         ->and($profileSheet)->toContain('equipmentItem.qr_code_svg_data_uri')
         ->and($profileSheet)->toContain('profile_autosave_saving')
         ->and($profileSheet)->toContain('managerSearchQuery')
-        ->and($profileSheet)->toContain('filteredManagerOptions');
+        ->and($profileSheet)->toContain('filteredManagerOptions')
+        ->and($profileSheet)->toContain('emit(\'open-user\', userId)')
+        ->and($profileSheet)->toContain('@click="openUser(subordinate.id)"');
 });
 
 test('managed user profile payload includes issued equipment', function () {

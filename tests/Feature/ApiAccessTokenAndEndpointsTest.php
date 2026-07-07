@@ -938,6 +938,8 @@ test('api token settings form keeps selected permissions in the posted payload',
         ->and($apiPage)->toContain('onFlash: (flash: { apiToken?: IssuedApiToken }) =>')
         ->and($apiPage)->toContain('permissions: [] as string[]')
         ->and($apiPage)->not->toContain(':disabled="form.never_expires"')
+        ->and($apiPage)->not->toContain('apiDocumentationUrl')
+        ->and($apiPage)->not->toContain('t.settings.api_documentation')
         ->and($apiPage)->not->toContain("const documentationSectionId = 'api-documentation'")
         ->and($apiDocumentationPage)->toContain("const documentationSectionId = 'api-documentation'")
         ->and($apiDocumentationPage)->toContain('{{ t.api.target_user_overview }}')

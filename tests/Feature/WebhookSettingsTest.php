@@ -261,9 +261,9 @@ test('webhook settings page opens issued token details in a dialog', function ()
         ->and($webhooksPage)->toContain('class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]"')
         ->and($webhooksPage)->toContain('class="grid gap-3 md:grid-cols-2 2xl:grid-cols-3"')
         ->and($webhooksPage)->toContain('class="min-w-0 space-y-1"')
-        ->and($webhooksPage)->toContain('class="break-words text-sm text-muted-foreground"')
-        ->and($webhooksPage)->toContain('editDocumentation()')
-        ->and($webhooksPage)->toContain('t.settings.webhooks_documentation')
+        ->and($webhooksPage)->toContain('class="text-sm break-words text-muted-foreground"')
+        ->and($webhooksPage)->not->toContain('webhooksDocumentationUrl')
+        ->and($webhooksPage)->not->toContain('t.settings.webhooks_documentation')
         ->and($webhooksPage)->not->toContain('props.documentation.base_url');
 
     expect($existingSectionPosition)->not->toBeFalse()

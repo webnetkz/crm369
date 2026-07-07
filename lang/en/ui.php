@@ -27,6 +27,7 @@ return [
     'profile' => require __DIR__.'/ui/profile.php',
     'integrations' => require __DIR__.'/ui/integrations.php',
     'business_processes' => require __DIR__.'/ui/business_processes.php',
+    'documentation' => require __DIR__.'/ui/documentation.php',
     'webhooks' => require __DIR__.'/ui/webhooks.php',
     'api' => require __DIR__.'/ui/api.php',
     'security' => require __DIR__.'/ui/security.php',

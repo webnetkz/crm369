@@ -67,6 +67,7 @@ class ChatSidebarController extends Controller
         return response()->json([
             'data' => $managedUserProfileData->serialize($user->load('group:id,name')),
             'canEdit' => $managedUserProfileData->canEdit($viewer, $user),
+            'managerOptions' => $managedUserProfileData->managerOptions($viewer),
         ]);
     }
 }

@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, BookText, FileCode2, Link2, Webhook } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    watch,
+} from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import Heading from '@/components/Heading.vue';
 import { Input } from '@/components/ui/input';
@@ -80,6 +87,10 @@ const { t } = useLanguage();
 
 const apiSectionId = (index: number): string => `api-doc-section-${index + 1}`;
 const tokenPlaceholder = '{token}';
+const webhookOverviewSectionId = 'webhook-doc-overview';
+const webhookEndpointsSectionId = 'webhook-doc-endpoints';
+const activeNavigationSectionId = ref<string | null>(null);
+let navigationSectionObserver: IntersectionObserver | null = null;
 
 const availableSections = computed(() => {
     return [
@@ -143,6 +154,126 @@ const apiNavigationSections = computed(() => {
         id: apiSectionId(index),
         title: section.title,
     }));
+});
+
+const documentationNavigationSections = computed(() => {
+    if (activeSection.value === 'webhooks' && props.webhookDocumentation) {
+        return [
+            {
+                id: webhookOverviewSectionId,
+                title: t.value.webhooks.documentation_overview_title,
+            },
+            {
+                id: webhookEndpointsSectionId,
+                title: t.value.webhooks.documentation_endpoints_title,
+            },
+        ];
+    }
+
+    return apiNavigationSections.value;
+});
+
+const setActiveNavigationSection = (sectionId: string | null): void => {
+    activeNavigationSectionId.value = sectionId;
+};
+
+const syncActiveNavigationSectionFromHash = (): void => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    const sectionIds = documentationNavigationSections.value.map(
+        (section) => section.id,
+    );
+    const hashSectionId = decodeURIComponent(window.location.hash).replace(
+        '#',
+        '',
+    );
+
+    if (hashSectionId && sectionIds.includes(hashSectionId)) {
+        setActiveNavigationSection(hashSectionId);
+
+        return;
+    }
+
+    setActiveNavigationSection(sectionIds[0] ?? null);
+};
+
+const disconnectNavigationSectionObserver = (): void => {
+    navigationSectionObserver?.disconnect();
+    navigationSectionObserver = null;
+};
+
+const observeNavigationSections = (): void => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    syncActiveNavigationSectionFromHash();
+    disconnectNavigationSectionObserver();
+
+    if (!('IntersectionObserver' in window)) {
+        return;
+    }
+
+    const elements = documentationNavigationSections.value
+        .map((section) => document.getElementById(section.id))
+        .filter(
+            (element): element is HTMLElement => element instanceof HTMLElement,
+        );
+
+    if (elements.length === 0) {
+        return;
+    }
+
+    navigationSectionObserver = new IntersectionObserver(
+        (entries) => {
+            const visibleEntries = entries
+                .filter((entry) => entry.isIntersecting)
+                .sort(
+                    (firstEntry, secondEntry) =>
+                        secondEntry.intersectionRatio -
+                            firstEntry.intersectionRatio ||
+                        firstEntry.boundingClientRect.top -
+                            secondEntry.boundingClientRect.top,
+                );
+
+            const nextSectionId = visibleEntries[0]?.target.id;
+
+            if (nextSectionId) {
+                setActiveNavigationSection(nextSectionId);
+            }
+        },
+        {
+            rootMargin: '-20% 0px -55% 0px',
+            threshold: [0.15, 0.35, 0.6],
+        },
+    );
+
+    elements.forEach((element) => navigationSectionObserver?.observe(element));
+};
+
+const handleNavigationHashChange = (): void => {
+    syncActiveNavigationSectionFromHash();
+};
+
+watch(
+    () => documentationNavigationSections.value.map((section) => section.id),
+    async () => {
+        await nextTick();
+        observeNavigationSections();
+    },
+    { immediate: true },
+);
+
+onMounted(() => {
+    window.addEventListener('hashchange', handleNavigationHashChange);
+    observeNavigationSections();
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('hashchange', handleNavigationHashChange);
+    disconnectNavigationSectionObserver();
 });
 
 const webhookAuthenticationExamples = computed(() => {
@@ -343,8 +474,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
             </div>
         </header>
 
-        <div class="grid flex-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
+        <div class="grid flex-1 gap-6 xl:grid-cols-[280px_minmax(0,1fr)_280px]">
+            <aside class="space-y-4 xl:sticky xl:top-4 xl:self-start">
                 <section
                     class="rounded-[2rem] border border-border/70 bg-card/92 p-4 shadow-sm"
                 >
@@ -428,27 +559,12 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
                         </div>
                     </section>
 
-                    <nav
-                        class="rounded-[2rem] border border-border/70 bg-background/95 p-4 shadow-sm"
-                    >
-                        <div class="flex flex-wrap gap-2">
-                            <a
-                                v-for="section in apiNavigationSections"
-                                :key="section.id"
-                                :href="`#${section.id}`"
-                                class="inline-flex items-center rounded-full border border-border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
-                            >
-                                {{ section.title }}
-                            </a>
-                        </div>
-                    </nav>
-
                     <section class="space-y-5">
                         <article
                             v-for="(section, index) in props.apiDocumentation"
                             :id="apiSectionId(index)"
                             :key="section.title"
-                            class="scroll-mt-8 rounded-[2rem] border border-border/70 bg-card/92 p-5 shadow-sm"
+                            class="scroll-mt-24 rounded-[2rem] border border-border/70 bg-card/92 p-5 shadow-sm"
                         >
                             <div>
                                 <h2 class="text-lg font-semibold">
@@ -571,7 +687,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
                     />
 
                     <section
-                        class="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]"
+                        :id="webhookOverviewSectionId"
+                        class="grid scroll-mt-24 gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]"
                     >
                         <article
                             class="rounded-[2rem] border border-border/70 bg-card/92 p-5 shadow-sm"
@@ -671,7 +788,10 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
                         </article>
                     </section>
 
-                    <section class="space-y-4">
+                    <section
+                        :id="webhookEndpointsSectionId"
+                        class="scroll-mt-24 space-y-4"
+                    >
                         <div
                             class="flex items-center gap-2 text-base font-medium"
                         >
@@ -734,6 +854,36 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
                     </section>
                 </section>
             </main>
+
+            <aside
+                v-if="documentationNavigationSections.length > 0"
+                class="hidden xl:sticky xl:top-4 xl:block xl:self-start"
+            >
+                <section
+                    class="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[2rem] border border-border/70 bg-background/95 p-4 pr-3 shadow-sm"
+                >
+                    <div class="text-sm font-semibold">
+                        {{ t.documentation.sections_label }}
+                    </div>
+
+                    <div class="mt-4 grid gap-2">
+                        <a
+                            v-for="section in documentationNavigationSections"
+                            :key="section.id"
+                            :href="`#${section.id}`"
+                            class="rounded-xl border px-3 py-2 text-sm transition-colors"
+                            :class="
+                                activeNavigationSectionId === section.id
+                                    ? 'border-primary/30 bg-primary/10 font-medium text-foreground'
+                                    : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground'
+                            "
+                            @click="setActiveNavigationSection(section.id)"
+                        >
+                            {{ section.title }}
+                        </a>
+                    </div>
+                </section>
+            </aside>
         </div>
     </div>
 </template>

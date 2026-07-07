@@ -855,6 +855,25 @@ test('tasks page includes list, kanban, and gantt standalone views', function ()
         ->toContain('view_gantt');
 });
 
+test('task forms use searchable user pickers with avatars for assignees', function () {
+    $projectsPage = file_get_contents(resource_path('js/pages/projects/Index.vue'));
+    $taskUserPicker = file_get_contents(resource_path('js/components/TaskUserPicker.vue'));
+
+    expect($projectsPage)
+        ->toContain('TaskUserPicker')
+        ->toContain('v-model="taskForm.assignee_user_id"')
+        ->toContain('v-model="taskForm.co_assignee_user_ids"')
+        ->toContain('v-model="activeTaskForm.assignee_user_id"')
+        ->toContain('v-model="activeTaskForm.co_assignee_user_ids"')
+        ->and($taskUserPicker)
+        ->toContain('AvatarImage')
+        ->toContain('userSearchQuery')
+        ->toContain('t.admin.user_search_placeholder')
+        ->toContain('t.value.projects.unassigned')
+        ->toContain('t.value.projects.no_co_assignees')
+        ->toContain('startsWith(query)');
+});
+
 test('visible users can open task discussion and send messages while outsiders cannot', function () {
     $creator = User::factory()->create();
     $assignee = User::factory()->create();

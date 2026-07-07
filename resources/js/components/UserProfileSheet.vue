@@ -46,6 +46,7 @@ const form = defineModel<ManagedProfileFormState>('form', { required: true });
 
 const emit = defineEmits<{
     (event: 'update:open', value: boolean): void;
+    (event: 'open-user', userId: number): void;
 }>();
 
 const { getInitials } = useInitials();
@@ -138,6 +139,10 @@ const managerOptionAvatarStyle = (
     objectPosition: 'center',
     transform: `scale(${option.avatar_scale ?? 1})`,
 });
+
+const openUser = (userId: number): void => {
+    emit('open-user', userId);
+};
 
 const closeManagerPicker = (): void => {
     managerPickerOpen.value = false;
@@ -608,17 +613,19 @@ onBeforeUnmount(() => {
                             v-if="user?.subordinates.length"
                             class="flex flex-wrap gap-2"
                         >
-                            <span
+                            <button
                                 v-for="subordinate in user.subordinates"
                                 :key="subordinate.id"
-                                class="rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-foreground"
+                                type="button"
+                                class="rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                                @click="openUser(subordinate.id)"
                             >
                                 {{
                                     subordinate.position
                                         ? `${subordinate.full_name} · ${subordinate.position}`
                                         : subordinate.full_name
                                 }}
-                            </span>
+                            </button>
                         </div>
                         <div v-else class="mt-1 font-medium">
                             {{ t.company_structure.no_subordinates }}

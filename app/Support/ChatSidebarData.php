@@ -50,6 +50,34 @@ class ChatSidebarData
         ];
     }
 
+    /**
+     * @return array<int, array{id: int, title: string, excerpt: string|null, unreadCount: int, latestMessageId: int|null, lastMessageAt: string|null}>
+     */
+    public function unreadConversations(User $user, int $limit = 10): array
+    {
+        $unreadCounts = $this->unreadCounts($user);
+
+        return $this->conversationCollection($user, '')
+            ->map(function (ChatConversation $conversation) use ($unreadCounts, $user): array {
+                $otherParticipant = $this->otherParticipant($conversation, $user);
+
+                return [
+                    'id' => $conversation->id,
+                    'title' => $conversation->type === ChatConversation::TYPE_DIRECT
+                        ? $this->displayName($otherParticipant)
+                        : ($conversation->title ?? __('ui.chat.untitled_chat')),
+                    'excerpt' => $this->chatMessageData->excerpt($conversation->latestMessage),
+                    'unreadCount' => Arr::get($unreadCounts, $conversation->id, 0),
+                    'latestMessageId' => $conversation->latestMessage?->id,
+                    'lastMessageAt' => $conversation->last_message_at?->toISOString(),
+                ];
+            })
+            ->filter(fn (array $conversation): bool => $conversation['unreadCount'] > 0)
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
     public function markConversationAsRead(ChatConversation $conversation, User $user): void
     {
         ChatConversationParticipant::query()

@@ -27,6 +27,7 @@ import type {
     ChatCenter,
     ChatConversationListItem,
     ChatUserSummary,
+    CompanyStructureManagerOption,
     ManagedProfileSaveState,
     ManagedUserProfile,
 } from '@/types/ui';
@@ -70,6 +71,7 @@ const selectedAttachments = ref<File[]>([]);
 const activeConversationId = ref<number | null>(null);
 const selectedProfileUser = ref<ManagedUserProfile | null>(null);
 const selectedProfileCanEdit = ref(false);
+const managerOptions = ref<CompanyStructureManagerOption[]>([]);
 const managedProfileSnapshot = ref<ManagedProfilePayload | null>(null);
 const managedProfileSaveState = ref<ManagedProfileSaveState>('idle');
 const isSyncingManagedProfile = ref(false);
@@ -206,6 +208,7 @@ const openProfile = async (
         const response = await fetchSameOriginJson<{
             data: ManagedUserProfile;
             canEdit: boolean;
+            managerOptions: CompanyStructureManagerOption[];
         }>(showUserProfile.url(user.id), {
             method: 'GET',
         });
@@ -216,6 +219,7 @@ const openProfile = async (
 
         selectedProfileUser.value = response.data;
         selectedProfileCanEdit.value = response.canEdit;
+        managerOptions.value = response.managerOptions;
         syncManagedProfileForm(response.data);
     } catch (error) {
         console.error(error);
@@ -223,11 +227,23 @@ const openProfile = async (
     }
 };
 
+const openProfileById = async (userId: number): Promise<void> => {
+    await openProfile({
+        id: userId,
+        name: '',
+        email: '',
+        phone: null,
+        avatar: null,
+        avatarScale: 1,
+    });
+};
+
 const closeProfile = (): void => {
     clearManagedProfileSaveTimeout();
     profileRequestSequence += 1;
     selectedProfileUser.value = null;
     selectedProfileCanEdit.value = false;
+    managerOptions.value = [];
     managedProfileSnapshot.value = null;
     managedProfileSaveState.value = 'idle';
     managedProfileForm.clearErrors();
@@ -1009,8 +1025,10 @@ onBeforeUnmount(() => {
             :user="selectedProfileUser"
             :can-edit="selectedProfileCanEdit"
             :save-state="managedProfileSaveState"
+            :manager-options="managerOptions"
             v-model:form="managedProfileForm"
             @update:open="(isOpen) => !isOpen && closeProfile()"
+            @open-user="openProfileById"
         />
     </div>
 </template>

@@ -42,6 +42,7 @@ import {
 import InputError from '@/components/InputError.vue';
 import ProjectTaskConversationPanel from '@/components/ProjectTaskConversationPanel.vue';
 import ProjectTaskTreeItem from '@/components/ProjectTaskTreeItem.vue';
+import TaskUserPicker from '@/components/TaskUserPicker.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -1043,29 +1044,6 @@ const openCreateSubtaskFromActiveTask = (): void => {
     taskForm.parent_task_id = props.activeTask.id;
 };
 
-const toggleCoAssignee = (
-    userId: number,
-    checked: boolean | 'indeterminate' | null | undefined,
-): void => {
-    if (checked === true) {
-        taskForm.co_assignee_user_ids = [
-            ...new Set([...taskForm.co_assignee_user_ids, userId]),
-        ];
-
-        return;
-    }
-
-    taskForm.co_assignee_user_ids = taskForm.co_assignee_user_ids.filter(
-        (value) => value !== userId,
-    );
-};
-
-const taskCoAssigneeHandler = (userId: number) => {
-    return (checked: boolean | 'indeterminate' | null | undefined): void => {
-        toggleCoAssignee(userId, checked);
-    };
-};
-
 const submitTask = (): void => {
     taskForm
         .transform((data) => ({
@@ -1089,28 +1067,18 @@ const submitTask = (): void => {
         );
 };
 
-const toggleActiveTaskCoAssignee = (
-    userId: number,
-    checked: boolean | 'indeterminate' | null | undefined,
-): void => {
-    if (checked === true) {
-        activeTaskForm.co_assignee_user_ids = [
-            ...new Set([...activeTaskForm.co_assignee_user_ids, userId]),
-        ];
-    } else {
-        activeTaskForm.co_assignee_user_ids =
-            activeTaskForm.co_assignee_user_ids.filter(
-                (value) => value !== userId,
-            );
+const handleTaskAssigneeChange = (): void => {
+    if (taskForm.assignee_user_id === '') {
+        return;
     }
 
-    handleActiveTaskFieldChange();
+    taskForm.co_assignee_user_ids = taskForm.co_assignee_user_ids.filter(
+        (userId) => userId !== Number(taskForm.assignee_user_id),
+    );
 };
 
-const activeTaskCoAssigneeHandler = (userId: number) => {
-    return (checked: boolean | 'indeterminate' | null | undefined): void => {
-        toggleActiveTaskCoAssignee(userId, checked);
-    };
+const handleActiveTaskCoAssigneeChange = (): void => {
+    handleActiveTaskFieldChange();
 };
 
 const submitActiveTaskUpdate = (): void => {
@@ -1168,6 +1136,33 @@ const submitActiveTaskUpdate = (): void => {
             },
         );
 };
+
+watch(
+    selectedTaskProjectId,
+    () => {
+        const allowedMemberIds = new Set(
+            taskMemberOptions.value.map((member) => member.id),
+        );
+
+        if (
+            taskForm.assignee_user_id !== '' &&
+            !allowedMemberIds.has(Number(taskForm.assignee_user_id))
+        ) {
+            taskForm.assignee_user_id = '';
+        }
+
+        taskForm.co_assignee_user_ids = taskForm.co_assignee_user_ids.filter(
+            (userId) => allowedMemberIds.has(userId),
+        );
+    },
+);
+
+watch(
+    () => taskForm.assignee_user_id,
+    () => {
+        handleTaskAssigneeChange();
+    },
+);
 
 watch(
     () =>
@@ -2871,22 +2866,11 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 <Label for="task-assignee">{{
                                     t.projects.assignee
                                 }}</Label>
-                                <select
+                                <TaskUserPicker
                                     id="task-assignee"
                                     v-model="taskForm.assignee_user_id"
-                                    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                >
-                                    <option value="">
-                                        {{ t.projects.unassigned }}
-                                    </option>
-                                    <option
-                                        v-for="member in taskMemberOptions"
-                                        :key="member.id"
-                                        :value="member.id"
-                                    >
-                                        {{ fullName(member) }}
-                                    </option>
-                                </select>
+                                    :options="taskMemberOptions"
+                                />
                                 <InputError
                                     :message="taskForm.errors.assignee_user_id"
                                 />
@@ -2902,38 +2886,16 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     </p>
                                 </div>
 
-                                <div
-                                    class="max-h-72 space-y-2 overflow-y-auto pr-1"
-                                >
-                                    <label
-                                        v-for="member in taskMemberOptions"
-                                        :key="member.id"
-                                        class="flex items-start gap-3 rounded-2xl border border-border bg-background/70 p-3"
-                                    >
-                                        <Checkbox
-                                            :checked="
-                                                taskForm.co_assignee_user_ids.includes(
-                                                    member.id,
-                                                )
-                                            "
-                                            @update:checked="
-                                                taskCoAssigneeHandler(member.id)
-                                            "
-                                        />
-                                        <div class="min-w-0 flex-1">
-                                            <div
-                                                class="truncate text-sm font-medium"
-                                            >
-                                                {{ fullName(member) }}
-                                            </div>
-                                            <div
-                                                class="truncate text-xs text-muted-foreground"
-                                            >
-                                                {{ member.email }}
-                                            </div>
-                                        </div>
-                                    </label>
-                                </div>
+                                <TaskUserPicker
+                                    v-model="taskForm.co_assignee_user_ids"
+                                    multiple
+                                    :options="taskMemberOptions"
+                                    :exclude-user-ids="
+                                        taskForm.assignee_user_id === ''
+                                            ? []
+                                            : [Number(taskForm.assignee_user_id)]
+                                    "
+                                />
                                 <InputError
                                     :message="
                                         taskForm.errors.co_assignee_user_ids
@@ -3258,24 +3220,14 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     />
                                     {{ t.projects.assignee }}
                                 </div>
-                                <select
+                                <TaskUserPicker
                                     id="active-task-assignee"
                                     v-model="activeTaskForm.assignee_user_id"
-                                    class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    class="mt-2"
+                                    :options="activeTaskMemberOptions"
                                     :disabled="!props.can.manageTask"
                                     @change="handleActiveTaskFieldChange"
-                                >
-                                    <option value="">
-                                        {{ t.projects.unassigned }}
-                                    </option>
-                                    <option
-                                        v-for="member in activeTaskMemberOptions"
-                                        :key="member.id"
-                                        :value="member.id"
-                                    >
-                                        {{ fullName(member) }}
-                                    </option>
-                                </select>
+                                />
                                 <InputError
                                     class="mt-2"
                                     :message="
@@ -3373,41 +3325,22 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 {{ t.projects.co_assignees_help }}
                             </p>
 
-                            <div
-                                class="max-h-72 space-y-2 overflow-y-auto pr-1"
-                            >
-                                <label
-                                    v-for="member in activeTaskMemberOptions"
-                                    :key="member.id"
-                                    class="flex items-start gap-3 rounded-2xl border border-border bg-background/70 p-3"
-                                >
-                                    <Checkbox
-                                        :checked="
-                                            activeTaskForm.co_assignee_user_ids.includes(
-                                                member.id,
-                                            )
-                                        "
-                                        :disabled="!props.can.manageTask"
-                                        @update:checked="
-                                            activeTaskCoAssigneeHandler(
-                                                member.id,
-                                            )
-                                        "
-                                    />
-                                    <div class="min-w-0 flex-1">
-                                        <div
-                                            class="truncate text-sm font-medium"
-                                        >
-                                            {{ fullName(member) }}
-                                        </div>
-                                        <div
-                                            class="truncate text-xs text-muted-foreground"
-                                        >
-                                            {{ member.email }}
-                                        </div>
-                                    </div>
-                                </label>
-                            </div>
+                            <TaskUserPicker
+                                v-model="activeTaskForm.co_assignee_user_ids"
+                                multiple
+                                :options="activeTaskMemberOptions"
+                                :disabled="!props.can.manageTask"
+                                :exclude-user-ids="
+                                    activeTaskForm.assignee_user_id === ''
+                                        ? []
+                                        : [
+                                              Number(
+                                                  activeTaskForm.assignee_user_id,
+                                              ),
+                                          ]
+                                "
+                                @change="handleActiveTaskCoAssigneeChange"
+                            />
                             <InputError
                                 class="mt-2"
                                 :message="

@@ -9,6 +9,25 @@ use Illuminate\Support\Collection;
 class ManagedUserProfileData
 {
     /**
+     * @return array<int, array{id: int, name: string, last_name: string|null, middle_name: string|null, full_name: string, email: string, position: string|null, avatar: string|null, avatar_scale: float, is_active: bool}>
+     */
+    public function managerOptions(?User $viewer): array
+    {
+        if (! $viewer?->canManageUserAccounts()) {
+            return [];
+        }
+
+        return User::query()
+            ->select(['id', 'name', 'last_name', 'middle_name', 'email', 'position', 'avatar_path', 'avatar_scale', 'is_active'])
+            ->orderBy('name')
+            ->orderBy('last_name')
+            ->get()
+            ->map(fn (User $user): array => $this->serializeStructureUser($user))
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function serialize(User $user): array

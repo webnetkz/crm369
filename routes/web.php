@@ -14,6 +14,7 @@ use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\KnowledgeBaseController;
 use App\Http\Controllers\LanguageController;
+use App\Http\Controllers\MobileNotificationFeedController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationPageController;
@@ -142,6 +143,7 @@ Route::get('edo/public/{edoDocument:public_token}/download', [PublicEdoSigningCo
     ->name('edo.public.download');
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('mobile/notifications/feed', MobileNotificationFeedController::class)->name('mobile.notifications.feed');
     Route::get('notifications', NotificationPageController::class)->name('notifications.index');
     Route::post('api/language', [LanguageController::class, 'update'])->name('language.update');
     Route::patch('notifications/read-all', [NotificationController::class, 'updateAll'])->name('notifications.read-all.update');

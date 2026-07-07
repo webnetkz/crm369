@@ -108,33 +108,7 @@ class UserController extends Controller
                 : [],
             'perPageOptions' => PerPageOptions::allowed(),
             'visibleUserTableColumns' => $this->visibleUserTableColumns($viewer),
-            'managerOptions' => $viewer?->canManageUserAccounts()
-                ? User::query()
-                    ->select(['id', 'name', 'last_name', 'middle_name', 'email', 'position', 'avatar_path', 'avatar_scale'])
-                    ->orderBy('name')
-                    ->orderBy('last_name')
-                    ->get()
-                    ->map(function (User $user): array {
-                        $fullName = trim(implode(' ', array_filter([
-                            $user->name,
-                            $user->last_name,
-                            $user->middle_name,
-                        ])));
-
-                        return [
-                            'id' => $user->id,
-                            'name' => $user->name,
-                            'last_name' => $user->last_name,
-                            'middle_name' => $user->middle_name,
-                            'full_name' => $fullName !== '' ? $fullName : $user->email,
-                            'email' => $user->email,
-                            'position' => $user->position,
-                            'avatar' => $user->avatar,
-                            'avatar_scale' => $user->avatar_scale,
-                        ];
-                    })
-                    ->values()
-                : [],
+            'managerOptions' => $managedUserProfileData->managerOptions($viewer),
         ]);
     }
 
