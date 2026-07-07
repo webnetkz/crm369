@@ -2,6 +2,7 @@ import { createInertiaApp } from '@inertiajs/vue3';
 import { initializeTheme } from '@/composables/useAppearance';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
+import DocumentationLayout from '@/layouts/documentation/Layout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
 import type { Portal } from '@/types';
@@ -21,6 +22,8 @@ createInertiaApp({
                 return AuthLayout;
             case name.startsWith('public/'):
                 return AuthLayout;
+            case name.startsWith('documentation/'):
+                return DocumentationLayout;
             case name.startsWith('settings/'):
                 return [AppLayout, SettingsLayout];
             default:

@@ -9,6 +9,8 @@ import {
 import {
     Ban,
     CircleCheck,
+    CircleX,
+    Columns3,
     KeyRound,
     LogIn,
     RefreshCw,
@@ -25,6 +27,7 @@ import InputError from '@/components/InputError.vue';
 import PaginationControls from '@/components/PaginationControls.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -33,6 +36,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import UserProfileSheet from '@/components/UserProfileSheet.vue';
@@ -44,6 +55,7 @@ import { update as updateUserGroup } from '@/routes/settings/users/group';
 import { store as startUserImpersonation } from '@/routes/settings/users/impersonation';
 import { reset as resetUserPassword } from '@/routes/settings/users/password';
 import { update as updateUserProfile } from '@/routes/settings/users/profile';
+import { update as updateUserTableColumns } from '@/routes/settings/users/table-columns';
 import type {
     CompanyStructureManagerOption,
     ManagedProfileSaveState,
@@ -59,6 +71,7 @@ type UserRow = ManagedUserProfile & {
 type ManagedProfilePayload = {
     name: string;
     last_name: string;
+    middle_name: string;
     email: string;
     phone: string;
     position: string;
@@ -74,6 +87,26 @@ type UserFilters = {
     per_page: number;
 };
 
+type UserTableOptionalColumnKey =
+    | 'position'
+    | 'manager'
+    | 'status'
+    | 'email_verified'
+    | 'group';
+
+type UserTableOptionalColumnOption = {
+    key: UserTableOptionalColumnKey;
+    label: string;
+};
+
+const allUserTableOptionalColumnKeys: UserTableOptionalColumnKey[] = [
+    'position',
+    'manager',
+    'status',
+    'email_verified',
+    'group',
+];
+
 const props = defineProps<{
     can: {
         manage_users: boolean;
@@ -85,6 +118,7 @@ const props = defineProps<{
     groups: UserGroupOption[];
     filters: UserFilters;
     perPageOptions: number[];
+    visibleUserTableColumns: UserTableOptionalColumnKey[];
     managerOptions: CompanyStructureManagerOption[];
 }>();
 
@@ -95,6 +129,9 @@ const { generatePassword } = usePasswordGenerator();
 const createUserDialogOpen = ref(false);
 const selectedProfileUser = ref<UserRow | null>(null);
 const selectedPasswordUser = ref<UserRow | null>(null);
+const visibleUserTableColumns = ref<UserTableOptionalColumnKey[]>([
+    ...props.visibleUserTableColumns,
+]);
 const showAdvancedFilters = ref(
     props.filters.status !== '' ||
         props.filters.group !== '' ||
@@ -125,6 +162,7 @@ const passwordForm = useForm({
 const managedProfileForm = useForm({
     name: '',
     last_name: '',
+    middle_name: '',
     email: '',
     phone: defaultKazakhstanPhonePrefix,
     position: '',
@@ -141,6 +179,49 @@ const filtersForm = useForm<UserFilters>({
 });
 
 const visibleUsers = computed(() => props.users.data);
+const userTableColumnOptions = computed<UserTableOptionalColumnOption[]>(() => [
+    {
+        key: 'position',
+        label: t.value.company_structure.position,
+    },
+    {
+        key: 'manager',
+        label: t.value.company_structure.manager,
+    },
+    {
+        key: 'status',
+        label: t.value.admin.status,
+    },
+    {
+        key: 'email_verified',
+        label: t.value.admin.email_verified,
+    },
+    {
+        key: 'group',
+        label: t.value.admin.group,
+    },
+]);
+const visibleUserTableColumnKeySet = computed(
+    () => new Set(visibleUserTableColumns.value),
+);
+const showUserActionsColumn = computed(() => {
+    return (
+        props.can.manage_activation ||
+        props.can.manage_accounts ||
+        props.can.impersonate_users
+    );
+});
+const desktopUserTableMinWidthClass = computed(() => {
+    if (visibleUserTableColumns.value.length <= 1) {
+        return 'min-w-[820px]';
+    }
+
+    if (visibleUserTableColumns.value.length <= 3) {
+        return 'min-w-[1040px]';
+    }
+
+    return 'min-w-[1240px]';
+});
 const canAutoSubmitCreateUser = computed(() => {
     return (
         createUserForm.name.trim() !== '' && createUserForm.email.trim() !== ''
@@ -275,6 +356,58 @@ const impersonateUser = (user: UserRow): void => {
     );
 };
 
+const normalizeVisibleUserTableColumns = (
+    selectedColumns: UserTableOptionalColumnKey[],
+): UserTableOptionalColumnKey[] => {
+    return allUserTableOptionalColumnKeys.filter((column) =>
+        selectedColumns.includes(column),
+    );
+};
+
+const isUserTableColumnVisible = (column: UserTableOptionalColumnKey): boolean => {
+    return visibleUserTableColumnKeySet.value.has(column);
+};
+
+const persistVisibleUserTableColumns = (): void => {
+    router.patch(
+        updateUserTableColumns.url(),
+        {
+            visible_columns: visibleUserTableColumns.value,
+        },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+            only: ['visibleUserTableColumns'],
+            onError: () => {
+                visibleUserTableColumns.value = normalizeVisibleUserTableColumns(
+                    props.visibleUserTableColumns,
+                );
+            },
+        },
+    );
+};
+
+const setUserTableColumnVisibility = (
+    column: UserTableOptionalColumnKey,
+    checked: boolean | 'indeterminate',
+): void => {
+    const nextVisibleColumns = checked
+        ? [...visibleUserTableColumns.value, column]
+        : visibleUserTableColumns.value.filter(
+              (visibleColumn) => visibleColumn !== column,
+          );
+
+    visibleUserTableColumns.value =
+        normalizeVisibleUserTableColumns(nextVisibleColumns);
+
+    persistVisibleUserTableColumns();
+};
+
+const showUserActions = (user: UserRow): boolean => {
+    return !user.is_super_admin && showUserActionsColumn.value;
+};
+
 const canToggleActivation = (user: UserRow): boolean => {
     return (
         props.can.manage_activation &&
@@ -338,6 +471,7 @@ const formatKazakhstanPhone = (value: string | null | undefined): string => {
 const managedProfilePayload = (): ManagedProfilePayload => ({
     name: managedProfileForm.name,
     last_name: managedProfileForm.last_name,
+    middle_name: managedProfileForm.middle_name,
     email: managedProfileForm.email,
     phone: managedProfileForm.phone,
     position: managedProfileForm.position,
@@ -426,6 +560,7 @@ const syncManagedProfileForm = (user: UserRow | null): void => {
 
     managedProfileForm.name = user?.name ?? '';
     managedProfileForm.last_name = user?.last_name ?? '';
+    managedProfileForm.middle_name = user?.middle_name ?? '';
     managedProfileForm.email = user?.email ?? '';
     managedProfileForm.phone = formatKazakhstanPhone(user?.phone);
     managedProfileForm.position = user?.position ?? '';
@@ -529,6 +664,14 @@ watch(
 );
 
 watch(
+    () => props.visibleUserTableColumns,
+    (columns) => {
+        visibleUserTableColumns.value =
+            normalizeVisibleUserTableColumns(columns);
+    },
+);
+
+watch(
     () => props.filters,
     (filters) => {
         isSyncingFilters.value = true;
@@ -579,6 +722,7 @@ watch(
     () => [
         managedProfileForm.name,
         managedProfileForm.last_name,
+        managedProfileForm.middle_name,
         managedProfileForm.email,
         managedProfileForm.phone,
         managedProfileForm.position,
@@ -656,6 +800,46 @@ const formatStructureSummary = (
                         <UserPlus class="size-4" />
                         {{ t.admin.create_user }}
                     </Button>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger :as-child="true">
+                            <Button type="button" variant="outline" size="sm">
+                                <Columns3 class="size-4" />
+                                {{ t.admin.show_columns }}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" class="w-56">
+                            <DropdownMenuLabel>
+                                {{ t.admin.available_columns }}
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuCheckboxItem
+                                v-for="column in userTableColumnOptions"
+                                :key="column.key"
+                                :checked="
+                                    isUserTableColumnVisible(column.key)
+                                "
+                                class="pl-2"
+                                @select.prevent="
+                                    setUserTableColumnVisibility(
+                                        column.key,
+                                        !isUserTableColumnVisible(column.key),
+                                    )
+                                "
+                            >
+                                <template #indicator-icon>
+                                    <span class="hidden" />
+                                </template>
+                                <Checkbox
+                                    :checked="
+                                        isUserTableColumnVisible(column.key)
+                                    "
+                                    class="pointer-events-none"
+                                />
+                                <span>{{ column.label }}</span>
+                            </DropdownMenuCheckboxItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
 
                     <Button
                         type="button"
@@ -892,7 +1076,10 @@ const formatStructureSummary = (
                         @click="openProfile(user)"
                     >
                         <div class="truncate font-medium">{{ user.name }}</div>
-                        <div class="text-sm text-muted-foreground">
+                        <div
+                            v-if="isUserTableColumnVisible('position')"
+                            class="text-sm text-muted-foreground"
+                        >
                             {{
                                 user.position ??
                                 t.company_structure.no_position
@@ -911,6 +1098,7 @@ const formatStructureSummary = (
                             {{ t.admin.super_admin }}
                         </span>
                         <span
+                            v-if="isUserTableColumnVisible('status')"
                             class="rounded-full px-2 py-1 text-xs"
                             :class="
                                 user.is_active
@@ -928,7 +1116,10 @@ const formatStructureSummary = (
                 </div>
 
                 <dl class="mt-4 grid gap-3 text-sm">
-                    <div class="flex items-center justify-between gap-4">
+                    <div
+                        v-if="isUserTableColumnVisible('email_verified')"
+                        class="flex items-center justify-between gap-4"
+                    >
                         <dt class="text-muted-foreground">
                             {{ t.admin.email_verified }}
                         </dt>
@@ -962,7 +1153,10 @@ const formatStructureSummary = (
                         </dd>
                     </div>
 
-                    <div class="grid gap-2">
+                    <div
+                        v-if="isUserTableColumnVisible('manager')"
+                        class="grid gap-2"
+                    >
                         <dt class="text-muted-foreground">
                             {{ t.company_structure.manager }}
                         </dt>
@@ -971,7 +1165,10 @@ const formatStructureSummary = (
                         </dd>
                     </div>
 
-                    <div class="grid gap-2">
+                    <div
+                        v-if="isUserTableColumnVisible('group')"
+                        class="grid gap-2"
+                    >
                         <dt class="text-muted-foreground">
                             {{ t.admin.group }}
                         </dt>
@@ -1010,11 +1207,7 @@ const formatStructureSummary = (
                 </dl>
 
                 <div
-                    v-if="
-                        can.manage_activation ||
-                        can.manage_accounts ||
-                        can.impersonate_users
-                    "
+                    v-if="showUserActions(user)"
                     class="mt-4 grid gap-2"
                 >
                     <Button
@@ -1064,37 +1257,53 @@ const formatStructureSummary = (
         <div
             class="hidden overflow-x-auto rounded-lg border border-border md:block"
         >
-            <table class="w-full min-w-[1020px] table-fixed text-sm">
+            <table
+                :class="[
+                    'w-full table-fixed text-sm',
+                    desktopUserTableMinWidthClass,
+                ]"
+            >
                 <thead class="bg-muted/50 text-left">
                     <tr class="divide-x divide-border">
-                        <th class="w-[18%] px-4 py-3 font-medium">
+                        <th class="w-[16%] px-4 py-3 align-top font-medium">
                             {{ t.common.name }}
                         </th>
-                        <th class="w-[18%] px-4 py-3 font-medium">
+                        <th
+                            v-if="isUserTableColumnVisible('position')"
+                            class="w-[14%] px-4 py-3 align-top font-medium"
+                        >
                             {{ t.company_structure.position }}
                         </th>
-                        <th class="w-[20%] px-4 py-3 font-medium">
+                        <th
+                            v-if="isUserTableColumnVisible('manager')"
+                            class="w-[12%] px-4 py-3 align-top font-medium"
+                        >
                             {{ t.company_structure.manager }}
                         </th>
-                        <th class="w-[20%] px-4 py-3 font-medium">
+                        <th class="w-[18%] px-4 py-3 align-top font-medium">
                             {{ t.common.email }}
                         </th>
-                        <th class="w-[10%] px-4 py-3 font-medium">
+                        <th
+                            v-if="isUserTableColumnVisible('status')"
+                            class="w-[8%] px-4 py-3 align-top font-medium"
+                        >
                             {{ t.admin.status }}
                         </th>
-                        <th class="w-[8%] px-4 py-3 text-center font-medium">
+                        <th
+                            v-if="isUserTableColumnVisible('email_verified')"
+                            class="w-[10%] px-4 py-3 text-center align-top font-medium leading-tight"
+                        >
                             {{ t.admin.email_verified }}
                         </th>
-                        <th class="px-4 py-3 font-medium">
+                        <th
+                            v-if="isUserTableColumnVisible('group')"
+                            class="w-[10%] px-4 py-3 align-top font-medium leading-tight"
+                        >
                             {{ t.admin.group }}
                         </th>
                         <th
-                            v-if="
-                                can.manage_activation ||
-                                can.manage_accounts ||
-                                can.impersonate_users
-                            "
-                            class="w-[14%] px-4 py-3 text-right font-medium"
+                            v-if="showUserActionsColumn"
+                            class="w-[12%] px-4 py-3 text-right align-top font-medium leading-tight"
                         >
                             {{ t.admin.actions }}
                         </th>
@@ -1124,19 +1333,28 @@ const formatStructureSummary = (
                                 </div>
                             </button>
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground">
+                        <td
+                            v-if="isUserTableColumnVisible('position')"
+                            class="px-4 py-3 text-muted-foreground"
+                        >
                             {{
                                 user.position ??
                                 t.company_structure.no_position
                             }}
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground">
+                        <td
+                            v-if="isUserTableColumnVisible('manager')"
+                            class="px-4 py-3 text-muted-foreground"
+                        >
                             {{ formatStructureSummary(user.manager) }}
                         </td>
                         <td class="px-4 py-3 text-muted-foreground">
                             <span class="break-all">{{ user.email }}</span>
                         </td>
-                        <td class="px-4 py-3">
+                        <td
+                            v-if="isUserTableColumnVisible('status')"
+                            class="px-4 py-3"
+                        >
                             <span
                                 class="rounded-full px-2 py-1 text-xs"
                                 :class="
@@ -1152,7 +1370,10 @@ const formatStructureSummary = (
                                 }}
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-center">
+                        <td
+                            v-if="isUserTableColumnVisible('email_verified')"
+                            class="px-4 py-3 text-center"
+                        >
                             <span
                                 class="inline-flex items-center justify-center"
                                 :title="
@@ -1180,7 +1401,10 @@ const formatStructureSummary = (
                                 </span>
                             </span>
                         </td>
-                        <td class="px-4 py-3">
+                        <td
+                            v-if="isUserTableColumnVisible('group')"
+                            class="px-4 py-3"
+                        >
                             <select
                                 v-if="can.manage_users"
                                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -1212,14 +1436,13 @@ const formatStructureSummary = (
                             </span>
                         </td>
                         <td
-                            v-if="
-                                can.manage_activation ||
-                                can.manage_accounts ||
-                                can.impersonate_users
-                            "
+                            v-if="showUserActionsColumn"
                             class="px-4 py-3"
                         >
-                            <div class="flex justify-end gap-2">
+                            <div
+                                v-if="showUserActions(user)"
+                                class="flex justify-end gap-2"
+                            >
                                 <Button
                                     v-if="can.impersonate_users"
                                     variant="secondary"

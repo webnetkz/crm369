@@ -24,6 +24,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property int $id
  * @property string $name
  * @property string|null $last_name
+ * @property string|null $middle_name
  * @property string $email
  * @property string|null $phone
  * @property string|null $position
@@ -40,6 +41,8 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property array<int, string>|null $hidden_menu_item_keys
  * @property array<int, int>|null $hidden_menu_item_ids
  * @property array<int, string>|null $menu_item_order
+ * @property string $task_display_mode
+ * @property array<int, string>|null $visible_user_table_columns
  * @property string|null $avatar_path
  * @property int $avatar_position_x
  * @property int $avatar_position_y
@@ -54,12 +57,20 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'last_name', 'email', 'phone', 'position', 'manager_id', 'password', 'appearance', 'language', 'has_selected_language', 'background_color', 'background_image_path', 'background_blur', 'hidden_menu_item_keys', 'hidden_menu_item_ids', 'menu_item_order', 'avatar_path', 'avatar_position_x', 'avatar_position_y', 'avatar_scale', 'user_group_id', 'is_active', 'deactivated_at'])]
+#[Fillable(['name', 'last_name', 'middle_name', 'email', 'phone', 'position', 'manager_id', 'password', 'appearance', 'language', 'has_selected_language', 'background_color', 'background_image_path', 'background_blur', 'hidden_menu_item_keys', 'hidden_menu_item_ids', 'menu_item_order', 'task_display_mode', 'visible_user_table_columns', 'avatar_path', 'avatar_position_x', 'avatar_position_y', 'avatar_scale', 'user_group_id', 'is_active', 'deactivated_at'])]
 #[Hidden(['password', 'avatar_path', 'background_image_path', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+
+    public const array VISIBLE_USER_TABLE_OPTIONAL_COLUMNS = [
+        'position',
+        'manager',
+        'status',
+        'email_verified',
+        'group',
+    ];
 
     /**
      * @var array<int, string>
@@ -80,6 +91,7 @@ class User extends Authenticatable implements PasskeyUser
             'hidden_menu_item_keys' => 'array',
             'hidden_menu_item_ids' => 'array',
             'menu_item_order' => 'array',
+            'visible_user_table_columns' => 'array',
             'avatar_position_x' => 'integer',
             'avatar_position_y' => 'integer',
             'avatar_scale' => 'float',
@@ -224,29 +236,124 @@ class User extends Authenticatable implements PasskeyUser
         return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_IMPERSONATE_USERS);
     }
 
+    public function canAccessCompanyStructure(): bool
+    {
+        return $this->canAccessConfiguredModule('company-structure', [
+            UserGroup::PERMISSION_ACCESS_COMPANY_STRUCTURE,
+        ]);
+    }
+
+    public function canAccessNews(): bool
+    {
+        return $this->canAccessConfiguredModule('news', [
+            UserGroup::PERMISSION_ACCESS_NEWS,
+            UserGroup::PERMISSION_MANAGE_NEWS,
+        ]);
+    }
+
     public function canManageKnowledgeBases(): bool
     {
-        return $this->isSuperAdmin();
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_MANAGE_KNOWLEDGE_BASES);
     }
 
     public function canManageNews(): bool
     {
-        return $this->isSuperAdmin();
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_MANAGE_NEWS);
+    }
+
+    public function canAccessProjects(): bool
+    {
+        return $this->canAccessConfiguredModule('projects', [
+            UserGroup::PERMISSION_ACCESS_PROJECTS,
+        ]);
+    }
+
+    public function canAccessChats(): bool
+    {
+        return $this->canAccessConfiguredModule('chats', [
+            UserGroup::PERMISSION_ACCESS_CHATS,
+        ]);
+    }
+
+    public function canAccessKnowledgeBases(): bool
+    {
+        return $this->canAccessConfiguredModule('knowledge-bases', [
+            UserGroup::PERMISSION_ACCESS_KNOWLEDGE_BASES,
+            UserGroup::PERMISSION_MANAGE_KNOWLEDGE_BASES,
+        ]);
     }
 
     public function canManageApiTokens(): bool
     {
-        return $this->isSuperAdmin() || $this->canManageUserAccounts();
+        return $this->isSuperAdmin()
+            || $this->hasGroupPermission(UserGroup::PERMISSION_MANAGE_API_TOKENS)
+            || $this->canManageUserAccounts();
     }
 
     public function canManageMessengerIntegrations(): bool
     {
-        return $this->isSuperAdmin();
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_MANAGE_MESSENGER_INTEGRATIONS);
     }
 
     public function canManageWebhooks(): bool
     {
-        return $this->isSuperAdmin() || $this->isGroupAdministrator();
+        return $this->isSuperAdmin()
+            || $this->hasGroupPermission(UserGroup::PERMISSION_MANAGE_WEBHOOKS)
+            || $this->isGroupAdministrator();
+    }
+
+    public function canAccessForms(): bool
+    {
+        return $this->canAccessConfiguredModule('forms', [
+            UserGroup::PERMISSION_ACCESS_FORMS,
+        ]);
+    }
+
+    public function canAccessEdo(): bool
+    {
+        return $this->canAccessConfiguredModule('edo', [
+            UserGroup::PERMISSION_ACCESS_EDO,
+        ]);
+    }
+
+    public function canAccessFiles(): bool
+    {
+        return $this->canAccessConfiguredModule('files', [
+            UserGroup::PERMISSION_ACCESS_FILES,
+        ]);
+    }
+
+    public function canAccessProduction(): bool
+    {
+        return $this->canAccessConfiguredModule('production', [
+            UserGroup::PERMISSION_ACCESS_PRODUCTION,
+        ]);
+    }
+
+    public function canAccessWarehouses(): bool
+    {
+        return $this->canAccessConfiguredModule('warehouses', [
+            UserGroup::PERMISSION_ACCESS_WAREHOUSES,
+        ]);
+    }
+
+    public function canAccessTsd(): bool
+    {
+        return $this->canAccessConfiguredModule('tsd', [
+            UserGroup::PERMISSION_ACCESS_TSD,
+        ]);
+    }
+
+    public function canAccessEquipment(): bool
+    {
+        return $this->canAccessConfiguredModule('equipment', [
+            UserGroup::PERMISSION_ACCESS_EQUIPMENT,
+        ]);
+    }
+
+    public function canManageBusinessProcesses(): bool
+    {
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_MANAGE_BUSINESS_PROCESSES);
     }
 
     public function canAccessPersonContacts(): bool
@@ -306,7 +413,7 @@ class User extends Authenticatable implements PasskeyUser
 
     public function canManageFunnels(): bool
     {
-        return $this->isSuperAdmin();
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_MANAGE_FUNNELS);
     }
 
     public function canAccessFunnel(CrmFunnel $funnel): bool
@@ -430,25 +537,52 @@ class User extends Authenticatable implements PasskeyUser
             ->all();
     }
 
+    /**
+     * @return array<int, string>
+     */
+    public function visibleUserTableColumns(): array
+    {
+        return collect($this->visible_user_table_columns ?? [])
+            ->filter(fn (mixed $key): bool => is_string($key) && trim($key) !== '')
+            ->map(fn (string $key): string => trim($key))
+            ->filter(fn (string $key): bool => in_array($key, self::VISIBLE_USER_TABLE_OPTIONAL_COLUMNS, true))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function isGroupAdministrator(): bool
     {
-        if ($this->relationLoaded('group')) {
-            return $this->group?->name === UserGroup::ADMINISTRATORS_NAME;
-        }
-
-        return $this->group()
-            ->where('name', UserGroup::ADMINISTRATORS_NAME)
-            ->exists();
+        return $this->resolvedGroup()?->name === UserGroup::ADMINISTRATORS_NAME;
     }
 
     public function hasGroupPermission(string $permission): bool
     {
-        if ($this->relationLoaded('group')) {
-            return $this->group?->hasPermission($permission) ?? false;
+        return $this->resolvedGroup()?->hasPermission($permission) ?? false;
+    }
+
+    private function canAccessConfiguredModule(string $module, array $permissions, bool $legacyAccess = true): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
         }
 
-        $group = $this->group()->first();
+        $group = $this->resolvedGroup();
 
-        return $group?->hasPermission($permission) ?? false;
+        if (! $group || ! $group->isPermissionModuleConfigured($module)) {
+            return $legacyAccess;
+        }
+
+        return collect($permissions)
+            ->contains(fn (string $permission): bool => $group->hasPermission($permission));
+    }
+
+    private function resolvedGroup(): ?UserGroup
+    {
+        if ($this->relationLoaded('group')) {
+            return $this->group;
+        }
+
+        return $this->group()->first();
     }
 }

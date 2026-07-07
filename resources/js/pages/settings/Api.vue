@@ -23,6 +23,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/composables/useLanguage';
+import { index as documentationIndex } from '@/routes/documentation';
 import { edit } from '@/routes/settings/api';
 import { destroy, store } from '@/routes/settings/api/tokens';
 
@@ -71,9 +72,11 @@ const { language, t } = useLanguage();
 const copiedToken = ref(false);
 
 const readFlashApiToken = (): IssuedApiToken => {
-    const flashFromPage = (page as typeof page & {
-        flash?: { apiToken?: IssuedApiToken };
-    }).flash?.apiToken;
+    const flashFromPage = (
+        page as typeof page & {
+            flash?: { apiToken?: IssuedApiToken };
+        }
+    ).flash?.apiToken;
 
     return flashFromPage ?? page.props.flash?.apiToken ?? null;
 };
@@ -92,6 +95,11 @@ const issuedToken = ref<IssuedApiToken>(readFlashApiToken());
 const issuedTokenDialogOpen = ref(issuedToken.value !== null);
 const createTokenSectionId = 'api-create-token';
 const tokensSectionId = 'api-tokens';
+const apiDocumentationUrl = documentationIndex.url({
+    query: {
+        section: 'api',
+    },
+});
 
 const form = useForm({
     name: '',
@@ -227,7 +235,11 @@ const formatDateTime = (value: string | null): string => {
 
     <Dialog
         :open="issuedTokenDialogOpen"
-        @update:open="(isOpen) => { if (!isOpen) closeIssuedTokenDialog(); }"
+        @update:open="
+            (isOpen) => {
+                if (!isOpen) closeIssuedTokenDialog();
+            }
+        "
     >
         <DialogContent class="sm:max-w-lg">
             <DialogHeader>
@@ -249,7 +261,11 @@ const formatDateTime = (value: string | null): string => {
             </div>
 
             <DialogFooter class="gap-2">
-                <Button type="button" variant="outline" @click="closeIssuedTokenDialog">
+                <Button
+                    type="button"
+                    variant="outline"
+                    @click="closeIssuedTokenDialog"
+                >
                     {{ t.common.cancel }}
                 </Button>
                 <Button type="button" @click="copyToken">
@@ -281,6 +297,16 @@ const formatDateTime = (value: string | null): string => {
                 <Label>{{ t.api.base_url }}</Label>
                 <Input :model-value="props.baseUrl" readonly />
             </div>
+
+            <a
+                :href="apiDocumentationUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex w-fit items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+            >
+                <BookText class="size-4" />
+                {{ t.settings.api_documentation }}
+            </a>
         </section>
 
         <nav

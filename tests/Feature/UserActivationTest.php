@@ -238,6 +238,7 @@ test('administrators group can update a regular user profile', function () {
     $targetUser = User::factory()->create([
         'name' => 'Old Name',
         'last_name' => 'Old Last Name',
+        'middle_name' => 'Old Middle Name',
         'email' => 'old@example.com',
         'phone' => '+77010001122',
     ]);
@@ -246,6 +247,7 @@ test('administrators group can update a regular user profile', function () {
         ->patch(route('settings.users.profile.update', $targetUser), [
             'name' => 'Updated Name',
             'last_name' => 'Updated Last Name',
+            'middle_name' => 'Updated Middle Name',
             'email' => 'updated@example.com',
             'phone' => '+7 777 123 45 67',
         ])
@@ -253,6 +255,7 @@ test('administrators group can update a regular user profile', function () {
 
     expect($targetUser->refresh()->name)->toBe('Updated Name')
         ->and($targetUser->last_name)->toBe('Updated Last Name')
+        ->and($targetUser->middle_name)->toBe('Updated Middle Name')
         ->and($targetUser->email)->toBe('updated@example.com')
         ->and($targetUser->phone)->toBe('+77771234567')
         ->and($targetUser->email_verified_at)->toBeNull();
@@ -342,7 +345,9 @@ test('users page shows profile details in a right sheet sidebar', function () {
         ->and($profileSheet)->toContain('user?.issued_equipment?.length')
         ->and($profileSheet)->toContain('t.profile.issued_equipment')
         ->and($profileSheet)->toContain('equipmentItem.qr_code_svg_data_uri')
-        ->and($profileSheet)->toContain('profile_autosave_saving');
+        ->and($profileSheet)->toContain('profile_autosave_saving')
+        ->and($profileSheet)->toContain('managerSearchQuery')
+        ->and($profileSheet)->toContain('filteredManagerOptions');
 });
 
 test('managed user profile payload includes issued equipment', function () {
@@ -422,7 +427,9 @@ test('users page supports inline profile editing with autosave', function () {
         ->toContain('submitManagedProfileUpdate')
         ->toContain('updateUserProfile.url')
         ->and($profileSheet)->toContain('profile_autosave_saving')
-        ->and($profileSheet)->toContain('profile_autosave_saved');
+        ->and($profileSheet)->toContain('profile_autosave_saved')
+        ->and($profileSheet)->toContain('option.avatar')
+        ->and($profileSheet)->toContain('availableManagerOptions.value.slice(0, 5)');
 });
 
 test('sidebar user button opens a left bottom sheet instead of a dropdown', function () {

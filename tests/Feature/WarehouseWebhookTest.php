@@ -139,10 +139,10 @@ test('webhook settings include warehouse item qr endpoint in documentation', fun
     ]);
 
     $this->actingAs($admin)
-        ->get(route('settings.webhooks.edit'))
+        ->get(route('settings.webhooks.documentation.edit'))
         ->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page
-            ->component('settings/Webhooks')
+            ->component('settings/WebhookDocumentation')
             ->where('documentation.warehouses_items_url', url('/portal-webhooks').'/{webhook_id}/warehouses/{warehouse_id}/items')
         );
 });

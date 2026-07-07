@@ -39,23 +39,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('settings/appearance', [AppearanceController::class, 'update'])->name('appearance.update');
 });
 
-Route::middleware(['auth', 'verified', 'module.enabled:api'])->group(function () {
+Route::middleware(['auth', 'verified', 'module.enabled:api', 'can:manage-api-tokens'])->group(function () {
     Route::get('settings/api', [ApiController::class, 'edit'])->name('settings.api.edit');
     Route::get('settings/api/documentation', [ApiController::class, 'documentation'])
         ->name('settings.api.documentation.edit');
 
-    Route::middleware('can:manage-user-accounts')->group(function () {
-        Route::post('settings/api/tokens', [ApiController::class, 'store'])
-            ->middleware('throttle:api-tokens')
-            ->name('settings.api.tokens.store');
-        Route::delete('settings/api/tokens/{apiAccessToken}', [ApiController::class, 'destroy'])
-            ->name('settings.api.tokens.destroy');
-    });
+    Route::post('settings/api/tokens', [ApiController::class, 'store'])
+        ->middleware('throttle:api-tokens')
+        ->name('settings.api.tokens.store');
+    Route::delete('settings/api/tokens/{apiAccessToken}', [ApiController::class, 'destroy'])
+        ->name('settings.api.tokens.destroy');
 });
 
 Route::middleware(['auth', 'verified', 'can:view-users'])->group(function () {
     Route::get('settings/users', [UserController::class, 'index'])->name('settings.users.index');
     Route::get('settings/users/{user}', [UserController::class, 'show'])->name('settings.users.show');
+    Route::patch('settings/users/table-columns', [UserController::class, 'updateTableColumns'])->name('settings.users.table-columns.update');
 });
 
 Route::middleware(['auth', 'verified', 'can:manage-user-accounts'])->group(function () {
@@ -94,30 +93,31 @@ Route::middleware(['auth', 'verified', 'can:manage-users'])->group(function () {
     Route::post('settings/portal', [PortalController::class, 'update'])->name('settings.portal.update');
     Route::get('settings/modules', [ModuleController::class, 'edit'])->name('settings.modules.edit');
     Route::patch('settings/modules', [ModuleController::class, 'update'])->name('settings.modules.update');
+    Route::get('settings/logs', [LogController::class, 'edit'])->name('settings.logs.edit');
+});
+
+Route::middleware(['auth', 'verified', 'module.enabled:business-processes', 'can:manage-business-processes'])->group(function () {
     Route::get('settings/business-processes', [BusinessProcessController::class, 'index'])
-        ->middleware('module.enabled:business-processes')
         ->name('settings.business-processes.index');
     Route::post('settings/business-processes', [BusinessProcessController::class, 'store'])
-        ->middleware('module.enabled:business-processes')
         ->name('settings.business-processes.store');
     Route::patch('settings/business-processes/{businessProcess}', [BusinessProcessController::class, 'update'])
-        ->middleware('module.enabled:business-processes')
         ->name('settings.business-processes.update');
     Route::delete('settings/business-processes/{businessProcess}', [BusinessProcessController::class, 'destroy'])
-        ->middleware('module.enabled:business-processes')
         ->name('settings.business-processes.destroy');
-    Route::get('settings/logs', [LogController::class, 'edit'])->name('settings.logs.edit');
+});
 
+Route::middleware(['auth', 'verified', 'module.enabled:integrations', 'can:manage-messenger-integrations'])->group(function () {
     Route::get('settings/integrations', [MessengerIntegrationController::class, 'edit'])
-        ->middleware('module.enabled:integrations')
         ->name('settings.integrations.edit');
     Route::patch('settings/integrations/{messengerIntegration}', [MessengerIntegrationController::class, 'update'])
-        ->middleware('module.enabled:integrations')
         ->name('settings.integrations.update');
 });
 
 Route::middleware(['auth', 'verified', 'module.enabled:webhooks', 'can:manage-webhooks'])->group(function () {
     Route::get('settings/webhooks', [WebhookController::class, 'edit'])->name('settings.webhooks.edit');
+    Route::get('settings/webhooks/documentation', [WebhookController::class, 'documentation'])
+        ->name('settings.webhooks.documentation.edit');
     Route::post('settings/webhooks', [WebhookController::class, 'store'])->name('settings.webhooks.store');
     Route::patch('settings/webhooks/{portalWebhook}', [WebhookController::class, 'update'])->name('settings.webhooks.update');
     Route::post('settings/webhooks/{portalWebhook}/regenerate', [WebhookController::class, 'regenerate'])->name('settings.webhooks.regenerate');

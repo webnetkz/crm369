@@ -26,6 +26,7 @@ class EquipmentPageData
                     'id' => $equipmentItem->id,
                     'name' => $equipmentItem->name,
                     'qr_code' => $equipmentItem->qr_code,
+                    'qr_code_svg_data_uri' => $equipmentItem->qrCodeSvgDataUri(),
                     'status' => $equipmentItem->status,
                     'status_label' => __(
                         EquipmentItem::statusDefinitions()[$equipmentItem->status]['label_key']

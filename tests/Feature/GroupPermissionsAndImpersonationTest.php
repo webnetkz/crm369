@@ -24,6 +24,7 @@ test('super admin can view and update group rights', function () {
             ->has('groups.data')
             ->where('groups.meta.per_page', 50)
             ->has('availablePermissions')
+            ->has('permissionGroups')
         );
 
     $this->actingAs($superAdmin)
@@ -37,6 +38,48 @@ test('super admin can view and update group rights', function () {
 
     expect($group->refresh()->resolvedPermissions())
         ->toContain(UserGroup::PERMISSION_VIEW_USERS, UserGroup::PERMISSION_IMPERSONATE_USERS);
+});
+
+test('super admin can explicitly configure module access for a group', function () {
+    config(['admin.super_admin_email' => 'super@example.com']);
+
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+    ]);
+
+    $group = UserGroup::factory()->create([
+        'name' => 'Module Editors',
+        'permissions' => [],
+    ]);
+
+    $member = User::factory()->create([
+        'user_group_id' => $group->id,
+    ]);
+
+    $this->actingAs($superAdmin)
+        ->patch(route('settings.rights.update', $group), [
+            'permissions' => [
+                UserGroup::PERMISSION_ACCESS_COMPANY_STRUCTURE,
+            ],
+            'configured_modules' => [
+                'company-structure',
+                'news',
+            ],
+        ])
+        ->assertRedirect();
+
+    expect($group->refresh()->resolvedPermissions())
+        ->toContain(UserGroup::PERMISSION_ACCESS_COMPANY_STRUCTURE)
+        ->and($group->configuredPermissionModules())
+        ->toBe(['company-structure', 'news']);
+
+    $this->actingAs($member)
+        ->get(route('company-structure.index'))
+        ->assertSuccessful();
+
+    $this->actingAs($member)
+        ->get(route('news.index'))
+        ->assertForbidden();
 });
 
 test('non super admins cannot manage group rights', function () {

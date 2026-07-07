@@ -3,7 +3,6 @@ import { Head, Link, setLayoutProps } from '@inertiajs/vue3';
 import {
     ArrowRight,
     BadgeCheck,
-    Boxes,
     Building2,
     ClipboardList,
     Cpu,
@@ -23,7 +22,6 @@ import {
 
 type ProductionSectionKey =
     | 'overview'
-    | 'warehouses'
     | 'workshops'
     | 'machines'
     | 'raw-materials'
@@ -73,7 +71,6 @@ const { t } = useLanguage();
 
 const sectionIcons: Record<ProductionSectionKey, LucideIcon> = {
     overview: Factory,
-    warehouses: Boxes,
     workshops: Building2,
     machines: Cpu,
     'raw-materials': Package,

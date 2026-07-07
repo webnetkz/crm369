@@ -37,4 +37,5 @@ return [
     'api' => 'API',
     'api_documentation' => 'API docs',
     'webhooks' => 'Webhooks',
+    'webhooks_documentation' => 'Webhook docs',
 ];

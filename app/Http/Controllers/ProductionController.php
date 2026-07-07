@@ -12,7 +12,6 @@ class ProductionController extends Controller
      */
     private const array SECTION_KEYS = [
         'overview',
-        'warehouses',
         'workshops',
         'machines',
         'raw-materials',

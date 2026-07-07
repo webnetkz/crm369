@@ -48,20 +48,14 @@ function apiHeadersFor(string $token): array
     ];
 }
 
-test('api settings page is visible to verified users and token issuance is limited to admins', function () {
+test('api settings page is limited to admin-capable users and token issuance stays restricted', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
     ]);
 
     $this->actingAs($user)
         ->get(route('settings.api.edit'))
-        ->assertSuccessful()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('settings/Api')
-            ->where('can.manage_tokens', false)
-            ->has('baseUrl')
-            ->has('permissions')
-        );
+        ->assertForbidden();
 
     $this->actingAs($user)
         ->post(route('settings.api.tokens.store'), [
@@ -107,12 +101,13 @@ test('api settings page is visible to verified users and token issuance is limit
         ]);
 });
 
-test('api documentation page is visible to verified users', function () {
-    $user = User::factory()->create([
+test('api documentation page is visible to admin-capable users', function () {
+    $admin = User::factory()->create([
         'email_verified_at' => now(),
+        'user_group_id' => apiAdministratorsGroup()->id,
     ]);
 
-    $this->actingAs($user)
+    $this->actingAs($admin)
         ->get(route('settings.api.documentation.edit'))
         ->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page
@@ -353,6 +348,42 @@ test('legacy api tokens that use a plain text prefix still authenticate', functi
         ->getJson('/api/v1/profile')
         ->assertOk()
         ->assertJsonPath('data.email', $admin->email);
+});
+
+test('profile api exposes and updates position', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'user_group_id' => apiAdministratorsGroup()->id,
+        'position' => 'Operations Manager',
+        'middle_name' => 'Kanatovna',
+    ]);
+
+    $token = issueApiTokenFor($admin, [
+        ApiAccessToken::PERMISSION_PROFILE_READ,
+        ApiAccessToken::PERMISSION_PROFILE_WRITE,
+    ]);
+
+    $this->withHeaders(apiHeadersFor($token))
+        ->getJson('/api/v1/profile')
+        ->assertOk()
+        ->assertJsonPath('data.middle_name', 'Kanatovna')
+        ->assertJsonPath('data.position', 'Operations Manager');
+
+    $this->withHeaders(apiHeadersFor($token))
+        ->patchJson('/api/v1/profile', [
+            'name' => $admin->name,
+            'email' => $admin->email,
+            'phone' => '+7 777 123 45 67',
+            'middle_name' => 'Samatovna',
+            'position' => 'Commercial Director',
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.middle_name', 'Samatovna')
+        ->assertJsonPath('data.position', 'Commercial Director');
+
+    expect($admin->refresh()->position)->toBe('Commercial Director')
+        ->and($admin->middle_name)->toBe('Samatovna')
+        ->and($admin->phone)->toBe('+77771234567');
 });
 
 test('super admin token can read the documented api modules', function () {

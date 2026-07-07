@@ -19,11 +19,11 @@ import {
 import { computed } from 'vue';
 import type { ComputedRef } from 'vue';
 import { useLanguage } from '@/composables/useLanguage';
+import { index as documentationIndex } from '@/routes/documentation';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import { edit as editApi } from '@/routes/settings/api';
-import { edit as editApiDocumentation } from '@/routes/settings/api/documentation';
 import { index as businessProcessesIndex } from '@/routes/settings/business-processes';
 import { index as groupsIndex } from '@/routes/settings/groups';
 import { edit as editIntegrations } from '@/routes/settings/integrations';
@@ -35,6 +35,14 @@ import { index as rightsIndex } from '@/routes/settings/rights';
 import { index as usersIndex } from '@/routes/settings/users';
 import { edit as editWebhooks } from '@/routes/settings/webhooks';
 import type { NavItem } from '@/types';
+
+const documentationHref = (section: 'api' | 'webhooks'): string => {
+    return documentationIndex.url({
+        query: {
+            section,
+        },
+    });
+};
 
 export function useSettingsNavigation(): ComputedRef<NavItem[]> {
     const page = usePage();
@@ -137,7 +145,7 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                       },
                   ]
                 : []),
-            ...(page.props.auth.isSuperAdmin &&
+            ...(page.props.auth.canManageBusinessProcesses &&
             isVisible('settings.business-processes') &&
             isModuleEnabled('business-processes')
                 ? [
@@ -149,7 +157,7 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                       },
                   ]
                 : []),
-            ...(page.props.auth.isSuperAdmin &&
+            ...(page.props.auth.canManageMessengerIntegrations &&
             isVisible('settings.integrations') &&
             isModuleEnabled('integrations')
                 ? [
@@ -171,7 +179,9 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                       },
                   ]
                 : []),
-            ...(isVisible('settings.api') && isModuleEnabled('api')
+            ...(page.props.auth.canManageApiTokens &&
+            isVisible('settings.api') &&
+            isModuleEnabled('api')
                 ? [
                       {
                           key: 'settings.api',
@@ -182,7 +192,7 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                       {
                           key: 'settings.api.documentation',
                           title: t.value.settings.api_documentation,
-                          href: editApiDocumentation(),
+                          href: documentationHref('api'),
                           icon: BookText,
                       },
                   ]
@@ -196,6 +206,12 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                           title: t.value.settings.webhooks,
                           href: editWebhooks(),
                           icon: Webhook,
+                      },
+                      {
+                          key: 'settings.webhooks.documentation',
+                          title: t.value.settings.webhooks_documentation,
+                          href: documentationHref('webhooks'),
+                          icon: BookText,
                       },
                   ]
                 : []),

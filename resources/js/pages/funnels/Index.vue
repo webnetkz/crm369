@@ -937,7 +937,7 @@ const removeDeal = (dealId: number): void => {
                             </div>
                         </div>
 
-                        <div class="overflow-x-auto pb-2">
+                        <div class="scrollbar-x-visible overflow-x-scroll pb-2">
                             <div class="flex min-h-[30rem] gap-4">
                                 <div
                                     v-for="stage in props.activeFunnel.stages"

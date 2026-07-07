@@ -1429,12 +1429,12 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
     />
 
     <div
-        class="gap-6"
+        class="min-w-0 gap-6"
         :class="
             isTasksPage ? 'grid' : 'grid xl:grid-cols-[320px_minmax(0,1fr)]'
         "
     >
-        <section v-if="!isTasksPage" class="space-y-4">
+        <section v-if="!isTasksPage" class="min-w-0 space-y-4">
             <div class="rounded-3xl border border-border bg-card p-5 shadow-sm">
                 <div class="space-y-4">
                     <div>
@@ -1724,10 +1724,10 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
             </div>
         </section>
 
-        <section class="space-y-4">
+        <section class="min-w-0 space-y-4">
             <template v-if="isTasksPage">
                 <div
-                    class="rounded-3xl border border-border bg-card p-5 shadow-sm"
+                    class="min-w-0 rounded-3xl border border-border bg-card p-5 shadow-sm"
                 >
                     <div
                         class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
@@ -1949,149 +1949,171 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                     </template>
 
                     <template v-else-if="props.taskDisplayMode === 'kanban'">
-                        <div class="grid gap-4 xl:grid-cols-4">
-                            <div
-                                v-for="column in kanbanColumns"
-                                :key="column.value"
-                                class="rounded-2xl border border-border bg-background/60 p-4 transition-colors"
-                                :class="
-                                    dragOverTaskStatus === column.value ||
-                                    dragOverStageId === column.id
-                                        ? 'border-primary/50 bg-primary/5'
-                                        : ''
-                                "
-                                :style="taskStageColumnStyle(column.value)"
-                                @dragover.prevent="
-                                    handleKanbanColumnDragOver(column)
-                                "
-                                @dragenter.prevent="
-                                    handleKanbanColumnDragOver(column)
-                                "
-                                @drop.prevent="handleKanbanColumnDrop(column)"
-                            >
+                        <div
+                            class="scrollbar-x-visible max-w-full overflow-x-scroll pb-2"
+                        >
+                            <div class="flex min-w-max gap-4">
                                 <div
-                                    class="mb-4 flex items-center justify-between gap-3"
+                                    v-for="column in kanbanColumns"
+                                    :key="column.value"
+                                    class="flex w-[320px] shrink-0 flex-col rounded-2xl border border-border bg-background/60 p-4 transition-colors"
+                                    :class="
+                                        dragOverTaskStatus === column.value ||
+                                        dragOverStageId === column.id
+                                            ? 'border-primary/50 bg-primary/5'
+                                            : ''
+                                    "
+                                    :style="taskStageColumnStyle(column.value)"
+                                    @dragover.prevent="
+                                        handleKanbanColumnDragOver(column)
+                                    "
+                                    @dragenter.prevent="
+                                        handleKanbanColumnDragOver(column)
+                                    "
+                                    @drop.prevent="
+                                        handleKanbanColumnDrop(column)
+                                    "
                                 >
                                     <div
-                                        class="flex items-center gap-2 text-sm font-medium"
+                                        class="mb-4 flex items-center justify-between gap-3"
                                     >
-                                        <button
-                                            v-if="
-                                                props.can.manageTaskStages &&
-                                                column.id !== null
-                                            "
-                                            type="button"
+                                        <div
+                                            class="flex items-center gap-2 text-sm font-medium"
+                                        >
+                                            <button
+                                                v-if="
+                                                    props.can
+                                                        .manageTaskStages &&
+                                                    column.id !== null
+                                                "
+                                                type="button"
+                                                draggable="true"
+                                                class="inline-flex cursor-grab items-center justify-center rounded-md p-1 text-muted-foreground transition hover:bg-background hover:text-foreground active:cursor-grabbing"
+                                                :title="
+                                                    t.projects
+                                                        .stage_reorder_hint
+                                                "
+                                                @dragstart="
+                                                    startDraggingStage(
+                                                        column.id,
+                                                        $event,
+                                                    )
+                                                "
+                                                @dragend="
+                                                    resetKanbanStageDragState
+                                                "
+                                            >
+                                                <GripVertical class="size-4" />
+                                            </button>
+                                            <span
+                                                class="size-2.5 rounded-full"
+                                                :style="{
+                                                    backgroundColor:
+                                                        column.color,
+                                                }"
+                                            />
+                                            {{ column.label }}
+                                        </div>
+                                        <span
+                                            class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground"
+                                        >
+                                            {{ column.tasks.length }}
+                                        </span>
+                                    </div>
+
+                                    <div
+                                        v-if="column.tasks.length === 0"
+                                        class="rounded-2xl border border-dashed border-border bg-background px-4 py-6 text-sm text-muted-foreground"
+                                    >
+                                        {{ t.projects.empty_status_column }}
+                                    </div>
+
+                                    <div v-else class="space-y-3">
+                                        <Link
+                                            v-for="task in column.tasks"
+                                            :key="task.id"
+                                            :href="taskHrefResolver(task)"
                                             draggable="true"
-                                            class="inline-flex cursor-grab items-center justify-center rounded-md p-1 text-muted-foreground transition hover:bg-background hover:text-foreground active:cursor-grabbing"
-                                            :title="
-                                                t.projects.stage_reorder_hint
-                                            "
+                                            class="block rounded-2xl border border-border bg-card px-4 py-4 transition hover:border-primary/40 hover:bg-background"
+                                            :class="[
+                                                props.activeTask?.id === task.id
+                                                    ? 'border-primary/50 bg-background'
+                                                    : '',
+                                                movingTaskId === task.id
+                                                    ? 'opacity-60'
+                                                    : 'cursor-grab active:cursor-grabbing',
+                                            ]"
                                             @dragstart="
-                                                startDraggingStage(
-                                                    column.id,
+                                                startDraggingTask(
+                                                    task.id,
                                                     $event,
                                                 )
                                             "
-                                            @dragend="resetKanbanStageDragState"
+                                            @dragend="resetKanbanDragState"
                                         >
-                                            <GripVertical class="size-4" />
-                                        </button>
-                                        <span
-                                            class="size-2.5 rounded-full"
-                                            :style="{
-                                                backgroundColor: column.color,
-                                            }"
-                                        />
-                                        {{ column.label }}
-                                    </div>
-                                    <span
-                                        class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground"
-                                    >
-                                        {{ column.tasks.length }}
-                                    </span>
-                                </div>
-
-                                <div
-                                    v-if="column.tasks.length === 0"
-                                    class="rounded-2xl border border-dashed border-border bg-background px-4 py-6 text-sm text-muted-foreground"
-                                >
-                                    {{ t.projects.empty_status_column }}
-                                </div>
-
-                                <div v-else class="space-y-3">
-                                    <Link
-                                        v-for="task in column.tasks"
-                                        :key="task.id"
-                                        :href="taskHrefResolver(task)"
-                                        draggable="true"
-                                        class="block rounded-2xl border border-border bg-card px-4 py-4 transition hover:border-primary/40 hover:bg-background"
-                                        :class="[
-                                            props.activeTask?.id === task.id
-                                                ? 'border-primary/50 bg-background'
-                                                : '',
-                                            movingTaskId === task.id
-                                                ? 'opacity-60'
-                                                : 'cursor-grab active:cursor-grabbing',
-                                        ]"
-                                        @dragstart="
-                                            startDraggingTask(task.id, $event)
-                                        "
-                                        @dragend="resetKanbanDragState"
-                                    >
-                                        <div class="space-y-3">
-                                            <div
-                                                class="flex items-start justify-between gap-3"
-                                            >
-                                                <div class="min-w-0">
-                                                    <div
-                                                        class="truncate text-sm font-medium"
-                                                    >
-                                                        {{ task.title }}
+                                            <div class="space-y-3">
+                                                <div
+                                                    class="flex items-start justify-between gap-3"
+                                                >
+                                                    <div class="min-w-0">
+                                                        <div
+                                                            class="truncate text-sm font-medium"
+                                                        >
+                                                            {{ task.title }}
+                                                        </div>
+                                                        <div
+                                                            v-if="
+                                                                task.parent_task_title
+                                                            "
+                                                            class="mt-1 truncate text-xs text-muted-foreground"
+                                                        >
+                                                            {{
+                                                                t.projects
+                                                                    .parent_task
+                                                            }}:
+                                                            {{
+                                                                task.parent_task_title
+                                                            }}
+                                                        </div>
                                                     </div>
-                                                    <div
-                                                        v-if="
-                                                            task.parent_task_title
-                                                        "
-                                                        class="mt-1 truncate text-xs text-muted-foreground"
+                                                    <span
+                                                        class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground"
+                                                    >
+                                                        {{ task.level + 1 }}
+                                                    </span>
+                                                </div>
+
+                                                <div
+                                                    class="flex flex-wrap gap-2 text-xs text-muted-foreground"
+                                                >
+                                                    <span
+                                                        class="rounded-full bg-background px-2 py-1"
                                                     >
                                                         {{
-                                                            t.projects
-                                                                .parent_task
+                                                            t.projects.assignee
                                                         }}:
                                                         {{
-                                                            task.parent_task_title
+                                                            fullName(
+                                                                task.assignee,
+                                                            )
                                                         }}
-                                                    </div>
+                                                    </span>
+                                                    <span
+                                                        class="rounded-full bg-background px-2 py-1"
+                                                    >
+                                                        {{
+                                                            t.projects.due_date
+                                                        }}:
+                                                        {{
+                                                            formatDate(
+                                                                task.due_at,
+                                                            )
+                                                        }}
+                                                    </span>
                                                 </div>
-                                                <span
-                                                    class="rounded-full bg-background px-2 py-1 text-xs text-muted-foreground"
-                                                >
-                                                    {{ task.level + 1 }}
-                                                </span>
                                             </div>
-
-                                            <div
-                                                class="flex flex-wrap gap-2 text-xs text-muted-foreground"
-                                            >
-                                                <span
-                                                    class="rounded-full bg-background px-2 py-1"
-                                                >
-                                                    {{ t.projects.assignee }}:
-                                                    {{
-                                                        fullName(task.assignee)
-                                                    }}
-                                                </span>
-                                                <span
-                                                    class="rounded-full bg-background px-2 py-1"
-                                                >
-                                                    {{ t.projects.due_date }}:
-                                                    {{
-                                                        formatDate(task.due_at)
-                                                    }}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </Link>
+                                        </Link>
+                                    </div>
                                 </div>
                             </div>
                         </div>

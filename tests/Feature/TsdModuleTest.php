@@ -194,12 +194,19 @@ test('webhook settings include tsd documentation and permissions', function () {
     ]);
 
     $this->actingAs($admin)
+        ->get(route('settings.webhooks.documentation.edit'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('settings/WebhookDocumentation')
+            ->where('documentation.tsd_index_url', url('/portal-webhooks').'/{webhook_id}/tsd/scans')
+            ->where('documentation.tsd_store_url', url('/portal-webhooks').'/{webhook_id}/tsd/scans')
+        );
+
+    $this->actingAs($admin)
         ->get(route('settings.webhooks.edit'))
         ->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/Webhooks')
-            ->where('documentation.tsd_index_url', url('/portal-webhooks').'/{webhook_id}/tsd/scans')
-            ->where('documentation.tsd_store_url', url('/portal-webhooks').'/{webhook_id}/tsd/scans')
             ->where('availablePermissions', fn ($permissions): bool => collect($permissions)->contains(
                 fn (array $permission): bool => $permission['key'] === PortalWebhook::PERMISSION_TSD_READ
             ) && collect($permissions)->contains(

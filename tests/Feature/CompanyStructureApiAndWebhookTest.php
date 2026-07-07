@@ -44,17 +44,20 @@ test('company structure api endpoints return the hierarchy and one selected node
     $chiefExecutive = User::factory()->create([
         'name' => 'Aruzhan',
         'last_name' => 'Sarsenova',
+        'middle_name' => 'Bauyrzhanovna',
         'position' => 'Chief Executive Officer',
     ]);
     $manager = User::factory()->create([
         'name' => 'Timur',
         'last_name' => 'Aitbayev',
+        'middle_name' => 'Maratovich',
         'position' => 'Operations Manager',
         'manager_id' => $chiefExecutive->id,
     ]);
     $staff = User::factory()->create([
         'name' => 'Dana',
         'last_name' => 'Abdullina',
+        'middle_name' => 'Sergeevna',
         'position' => 'Account Executive',
         'manager_id' => $manager->id,
     ]);
@@ -67,17 +70,17 @@ test('company structure api endpoints return the hierarchy and one selected node
         ->getJson(route('api.v1.company-structure.index'))
         ->assertOk()
         ->assertJsonPath('stats.total_users', 4)
-        ->assertJsonPath('roots.0.full_name', 'Aruzhan Sarsenova')
-        ->assertJsonPath('roots.0.children.0.full_name', 'Timur Aitbayev')
-        ->assertJsonPath('roots.0.children.0.children.0.full_name', 'Dana Abdullina');
+        ->assertJsonFragment(['full_name' => 'Aruzhan Sarsenova Bauyrzhanovna'])
+        ->assertJsonFragment(['full_name' => 'Timur Aitbayev Maratovich'])
+        ->assertJsonFragment(['full_name' => 'Dana Abdullina Sergeevna']);
 
     $this->withHeaders(companyStructureApiHeadersFor($token))
         ->getJson(route('api.v1.company-structure.show', $manager))
         ->assertOk()
-        ->assertJsonPath('data.full_name', 'Timur Aitbayev')
-        ->assertJsonPath('data.manager.full_name', 'Aruzhan Sarsenova')
-        ->assertJsonPath('data.subordinates.0.full_name', 'Dana Abdullina')
-        ->assertJsonPath('ancestors.0.full_name', 'Aruzhan Sarsenova');
+        ->assertJsonPath('data.full_name', 'Timur Aitbayev Maratovich')
+        ->assertJsonPath('data.manager.full_name', 'Aruzhan Sarsenova Bauyrzhanovna')
+        ->assertJsonPath('data.subordinates.0.full_name', 'Dana Abdullina Sergeevna')
+        ->assertJsonPath('ancestors.0.full_name', 'Aruzhan Sarsenova Bauyrzhanovna');
 
     expect($staff->refresh()->manager_id)->toBe($manager->id);
 });
@@ -118,11 +121,13 @@ test('company structure webhook endpoints and settings documentation expose the 
     $chiefExecutive = User::factory()->create([
         'name' => 'Aruzhan',
         'last_name' => 'Sarsenova',
+        'middle_name' => 'Bauyrzhanovna',
         'position' => 'Chief Executive Officer',
     ]);
     $manager = User::factory()->create([
         'name' => 'Timur',
         'last_name' => 'Aitbayev',
+        'middle_name' => 'Maratovich',
         'position' => 'Operations Manager',
         'manager_id' => $chiefExecutive->id,
     ]);
@@ -134,14 +139,19 @@ test('company structure webhook endpoints and settings documentation expose the 
     $webhook->issueToken('company-structure-webhook-token');
 
     $webhooksPage = $this->actingAs($admin)
-        ->get(route('settings.webhooks.edit'))
+        ->get(route('settings.webhooks.documentation.edit'))
         ->assertSuccessful();
 
     expect($webhooksPage->inertiaProps('documentation.company_structure_index_url'))
         ->toBe(url('/portal-webhooks').'/{webhook_id}/company-structure')
         ->and($webhooksPage->inertiaProps('documentation.company_structure_show_url'))
-        ->toBe(url('/portal-webhooks').'/{webhook_id}/company-structure/users/{user_id}')
-        ->and(collect($webhooksPage->inertiaProps('availablePermissions'))->pluck('key')->all())
+        ->toBe(url('/portal-webhooks').'/{webhook_id}/company-structure/users/{user_id}');
+
+    $webhooksSettingsPage = $this->actingAs($admin)
+        ->get(route('settings.webhooks.edit'))
+        ->assertSuccessful();
+
+    expect(collect($webhooksSettingsPage->inertiaProps('availablePermissions'))->pluck('key')->all())
         ->toContain(PortalWebhook::PERMISSION_COMPANY_STRUCTURE_READ);
 
     $apiDocsPage = $this->actingAs($admin)
@@ -169,11 +179,11 @@ test('company structure webhook endpoints and settings documentation expose the 
     $this->get(route('portal-webhooks.company-structure.index', $webhook).'?token=company-structure-webhook-token')
         ->assertOk()
         ->assertJsonPath('stats.total_users', 3)
-        ->assertJsonPath('roots.0.full_name', 'Aruzhan Sarsenova')
-        ->assertJsonPath('roots.0.children.0.full_name', 'Timur Aitbayev');
+        ->assertJsonFragment(['full_name' => 'Aruzhan Sarsenova Bauyrzhanovna'])
+        ->assertJsonFragment(['full_name' => 'Timur Aitbayev Maratovich']);
 
     $this->get(route('portal-webhooks.company-structure.show', [$webhook, $manager]).'?token=company-structure-webhook-token')
         ->assertOk()
-        ->assertJsonPath('data.full_name', 'Timur Aitbayev')
-        ->assertJsonPath('data.manager.full_name', 'Aruzhan Sarsenova');
+        ->assertJsonPath('data.full_name', 'Timur Aitbayev Maratovich')
+        ->assertJsonPath('data.manager.full_name', 'Aruzhan Sarsenova Bauyrzhanovna');
 });

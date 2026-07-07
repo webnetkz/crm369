@@ -8,6 +8,7 @@ use App\Http\Controllers\ContactCommentController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CrmFunnelController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocumentationController;
 use App\Http\Controllers\EdoDocumentController;
 use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\FileController;
@@ -149,11 +150,12 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
-    Route::middleware('module.enabled:company-structure')->group(function () {
+    Route::get('documentation', DocumentationController::class)->name('documentation.index');
+    Route::middleware(['module.enabled:company-structure', 'can:access-company-structure'])->group(function () {
         Route::get('company-structure', CompanyStructureController::class)->name('company-structure.index');
     });
 
-    Route::middleware('module.enabled:forms')->group(function () {
+    Route::middleware(['module.enabled:forms', 'can:access-forms'])->group(function () {
         Route::get('forms', [PortalFormController::class, 'index'])->name('forms.index');
         Route::post('forms', [PortalFormController::class, 'store'])->name('forms.store');
         Route::patch('forms/{portalForm}', [PortalFormController::class, 'update'])->name('forms.update');
@@ -178,7 +180,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('contacts.destroy');
     });
 
-    Route::middleware('module.enabled:files')->group(function () {
+    Route::middleware(['module.enabled:files', 'can:access-files'])->group(function () {
         Route::get('files', [FileController::class, 'index'])->name('files.index');
         Route::post('files/directories', [FileController::class, 'storeDirectory'])->name('files.directories.store');
         Route::delete('files/directories/{fileDirectory}', [FileController::class, 'destroyDirectory'])->name('files.directories.destroy');
@@ -189,7 +191,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('files/directories/{fileDirectory}/permissions/{fileDirectoryPermission}', [FileController::class, 'destroyPermission'])->name('files.directories.permissions.destroy');
     });
 
-    Route::middleware('module.enabled:edo')->group(function () {
+    Route::middleware(['module.enabled:edo', 'can:access-edo'])->group(function () {
         Route::get('edo', [EdoDocumentController::class, 'index'])->name('edo.index');
         Route::post('edo', [EdoDocumentController::class, 'store'])->name('edo.store');
         Route::patch('edo/{edoDocument}', [EdoDocumentController::class, 'update'])->name('edo.update');
@@ -198,12 +200,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('edo/{edoDocument}/public-link', [EdoDocumentController::class, 'issuePublicLink'])->name('edo.public-link.store');
     });
 
-    Route::middleware('module.enabled:news')->group(function () {
+    Route::middleware(['module.enabled:news', 'can:access-news'])->group(function () {
         Route::get('news', [NewsController::class, 'index'])->name('news.index');
         Route::get('news/{news}', [NewsController::class, 'show'])->name('news.show');
     });
 
-    Route::middleware('module.enabled:chats')->group(function () {
+    Route::middleware(['module.enabled:chats', 'can:access-chats'])->group(function () {
         Route::get('chats', ChatPageController::class)->name('chats.index');
         Route::get('chats/sidebar', [ChatSidebarController::class, 'index'])->name('chats.sidebar');
         Route::post('chats/direct', [ChatSidebarController::class, 'startDirect'])->name('chats.direct.store');
@@ -217,7 +219,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('chats.attachments.download');
     });
 
-    Route::middleware('module.enabled:knowledge-bases')->group(function () {
+    Route::middleware(['module.enabled:knowledge-bases', 'can:access-knowledge-bases'])->group(function () {
         Route::get('knowledge-bases', [KnowledgeBaseController::class, 'index'])->name('knowledge-bases.index');
         Route::get('knowledge-bases/{knowledgeBase}', [KnowledgeBaseController::class, 'show'])->name('knowledge-bases.show');
         Route::get('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'article'])->name('knowledge-bases.articles.show');
@@ -238,7 +240,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('funnels/{crmFunnel}/deals/{crmDeal}', [CrmFunnelController::class, 'destroyDeal'])->name('funnels.deals.destroy');
     });
 
-    Route::middleware('module.enabled:projects')->group(function () {
+    Route::middleware(['module.enabled:projects', 'can:access-projects'])->group(function () {
         Route::get('tasks', [ProjectController::class, 'tasksIndex'])->name('tasks.index');
         Route::get('tasks/export', [ProjectController::class, 'exportStandaloneTasks'])->name('tasks.export');
         Route::post('tasks/import', [ProjectController::class, 'importStandaloneTasks'])->name('tasks.import');
@@ -265,25 +267,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('projects/{project}/tasks/{projectTask}', [ProjectController::class, 'destroyTask'])->name('projects.tasks.destroy');
     });
 
-    Route::middleware('module.enabled:production')->group(function () {
+    Route::middleware(['module.enabled:production', 'can:access-production'])->group(function () {
         Route::get('production', [ProductionController::class, 'index'])->name('production.index');
         Route::get('production/{section}', [ProductionController::class, 'show'])->name('production.show');
     });
 
-    Route::middleware('module.enabled:warehouses')->group(function () {
+    Route::middleware(['module.enabled:warehouses', 'can:access-warehouses'])->group(function () {
         Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
         Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show'])->name('warehouses.show');
         Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
         Route::post('warehouses/scan', [WarehouseController::class, 'scan'])->name('warehouses.scan');
     });
 
-    Route::middleware('module.enabled:equipment')->group(function () {
+    Route::middleware(['module.enabled:equipment', 'can:access-equipment'])->group(function () {
         Route::get('equipment', [EquipmentController::class, 'index'])->name('equipment.index');
         Route::post('equipment', [EquipmentController::class, 'store'])->name('equipment.store');
         Route::patch('equipment/{equipmentItem}', [EquipmentController::class, 'update'])->name('equipment.update');
     });
 
-    Route::middleware('module.enabled:tsd')->group(function () {
+    Route::middleware(['module.enabled:tsd', 'can:access-tsd'])->group(function () {
         Route::get('tsd', [TsdController::class, 'index'])->name('tsd.index');
         Route::post('tsd/scans', [TsdController::class, 'store'])->name('tsd.store');
     });

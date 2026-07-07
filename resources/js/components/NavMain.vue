@@ -40,7 +40,7 @@ const emit = defineEmits<{
 
 const { isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
 const { t } = useLanguage();
-const { isMobile, state } = useSidebar();
+const { isMobile, setOpenMobile, state } = useSidebar();
 const visibleHandleKey = ref<string | null>(null);
 const dragSourceKey = ref<string | null>(null);
 const dropTarget = ref<{ key: string; position: 'before' | 'after' } | null>(
@@ -76,6 +76,14 @@ const anchorTarget = (item: NavItem): string | undefined => {
 
 const anchorRel = (item: NavItem): string | undefined => {
     return item.opensInNewTab ? 'noopener noreferrer' : undefined;
+};
+
+const handleMenuItemClick = (): void => {
+    if (!isMobile.value) {
+        return;
+    }
+
+    setOpenMobile(false);
 };
 
 const canReorderItem = (item: NavItem): item is NavItem & { key: string } => {
@@ -307,13 +315,18 @@ onBeforeUnmount(() => {
                             :href="anchorHref(item)"
                             :target="anchorTarget(item)"
                             :rel="anchorRel(item)"
+                            @click="handleMenuItemClick"
                         >
                             <component :is="item.icon" v-if="item.icon" />
                             <span class="min-w-0 flex-1 truncate">{{
                                 item.title
                             }}</span>
                         </a>
-                        <Link v-else :href="item.href">
+                        <Link
+                            v-else
+                            :href="item.href"
+                            @click="handleMenuItemClick"
+                        >
                             <component :is="item.icon" v-if="item.icon" />
                             <span class="min-w-0 flex-1 truncate">{{
                                 item.title
@@ -435,6 +448,7 @@ onBeforeUnmount(() => {
                                             :href="anchorHref(child)"
                                             :target="anchorTarget(child)"
                                             :rel="anchorRel(child)"
+                                            @click="handleMenuItemClick"
                                         >
                                             <component
                                                 :is="child.icon"
@@ -445,7 +459,11 @@ onBeforeUnmount(() => {
                                                 >{{ child.title }}</span
                                             >
                                         </a>
-                                        <Link v-else :href="child.href">
+                                        <Link
+                                            v-else
+                                            :href="child.href"
+                                            @click="handleMenuItemClick"
+                                        >
                                             <component
                                                 :is="child.icon"
                                                 v-if="child.icon"
@@ -484,13 +502,18 @@ onBeforeUnmount(() => {
                             :href="anchorHref(item)"
                             :target="anchorTarget(item)"
                             :rel="anchorRel(item)"
+                            @click="handleMenuItemClick"
                         >
                             <component :is="item.icon" v-if="item.icon" />
                             <span class="min-w-0 flex-1 truncate">{{
                                 item.title
                             }}</span>
                         </a>
-                        <Link v-else :href="item.href">
+                        <Link
+                            v-else
+                            :href="item.href"
+                            @click="handleMenuItemClick"
+                        >
                             <component :is="item.icon" v-if="item.icon" />
                             <span class="min-w-0 flex-1 truncate">{{
                                 item.title

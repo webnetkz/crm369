@@ -39,6 +39,17 @@ test('appearance page seeds the root html background with the user custom color'
         ->assertSee('#112233', false);
 });
 
+test('appearance defaults to light when no preference cookie is present', function () {
+    $user = User::factory()->create();
+
+    $this
+        ->actingAs($user)
+        ->get(route('appearance.edit'))
+        ->assertOk()
+        ->assertSee("const appearance = 'light';", false)
+        ->assertDontSee("const appearance = 'system';", false);
+});
+
 test('authenticated layout receives background settings through shared auth props', function () {
     $path = 'backgrounds/preview/dashboard-background.jpg';
 
@@ -156,22 +167,26 @@ test('appearance editor syncs live background previews with the app shell', func
     $appearancePage = file_get_contents(resource_path('js/pages/settings/Appearance.vue'));
     $appShell = file_get_contents(resource_path('js/components/AppShell.vue'));
     $backgroundPreview = file_get_contents(resource_path('js/composables/useBackgroundPreview.ts'));
+    $appearanceComposable = file_get_contents(resource_path('js/composables/useAppearance.ts'));
 
-    expect($appearancePage)->toContain("useBackgroundPreview")
+    expect($appearancePage)->toContain('useBackgroundPreview')
         ->and($appearancePage)->toContain('setPersisted({')
         ->and($appearancePage)->toContain('{ deep: true, immediate: true }')
         ->and($appearancePage)->toContain('setPreview({')
         ->and($appearancePage)->toContain('clearPreview();')
-        ->and($appShell)->toContain("useBackgroundPreview")
+        ->and($appShell)->toContain('useBackgroundPreview')
         ->and($appShell)->toContain('setPersisted(value);')
         ->and($appShell)->toContain('preview.value ?? persisted.value ?? authBackgroundSettings.value')
         ->and($appShell)->toContain("backgroundColor: backgroundSettings.value.color ?? 'var(--background)'")
-        ->and($appShell)->toContain("document.documentElement.style.backgroundColor = backgroundColor;")
-        ->and($appShell)->toContain("document.body.style.backgroundColor = backgroundColor;")
+        ->and($appShell)->toContain('document.documentElement.style.backgroundColor = backgroundColor;')
+        ->and($appShell)->toContain('document.body.style.backgroundColor = backgroundColor;')
         ->and($backgroundPreview)->toContain('export function useBackgroundPreview')
         ->and($backgroundPreview)->toContain('const persisted = computed<BackgroundPreviewSettings | null>(() => {')
         ->and($backgroundPreview)->toContain('const setPersisted = (value: BackgroundPreviewSettings | null): void => {')
-        ->and($backgroundPreview)->toContain('isPreviewActive');
+        ->and($backgroundPreview)->toContain('isPreviewActive')
+        ->and($appearanceComposable)->toContain("const defaultAppearance: Appearance = 'light';")
+        ->and($appearanceComposable)->toContain('updateTheme(savedAppearance || defaultAppearance);')
+        ->and($appearanceComposable)->toContain('const appearance = ref<Appearance>(defaultAppearance);');
 });
 
 test('app sidebar header and settings tabs stay pinned while their scroll container moves', function () {

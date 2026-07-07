@@ -34,6 +34,7 @@ class UserController extends Controller
                 'id',
                 'name',
                 'last_name',
+                'middle_name',
                 'email',
                 'phone',
                 'email_verified_at',
@@ -59,6 +60,7 @@ class UserController extends Controller
                     $searchQuery
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('middle_name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%");
                 });
             })
@@ -151,7 +153,7 @@ class UserController extends Controller
     {
         $validated = $request->validated();
 
-        $user->fill(Arr::only($validated, ['name', 'last_name', 'email', 'phone']));
+        $user->fill(Arr::only($validated, ['name', 'last_name', 'middle_name', 'email', 'phone', 'position', 'manager_id']));
 
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;

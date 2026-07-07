@@ -2,13 +2,15 @@
 import {
     BadgeCheck,
     Briefcase,
+    Check,
+    ChevronsUpDown,
     CircleX,
     Mail,
     Phone,
     UserRound,
     UsersRound,
 } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import InputError from '@/components/InputError.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -48,6 +50,10 @@ const emit = defineEmits<{
 
 const { getInitials } = useInitials();
 const { language, t } = useLanguage();
+const managerPickerOpen = ref(false);
+const managerSearchQuery = ref('');
+const managerPickerRef = ref<HTMLElement | null>(null);
+const managerSearchInputRef = ref<HTMLInputElement | null>(null);
 
 const avatarStyle = computed(() => ({
     objectPosition: 'center',
@@ -57,6 +63,30 @@ const avatarStyle = computed(() => ({
 const availableManagerOptions = computed(() => {
     return (props.managerOptions ?? []).filter(
         (option) => option.id !== props.user?.id,
+    );
+});
+
+const selectedManagerOption = computed(() => {
+    if (form.value.manager_id === '') {
+        return null;
+    }
+
+    return (
+        availableManagerOptions.value.find(
+            (option) => option.id === form.value.manager_id,
+        ) ?? null
+    );
+});
+
+const filteredManagerOptions = computed(() => {
+    const query = managerSearchQuery.value.trim().toLocaleLowerCase();
+
+    if (query === '') {
+        return availableManagerOptions.value.slice(0, 5);
+    }
+
+    return availableManagerOptions.value.filter((option) =>
+        option.name.toLocaleLowerCase().startsWith(query),
     );
 });
 
@@ -97,6 +127,75 @@ const formatStructureUser = (person: {
         ? `${person.full_name} · ${person.position}`
         : person.full_name;
 };
+
+const managerOptionSubtitle = (option: CompanyStructureManagerOption): string => {
+    return option.position ?? option.email;
+};
+
+const managerOptionAvatarStyle = (
+    option: CompanyStructureManagerOption,
+): Record<string, string> => ({
+    objectPosition: 'center',
+    transform: `scale(${option.avatar_scale ?? 1})`,
+});
+
+const closeManagerPicker = (): void => {
+    managerPickerOpen.value = false;
+    managerSearchQuery.value = '';
+};
+
+const openManagerPicker = async (): Promise<void> => {
+    managerPickerOpen.value = true;
+    managerSearchQuery.value = '';
+
+    await nextTick();
+    managerSearchInputRef.value?.focus();
+};
+
+const toggleManagerPicker = (): void => {
+    if (managerPickerOpen.value) {
+        closeManagerPicker();
+
+        return;
+    }
+
+    void openManagerPicker();
+};
+
+const selectManager = (option: CompanyStructureManagerOption | null): void => {
+    form.value.manager_id = option?.id ?? '';
+    closeManagerPicker();
+};
+
+const handleManagerPickerPointerDown = (event: MouseEvent): void => {
+    if (
+        managerPickerRef.value &&
+        !managerPickerRef.value.contains(event.target as Node)
+    ) {
+        closeManagerPicker();
+    }
+};
+
+watch(
+    () => props.user?.id,
+    () => {
+        closeManagerPicker();
+    },
+);
+
+onMounted(() => {
+    document.addEventListener(
+        'mousedown',
+        handleManagerPickerPointerDown,
+    );
+});
+
+onBeforeUnmount(() => {
+    document.removeEventListener(
+        'mousedown',
+        handleManagerPickerPointerDown,
+    );
+});
 </script>
 
 <template>
@@ -268,25 +367,133 @@ const formatStructureUser = (person: {
                             {{ t.company_structure.manager }}
                         </div>
                         <template v-if="canEdit">
-                            <select
-                                v-model="form.manager_id"
-                                class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            <div
+                                ref="managerPickerRef"
+                                class="relative mt-2"
                             >
-                                <option value="">
-                                    {{ t.company_structure.no_manager }}
-                                </option>
-                                <option
-                                    v-for="option in availableManagerOptions"
-                                    :key="option.id"
-                                    :value="option.id"
+                                <button
+                                    type="button"
+                                    class="flex min-h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40"
+                                    @click="toggleManagerPicker"
                                 >
-                                    {{
-                                        option.position
-                                            ? `${option.full_name} · ${option.position}`
-                                            : option.full_name
-                                    }}
-                                </option>
-                            </select>
+                                    <span class="truncate">
+                                        {{
+                                            formatStructureUser(
+                                                selectedManagerOption,
+                                            )
+                                        }}
+                                    </span>
+                                    <ChevronsUpDown
+                                        class="ml-2 size-4 shrink-0 text-muted-foreground"
+                                    />
+                                </button>
+
+                                <div
+                                    v-if="managerPickerOpen"
+                                    class="absolute inset-x-0 z-30 mt-2 rounded-2xl border border-border bg-background p-2 shadow-lg"
+                                >
+                                    <input
+                                        ref="managerSearchInputRef"
+                                        v-model="managerSearchQuery"
+                                        type="text"
+                                        class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"
+                                        autocomplete="off"
+                                        :placeholder="
+                                            t.admin.user_search_placeholder
+                                        "
+                                        @keydown.esc.prevent="closeManagerPicker"
+                                    />
+
+                                    <div class="mt-2 grid max-h-72 gap-1 overflow-y-auto">
+                                        <button
+                                            type="button"
+                                            class="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                                            @mousedown.prevent="
+                                                selectManager(null)
+                                            "
+                                        >
+                                            <div
+                                                class="flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground"
+                                            >
+                                                <CircleX class="size-4" />
+                                            </div>
+                                            <div class="min-w-0 flex-1">
+                                                <div class="truncate font-medium">
+                                                    {{
+                                                        t.company_structure.no_manager
+                                                    }}
+                                                </div>
+                                            </div>
+                                            <Check
+                                                v-if="form.manager_id === ''"
+                                                class="size-4 text-primary"
+                                            />
+                                        </button>
+
+                                        <button
+                                            v-for="option in filteredManagerOptions"
+                                            :key="option.id"
+                                            type="button"
+                                            class="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                                            @mousedown.prevent="
+                                                selectManager(option)
+                                            "
+                                        >
+                                            <Avatar
+                                                class="size-9 rounded-full border border-border"
+                                            >
+                                                <AvatarImage
+                                                    v-if="option.avatar"
+                                                    :src="option.avatar"
+                                                    :alt="option.full_name"
+                                                    :style="
+                                                        managerOptionAvatarStyle(
+                                                            option,
+                                                        )
+                                                    "
+                                                />
+                                                <AvatarFallback>
+                                                    {{
+                                                        getInitials(
+                                                            option.full_name,
+                                                        )
+                                                    }}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div class="min-w-0 flex-1">
+                                                <div class="truncate font-medium">
+                                                    {{ option.full_name }}
+                                                </div>
+                                                <div
+                                                    class="truncate text-xs text-muted-foreground"
+                                                >
+                                                    {{
+                                                        managerOptionSubtitle(
+                                                            option,
+                                                        )
+                                                    }}
+                                                </div>
+                                            </div>
+                                            <Check
+                                                v-if="
+                                                    form.manager_id === option.id
+                                                "
+                                                class="size-4 text-primary"
+                                            />
+                                        </button>
+
+                                        <div
+                                            v-if="
+                                                filteredManagerOptions.length ===
+                                                0
+                                            "
+                                            class="rounded-xl px-3 py-4 text-sm text-muted-foreground"
+                                        >
+                                            {{ t.admin.manager_search_empty }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <InputError
                                 class="mt-2"
                                 :message="form.errors.manager_id"
@@ -336,6 +543,26 @@ const formatStructureUser = (person: {
                         </template>
                         <div v-else class="mt-1 font-medium">
                             {{ user?.last_name ?? t.common.not_specified }}
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-border bg-card p-4">
+                        <div class="text-sm text-muted-foreground">
+                            {{ t.common.middle_name }}
+                        </div>
+                        <template v-if="canEdit">
+                            <Input
+                                v-model="form.middle_name"
+                                class="mt-2"
+                                autocomplete="additional-name"
+                            />
+                            <InputError
+                                class="mt-2"
+                                :message="form.errors.middle_name"
+                            />
+                        </template>
+                        <div v-else class="mt-1 font-medium">
+                            {{ user?.middle_name ?? t.common.not_specified }}
                         </div>
                     </div>
 

@@ -32,6 +32,7 @@ class UpdateManagedUserProfileRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $lastName = $this->input('last_name');
+        $middleName = $this->input('middle_name');
         $phone = $this->input('phone');
         $position = $this->input('position');
         $managerId = $this->input('manager_id');
@@ -39,6 +40,9 @@ class UpdateManagedUserProfileRequest extends FormRequest
         $this->merge([
             'last_name' => is_string($lastName) && trim($lastName) !== ''
                 ? trim($lastName)
+                : null,
+            'middle_name' => is_string($middleName) && trim($middleName) !== ''
+                ? trim($middleName)
                 : null,
             'phone' => $this->normalizeKazakhstanPhone(is_string($phone) ? $phone : null),
             'position' => is_string($position) && trim($position) !== ''
@@ -59,7 +63,6 @@ class UpdateManagedUserProfileRequest extends FormRequest
 
         return [
             ...$this->profileRules($targetUser instanceof User ? $targetUser->id : null),
-            'position' => ['nullable', 'string', 'max:255'],
             'manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
         ];
     }

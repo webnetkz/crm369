@@ -68,6 +68,7 @@ class CompanyStructureData
                 'id',
                 'name',
                 'last_name',
+                'middle_name',
                 'email',
                 'avatar_path',
                 'avatar_scale',
@@ -208,16 +209,21 @@ class CompanyStructureData
     }
 
     /**
-     * @return array{id: int, name: string, last_name: string|null, full_name: string, email: string, avatar: string|null, avatar_scale: float, position: string|null, is_active: bool}
+     * @return array{id: int, name: string, last_name: string|null, middle_name: string|null, full_name: string, email: string, avatar: string|null, avatar_scale: float, position: string|null, is_active: bool}
      */
     private function summary(User $user): array
     {
-        $fullName = trim($user->name.' '.($user->last_name ?? ''));
+        $fullName = trim(implode(' ', array_filter([
+            $user->name,
+            $user->last_name,
+            $user->middle_name,
+        ])));
 
         return [
             'id' => $user->id,
             'name' => $user->name,
             'last_name' => $user->last_name,
+            'middle_name' => $user->middle_name,
             'full_name' => $fullName !== '' ? $fullName : $user->email,
             'email' => $user->email,
             'avatar' => $user->avatar,

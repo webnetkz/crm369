@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\StorePortalWebhookRequest;
 use App\Http\Requests\Settings\UpdatePortalWebhookRequest;
 use App\Models\PortalWebhook;
+use App\Support\WebhookDocumentationCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,48 +17,15 @@ class WebhookController extends Controller
     public function edit(): Response
     {
         return Inertia::render('settings/Webhooks', [
-            'webhooks' => PortalWebhook::query()
-                ->with('creator:id,name,last_name,email')
-                ->orderByDesc('id')
-                ->get()
-                ->map(fn (PortalWebhook $webhook): array => $this->serializeWebhook($webhook))
-                ->values(),
-            'documentation' => [
-                'base_url' => url('/portal-webhooks').'/{webhook_id}',
-                'users_index_url' => url('/portal-webhooks').'/{webhook_id}/users',
-                'users_show_url' => url('/portal-webhooks').'/{webhook_id}/users/{user_id}',
-                'company_structure_index_url' => url('/portal-webhooks').'/{webhook_id}/company-structure',
-                'company_structure_show_url' => url('/portal-webhooks').'/{webhook_id}/company-structure/users/{user_id}',
-                'contacts_index_url' => url('/portal-webhooks').'/{webhook_id}/contacts',
-                'contacts_show_url' => url('/portal-webhooks').'/{webhook_id}/contacts/{contact_id}',
-                'contacts_store_url' => url('/portal-webhooks').'/{webhook_id}/contacts',
-                'contacts_update_url' => url('/portal-webhooks').'/{webhook_id}/contacts/{contact_id}',
-                'contacts_destroy_url' => url('/portal-webhooks').'/{webhook_id}/contacts/{contact_id}',
-                'equipment_index_url' => url('/portal-webhooks').'/{webhook_id}/equipment',
-                'equipment_show_url' => url('/portal-webhooks').'/{webhook_id}/equipment/{equipment_id}',
-                'equipment_store_url' => url('/portal-webhooks').'/{webhook_id}/equipment',
-                'equipment_update_url' => url('/portal-webhooks').'/{webhook_id}/equipment/{equipment_id}',
-                'edo_index_url' => url('/portal-webhooks').'/{webhook_id}/edo/documents',
-                'edo_show_url' => url('/portal-webhooks').'/{webhook_id}/edo/documents/{edo_document_id}',
-                'edo_store_url' => url('/portal-webhooks').'/{webhook_id}/edo/documents',
-                'edo_update_url' => url('/portal-webhooks').'/{webhook_id}/edo/documents/{edo_document_id}',
-                'edo_public_link_url' => url('/portal-webhooks').'/{webhook_id}/edo/documents/{edo_document_id}/public-link',
-                'tsd_index_url' => url('/portal-webhooks').'/{webhook_id}/tsd/scans',
-                'tsd_store_url' => url('/portal-webhooks').'/{webhook_id}/tsd/scans',
-                'warehouses_index_url' => url('/portal-webhooks').'/{webhook_id}/warehouses',
-                'warehouses_show_url' => url('/portal-webhooks').'/{webhook_id}/warehouses/{warehouse_id}',
-                'warehouses_items_url' => url('/portal-webhooks').'/{webhook_id}/warehouses/{warehouse_id}/items',
-                'warehouses_store_url' => url('/portal-webhooks').'/{webhook_id}/warehouses',
-                'warehouses_update_url' => url('/portal-webhooks').'/{webhook_id}/warehouses/{warehouse_id}',
-                'warehouses_destroy_url' => url('/portal-webhooks').'/{webhook_id}/warehouses/{warehouse_id}',
-            ],
-            'availablePermissions' => collect(PortalWebhook::permissionDefinitions())
-                ->map(fn (array $definition, string $key): array => [
-                    'key' => $key,
-                    'label' => __($definition['label_key']),
-                    'description' => __($definition['description_key']),
-                ])
-                ->values(),
+            'webhooks' => $this->webhooksPayload(),
+            'availablePermissions' => $this->availablePermissionsPayload(),
+        ]);
+    }
+
+    public function documentation(WebhookDocumentationCatalog $webhookDocumentationCatalog): Response
+    {
+        return Inertia::render('settings/WebhookDocumentation', [
+            'documentation' => $webhookDocumentationCatalog->payload(),
         ]);
     }
 
@@ -151,6 +119,35 @@ class WebhookController extends Controller
                 ]
                 : null,
         ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function webhooksPayload(): array
+    {
+        return PortalWebhook::query()
+            ->with('creator:id,name,last_name,email')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (PortalWebhook $webhook): array => $this->serializeWebhook($webhook))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{key: string, label: string, description: string}>
+     */
+    private function availablePermissionsPayload(): array
+    {
+        return collect(PortalWebhook::permissionDefinitions())
+            ->map(fn (array $definition, string $key): array => [
+                'key' => $key,
+                'label' => __($definition['label_key']),
+                'description' => __($definition['description_key']),
+            ])
+            ->values()
+            ->all();
     }
 
     /**

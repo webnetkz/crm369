@@ -16,12 +16,14 @@ test('authenticated users can open the company structure module and receive the 
     $chiefExecutive = User::factory()->create([
         'name' => 'Aruzhan',
         'last_name' => 'Sarsenova',
+        'middle_name' => 'Bauyrzhanovna',
         'position' => 'Chief Executive Officer',
     ]);
 
     $manager = User::factory()->create([
         'name' => 'Timur',
         'last_name' => 'Aitbayev',
+        'middle_name' => 'Maratovich',
         'position' => 'Operations Manager',
         'manager_id' => $chiefExecutive->id,
     ]);
@@ -29,6 +31,7 @@ test('authenticated users can open the company structure module and receive the 
     $staff = User::factory()->create([
         'name' => 'Dana',
         'last_name' => 'Abdullina',
+        'middle_name' => 'Sergeevna',
         'position' => 'Account Executive',
         'manager_id' => $manager->id,
     ]);
@@ -42,12 +45,12 @@ test('authenticated users can open the company structure module and receive the 
             ->where('stats.root_users', 1)
             ->where('stats.managers', 2)
             ->has('roots', 1)
-            ->where('roots.0.full_name', 'Aruzhan Sarsenova')
+            ->where('roots.0.full_name', 'Aruzhan Sarsenova Bauyrzhanovna')
             ->where('roots.0.position', 'Chief Executive Officer')
-            ->where('roots.0.children.0.full_name', 'Timur Aitbayev')
-            ->where('roots.0.children.0.children.0.full_name', 'Dana Abdullina')
-            ->where('roots.0.children.0.manager.full_name', 'Aruzhan Sarsenova')
-            ->where('roots.0.children.0.subordinates.0.full_name', 'Dana Abdullina'));
+            ->where('roots.0.children.0.full_name', 'Timur Aitbayev Maratovich')
+            ->where('roots.0.children.0.children.0.full_name', 'Dana Abdullina Sergeevna')
+            ->where('roots.0.children.0.manager.full_name', 'Aruzhan Sarsenova Bauyrzhanovna')
+            ->where('roots.0.children.0.subordinates.0.full_name', 'Dana Abdullina Sergeevna'));
 });
 
 test('company structure module returns 404 when disabled', function () {
@@ -71,12 +74,14 @@ test('administrators can update a managed user position and manager and see subo
     $manager = User::factory()->create([
         'name' => 'Miras',
         'last_name' => 'Kudaibergen',
+        'middle_name' => 'Askarovich',
         'position' => 'Sales Director',
     ]);
 
     $employee = User::factory()->create([
         'name' => 'Aliya',
         'last_name' => 'Rysbek',
+        'middle_name' => null,
         'position' => null,
         'manager_id' => null,
     ]);
@@ -85,6 +90,7 @@ test('administrators can update a managed user position and manager and see subo
         ->patch(route('settings.users.profile.update', $employee), [
             'name' => 'Aliya',
             'last_name' => 'Rysbek',
+            'middle_name' => 'Bekovna',
             'email' => $employee->email,
             'phone' => '+77011234567',
             'position' => 'Sales Specialist',
@@ -93,19 +99,21 @@ test('administrators can update a managed user position and manager and see subo
         ->assertRedirect();
 
     expect($employee->refresh()->position)->toBe('Sales Specialist')
+        ->and($employee->middle_name)->toBe('Bekovna')
         ->and($employee->manager_id)->toBe($manager->id);
 
     $this->actingAs($admin)
         ->getJson(route('settings.users.show', $manager))
         ->assertSuccessful()
         ->assertJsonPath('data.position', 'Sales Director')
-        ->assertJsonPath('data.subordinates.0.full_name', 'Aliya Rysbek');
+        ->assertJsonPath('data.subordinates.0.full_name', 'Aliya Rysbek Bekovna');
 
     $this->actingAs($admin)
         ->getJson(route('settings.users.show', $employee))
         ->assertSuccessful()
         ->assertJsonPath('data.position', 'Sales Specialist')
-        ->assertJsonPath('data.manager.full_name', 'Miras Kudaibergen')
+        ->assertJsonPath('data.middle_name', 'Bekovna')
+        ->assertJsonPath('data.manager.full_name', 'Miras Kudaibergen Askarovich')
         ->assertJsonPath('data.manager.position', 'Sales Director')
         ->assertJsonPath('data.subordinates_count', 0);
 });

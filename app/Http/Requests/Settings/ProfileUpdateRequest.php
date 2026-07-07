@@ -14,13 +14,21 @@ class ProfileUpdateRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $lastName = $this->input('last_name');
+        $middleName = $this->input('middle_name');
         $phone = $this->input('phone');
+        $position = $this->input('position');
 
         $this->merge([
             'last_name' => is_string($lastName) && trim($lastName) !== ''
                 ? trim($lastName)
                 : null,
+            'middle_name' => is_string($middleName) && trim($middleName) !== ''
+                ? trim($middleName)
+                : null,
             'phone' => $this->normalizeKazakhstanPhone(is_string($phone) ? $phone : null),
+            'position' => is_string($position) && trim($position) !== ''
+                ? trim($position)
+                : null,
         ]);
     }
 

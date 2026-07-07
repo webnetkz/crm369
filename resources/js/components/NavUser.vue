@@ -230,6 +230,17 @@ const stopImpersonation = (): void => {
                                 class="rounded-2xl border border-border bg-card p-4"
                             >
                                 <div class="text-sm text-muted-foreground">
+                                    {{ t.common.middle_name }}
+                                </div>
+                                <div class="mt-1 font-medium">
+                                    {{ user.middle_name ?? t.common.not_specified }}
+                                </div>
+                            </div>
+
+                            <div
+                                class="rounded-2xl border border-border bg-card p-4"
+                            >
+                                <div class="text-sm text-muted-foreground">
                                     {{ t.admin.group }}
                                 </div>
                                 <div class="mt-1 font-medium">

@@ -47,42 +47,6 @@ return [
                 'Confirm packaging and labeling readiness for the lots going out.',
             ],
         ],
-        'warehouses' => [
-            'title' => 'Warehouses',
-            'summary' => 'Control raw material, semi-finished, and finished stock by zones and balances.',
-            'hero_title' => 'Warehouse visibility at the start of the production flow',
-            'hero_description' => 'See overloaded zones, critical materials, and which lots are ready to move or release.',
-            'metrics' => [
-                ['label' => 'Storage zones', 'value' => '12', 'caption' => 'From raw material and component areas to quarantine and dispatch'],
-                ['label' => 'Inventory accuracy', 'value' => '98.4%', 'caption' => 'After the latest cycle count and lot reconciliation'],
-                ['label' => 'Reserved pallets', 'value' => '46', 'caption' => 'Allocated to confirmed production orders this week'],
-            ],
-            'cards' => [
-                ['title' => 'Main raw material warehouse', 'description' => 'Stores core materials by lot, shelf life, and storage requirements.'],
-                ['title' => 'Workshop buffer zone', 'description' => 'Keeps short-term reserve stock for uninterrupted issue to workstations.'],
-                ['title' => 'Material quarantine', 'description' => 'Holds disputed receipts and lots waiting for input inspection.'],
-                ['title' => 'Finished goods warehouse', 'description' => 'Accepts only confirmed lots that are ready for shipment.'],
-            ],
-            'records_title' => 'Warehouse activity',
-            'records_description' => 'Operational events across balances, zones, and warehouse discipline.',
-            'records' => [
-                ['title' => 'Critical copper stock', 'badge' => '14 kg', 'description' => 'Enough for only one and a half shifts at the current launch plan.'],
-                ['title' => 'Buffer count', 'badge' => 'Today 18:00', 'description' => 'Reserve check ahead of the night shift and morning launch.'],
-                ['title' => 'Pallet moves', 'badge' => '9 requests', 'description' => 'Some are tied to clearing aisles for an incoming delivery.'],
-            ],
-            'focus_title' => 'Warehouse focus',
-            'focus_points' => [
-                'Keep a transparent reservation against every confirmed order.',
-                'Separate quarantine and approved lots by address without overlap.',
-                'Maintain fast issue to workshops without queue buildup.',
-            ],
-            'next_steps_title' => 'Next warehouse actions',
-            'next_steps' => [
-                'Confirm purchases for critical materials before the end of the day.',
-                'Finalize slotting for the incoming delivery in priority zones.',
-                'Match workshop buffer balances against the active shift plan.',
-            ],
-        ],
         'workshops' => [
             'title' => 'Workshops',
             'summary' => 'Manage workshop load, shifts, queues, and production plan performance.',

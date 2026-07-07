@@ -58,6 +58,19 @@ test('authenticated users can open equipment page and manage equipment items', f
     expect($equipmentItem->fresh()->name)->toBe('Lenovo ThinkPad X1 Carbon')
         ->and($equipmentItem->fresh()->status)->toBe(EquipmentItem::STATUS_ISSUED)
         ->and($equipmentItem->fresh()->issued_to_user_id)->toBe($issuedUser->id);
+
+    $this->actingAs($user)
+        ->get(route('equipment.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('equipment/Index')
+            ->has('equipmentItems', 1, fn (Assert $equipment) => $equipment
+                ->where('name', 'Lenovo ThinkPad X1 Carbon')
+                ->where('qr_code', 'EQ-LENOVO-001')
+                ->where('qr_code_svg_data_uri', fn (string $value): bool => str_starts_with($value, 'data:image/svg+xml;utf8,'))
+                ->etc()
+            )
+        );
 });
 
 test('equipment page validates issued employee only for issued stage', function () {
@@ -107,4 +120,16 @@ test('equipment qr svg includes the CRM369 brand mark in the center', function (
     expect($svg)->toContain('>CRM369</text>')
         ->and($svg)->toContain('aria-label="CRM369 mark"')
         ->and($svg)->toContain('stroke="#0f172a"');
+});
+
+test('equipment page includes a qr preview and print action in the details dialog', function () {
+    $page = file_get_contents(resource_path('js/pages/equipment/Index.vue'));
+
+    expect($page)->toContain('selectedEquipmentItem.qr_code_svg_data_uri')
+        ->and($page)->toContain('printEquipmentQr')
+        ->and($page)->toContain("equipmentItem.status === 'issued'")
+        ->and($page)->toContain('${statusLabel ? `<div class="status">${statusLabel}</div>` : \'\'}')
+        ->and($page)->toContain("document.createElement('iframe')")
+        ->and($page)->toContain('t.equipment.print_qr')
+        ->not->toContain("window.open('', '_blank', 'noopener,noreferrer')");
 });

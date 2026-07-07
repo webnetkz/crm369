@@ -12,18 +12,26 @@ test('authenticated users can open the production overview and detail sections',
         ->assertInertia(fn (Assert $page) => $page
             ->component('production/Index')
             ->where('activeSection', 'overview')
-            ->has('sections', 8)
-            ->where('sections.1', 'warehouses')
+            ->has('sections', 7)
+            ->where('sections.1', 'workshops')
         );
 
     $this->actingAs($user)
-        ->get(route('production.show', 'warehouses'))
+        ->get(route('production.show', 'quality-control'))
         ->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page
             ->component('production/Index')
-            ->where('activeSection', 'warehouses')
-            ->where('sections.7', 'quality-control')
+            ->where('activeSection', 'quality-control')
+            ->where('sections.6', 'quality-control')
         );
+});
+
+test('warehouse section is no longer available inside production', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('production.show', 'warehouses'))
+        ->assertNotFound();
 });
 
 test('production is wired into the sidebar and built in menu items', function () {
@@ -39,7 +47,7 @@ test('production is wired into the sidebar and built in menu items', function ()
     expect($sidebar)->toContain("isMenuItemVisible('production')")
         ->and($sidebar)->toContain('title: t.value.production.title')
         ->and($sidebar)->toContain('href: productionIndex()')
-        ->and($sidebar)->toContain("href: showProductionSection('warehouses')")
+        ->and($sidebar)->not->toContain("href: showProductionSection('warehouses')")
         ->and($sidebar)->toContain("href: showProductionSection('quality-control')")
         ->and($builtInKeys->all())->toContain('production');
 });

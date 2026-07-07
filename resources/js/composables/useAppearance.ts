@@ -10,6 +10,8 @@ export type UseAppearanceReturn = {
     updateAppearance: (value: Appearance) => void;
 };
 
+const defaultAppearance: Appearance = 'light';
+
 export function updateTheme(value: Appearance): void {
     if (typeof window === 'undefined') {
         return;
@@ -67,7 +69,7 @@ const prefersDark = (): boolean => {
 const handleSystemThemeChange = () => {
     const currentAppearance = getStoredAppearance();
 
-    updateTheme(currentAppearance || 'system');
+    updateTheme(currentAppearance || defaultAppearance);
 };
 
 export function initializeTheme(): void {
@@ -75,15 +77,15 @@ export function initializeTheme(): void {
         return;
     }
 
-    // Initialize theme from saved preference or default to system...
+    // Initialize theme from saved preference or default to light...
     const savedAppearance = getStoredAppearance();
-    updateTheme(savedAppearance || 'system');
+    updateTheme(savedAppearance || defaultAppearance);
 
     // Set up system theme change listener...
     mediaQuery()?.addEventListener('change', handleSystemThemeChange);
 }
 
-const appearance = ref<Appearance>('system');
+const appearance = ref<Appearance>(defaultAppearance);
 
 export function useAppearance(): UseAppearanceReturn {
     onMounted(() => {

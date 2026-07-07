@@ -15,6 +15,7 @@ return [
     'login' => 'Войти',
     'logout' => 'Выйти',
     'last_name' => 'Фамилия',
+    'middle_name' => 'Отчество',
     'name' => 'Имя',
     'next' => 'Вперёд',
     'no_file_selected' => 'Файл не выбран',

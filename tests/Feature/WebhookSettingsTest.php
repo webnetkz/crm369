@@ -33,15 +33,27 @@ test('webhook settings are visible only to administrators and super admins', fun
         ->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/Webhooks')
+            ->has('availablePermissions')
+            ->has('webhooks')
+            ->missing('documentation')
+        );
+
+    $this->actingAs($admin)
+        ->get(route('settings.webhooks.documentation.edit'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('settings/WebhookDocumentation')
             ->where('documentation.base_url', url('/portal-webhooks').'/{webhook_id}')
             ->where('documentation.users_index_url', url('/portal-webhooks').'/{webhook_id}/users')
             ->where('documentation.users_show_url', url('/portal-webhooks').'/{webhook_id}/users/{user_id}')
-            ->has('availablePermissions')
-            ->has('webhooks')
         );
 
     $this->actingAs($superAdmin)
         ->get(route('settings.webhooks.edit'))
+        ->assertSuccessful();
+
+    $this->actingAs($superAdmin)
+        ->get(route('settings.webhooks.documentation.edit'))
         ->assertSuccessful();
 });
 
@@ -229,7 +241,6 @@ test('webhook settings page opens issued token details in a dialog', function ()
     $webhooksPage = file_get_contents(resource_path('js/pages/settings/Webhooks.vue'));
     $existingSectionPosition = strpos($webhooksPage, ':id="existingSectionId"');
     $createSectionPosition = strpos($webhooksPage, ':id="createSectionId"');
-    $documentationSectionPosition = strpos($webhooksPage, ':id="documentationSectionId"');
     $webhookMetaPosition = strpos($webhooksPage, 'selectedWebhook.creator?.name ??');
     $webhookNameFieldPosition = strpos($webhooksPage, ':for="`webhook-name-${selectedWebhook.id}`"');
 
@@ -244,7 +255,6 @@ test('webhook settings page opens issued token details in a dialog', function ()
         ->and($webhooksPage)->toContain('t.webhooks.copy_token')
         ->and($webhooksPage)->toContain("const existingSectionId = 'webhook-existing';")
         ->and($webhooksPage)->toContain("const createSectionId = 'webhook-create';")
-        ->and($webhooksPage)->toContain("const documentationSectionId = 'webhook-documentation';")
         ->and($webhooksPage)->toContain('const selectedWebhookId = ref<number | null>')
         ->and($webhooksPage)->toContain('const selectWebhook = (webhookId: number): void =>')
         ->and($webhooksPage)->toContain('sidebar-webhook-')
@@ -252,15 +262,25 @@ test('webhook settings page opens issued token details in a dialog', function ()
         ->and($webhooksPage)->toContain('class="grid gap-3 md:grid-cols-2 2xl:grid-cols-3"')
         ->and($webhooksPage)->toContain('class="min-w-0 space-y-1"')
         ->and($webhooksPage)->toContain('class="break-words text-sm text-muted-foreground"')
-        ->and($webhooksPage)->toContain('props.documentation.base_url')
-        ->and($webhooksPage)->toContain('documentation_endpoint_users_index_title');
+        ->and($webhooksPage)->toContain('editDocumentation()')
+        ->and($webhooksPage)->toContain('t.settings.webhooks_documentation')
+        ->and($webhooksPage)->not->toContain('props.documentation.base_url');
 
     expect($existingSectionPosition)->not->toBeFalse()
         ->and($createSectionPosition)->not->toBeFalse()
-        ->and($documentationSectionPosition)->not->toBeFalse()
         ->and($webhookMetaPosition)->not->toBeFalse()
         ->and($webhookNameFieldPosition)->not->toBeFalse()
         ->and($webhookMetaPosition)->toBeLessThan($webhookNameFieldPosition)
-        ->and($existingSectionPosition)->toBeLessThan($createSectionPosition)
-        ->and($createSectionPosition)->toBeLessThan($documentationSectionPosition);
+        ->and($existingSectionPosition)->toBeLessThan($createSectionPosition);
+});
+
+test('webhook documentation lives on a dedicated page', function () {
+    $documentationPage = file_get_contents(resource_path('js/pages/settings/WebhookDocumentation.vue'));
+
+    expect($documentationPage)->toContain('const overviewSectionId = \'webhook-docs-overview\';')
+        ->and($documentationPage)->toContain('const endpointsSectionId = \'webhook-docs-endpoints\';')
+        ->and($documentationPage)->toContain('props.documentation.base_url')
+        ->and($documentationPage)->toContain('documentation_endpoint_users_index_title')
+        ->and($documentationPage)->toContain('documentation_endpoint_warehouses_items_title')
+        ->and($documentationPage)->toContain('t.settings.webhooks_documentation');
 });

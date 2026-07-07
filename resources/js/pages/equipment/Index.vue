@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { Hash, Package, PencilLine, Plus, UserCog, Wrench } from '@lucide/vue';
+import { Eye, Hash, Package, PencilLine, Plus, Printer, UserCog, Wrench } from '@lucide/vue';
 import { computed, ref, watchEffect } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
@@ -41,6 +41,7 @@ type EquipmentItem = {
     id: number;
     name: string;
     qr_code: string;
+    qr_code_svg_data_uri: string;
     status: string;
     status_label: string;
     issued_to_user: EquipmentUser | null;
@@ -82,6 +83,8 @@ const form = useForm({
 
 const dialogOpen = ref(false);
 const editingEquipmentId = ref<number | null>(null);
+const detailsDialogOpen = ref(false);
+const selectedEquipmentItem = ref<EquipmentItem | null>(null);
 
 const isEditing = computed(() => editingEquipmentId.value !== null);
 
@@ -111,9 +114,19 @@ const closeDialog = (): void => {
     resetForm();
 };
 
+const closeDetailsDialog = (): void => {
+    detailsDialogOpen.value = false;
+    selectedEquipmentItem.value = null;
+};
+
 const openCreateDialog = (): void => {
     resetForm();
     dialogOpen.value = true;
+};
+
+const openDetailsDialog = (equipmentItem: EquipmentItem): void => {
+    selectedEquipmentItem.value = equipmentItem;
+    detailsDialogOpen.value = true;
 };
 
 const openEditDialog = (equipmentItem: EquipmentItem): void => {
@@ -176,6 +189,150 @@ const formattedDate = (value: string | null): string => {
     }
 
     return new Date(value).toLocaleString();
+};
+
+const escapeHtml = (value: string): string => {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+};
+
+const printableStatusLabel = (equipmentItem: EquipmentItem): string | null => {
+    if (equipmentItem.status === 'issued') {
+        return null;
+    }
+
+    return escapeHtml(equipmentItem.status_label);
+};
+
+const printEquipmentQr = (): void => {
+    if (! selectedEquipmentItem.value) {
+        return;
+    }
+
+    const equipmentItem = selectedEquipmentItem.value;
+    const title = escapeHtml(equipmentItem.name);
+    const qrCode = equipmentItem.qr_code_svg_data_uri;
+    const qrCodeValue = escapeHtml(equipmentItem.qr_code);
+    const statusLabel = printableStatusLabel(equipmentItem);
+    const locale = document.documentElement.lang || 'en';
+    const printMarkup = `<!doctype html>
+<html lang="${escapeHtml(locale)}">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${title}</title>
+        <style>
+            :root {
+                color-scheme: light;
+                font-family: "Instrument Sans", Arial, sans-serif;
+            }
+
+            body {
+                margin: 0;
+                min-height: 100vh;
+                display: grid;
+                place-items: center;
+                background: #f8fafc;
+                color: #0f172a;
+            }
+
+            .card {
+                width: min(420px, calc(100vw - 48px));
+                border: 1px solid #cbd5e1;
+                border-radius: 24px;
+                background: #ffffff;
+                padding: 28px;
+                box-sizing: border-box;
+                text-align: center;
+            }
+
+            .title {
+                font-size: 24px;
+                font-weight: 700;
+                line-height: 1.2;
+            }
+
+            .status {
+                margin-top: 10px;
+                font-size: 14px;
+                color: #475569;
+            }
+
+            .qr {
+                margin: 24px auto 0;
+                width: 240px;
+                height: 240px;
+                display: block;
+                border: 1px solid #e2e8f0;
+                border-radius: 24px;
+                background: #ffffff;
+                padding: 16px;
+                box-sizing: border-box;
+            }
+
+            .code {
+                margin-top: 18px;
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.08em;
+            }
+
+            @media print {
+                body {
+                    background: #ffffff;
+                }
+
+                .card {
+                    width: auto;
+                    border-color: #e2e8f0;
+                    box-shadow: none;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <main class="card">
+            <div class="title">${title}</div>
+            ${statusLabel ? `<div class="status">${statusLabel}</div>` : ''}
+            <img class="qr" src="${qrCode}" alt="QR code ${qrCodeValue}" />
+            <div class="code">${qrCodeValue}</div>
+        </main>
+    </body>
+</html>`;
+
+    const printFrame = document.createElement('iframe');
+
+    printFrame.setAttribute('aria-hidden', 'true');
+    printFrame.className = 'pointer-events-none fixed bottom-0 right-0 h-0 w-0 border-0 opacity-0';
+
+    const cleanup = (): void => {
+        printFrame.remove();
+    };
+
+    printFrame.onload = () => {
+        const frameWindow = printFrame.contentWindow;
+
+        if (! frameWindow) {
+            cleanup();
+
+            return;
+        }
+
+        frameWindow.onafterprint = cleanup;
+
+        window.setTimeout(() => {
+            frameWindow.focus();
+            frameWindow.print();
+            window.setTimeout(cleanup, 1_000);
+        }, 150);
+    };
+
+    document.body.append(printFrame);
+    printFrame.srcdoc = printMarkup;
 };
 
 const maintenanceStatusDescription = computed(() => {
@@ -296,7 +453,7 @@ const maintenanceStatusDescription = computed(() => {
                                 {{ t.equipment.last_updated }}
                             </th>
                             <th class="px-6 py-4 text-right font-medium text-muted-foreground">
-                                {{ t.equipment.edit }}
+                                {{ t.equipment.actions }}
                             </th>
                         </tr>
                     </thead>
@@ -350,17 +507,29 @@ const maintenanceStatusDescription = computed(() => {
                                 {{ formattedDate(equipmentItem.updated_at) }}
                             </td>
 
-                            <td class="px-6 py-4 text-right">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    class="gap-2"
-                                    @click="openEditDialog(equipmentItem)"
-                                >
-                                    <PencilLine class="size-4" />
-                                    <span>{{ t.equipment.edit }}</span>
-                                </Button>
+                            <td class="px-6 py-4">
+                                <div class="flex justify-end gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        class="gap-2"
+                                        @click="openDetailsDialog(equipmentItem)"
+                                    >
+                                        <Eye class="size-4" />
+                                        <span>{{ t.equipment.view }}</span>
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        class="gap-2"
+                                        @click="openEditDialog(equipmentItem)"
+                                    >
+                                        <PencilLine class="size-4" />
+                                        <span>{{ t.equipment.edit }}</span>
+                                    </Button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -368,6 +537,121 @@ const maintenanceStatusDescription = computed(() => {
             </div>
         </div>
     </div>
+
+    <Dialog
+        :open="detailsDialogOpen"
+        @update:open="(value) => (value ? (detailsDialogOpen = true) : closeDetailsDialog())"
+    >
+        <DialogContent class="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>{{ t.equipment.details_title }}</DialogTitle>
+                <DialogDescription>
+                    {{ t.equipment.details_description }}
+                </DialogDescription>
+            </DialogHeader>
+
+            <div v-if="selectedEquipmentItem" class="space-y-6">
+                <div
+                    class="rounded-3xl border border-border bg-muted/30 p-6"
+                >
+                    <div class="text-center">
+                        <h2 class="text-xl font-semibold tracking-tight">
+                            {{ selectedEquipmentItem.name }}
+                        </h2>
+                        <p class="mt-2 text-sm text-muted-foreground">
+                            {{ selectedEquipmentItem.status_label }}
+                        </p>
+                    </div>
+
+                    <div class="mt-6 flex justify-center">
+                        <div
+                            class="overflow-hidden rounded-[1.75rem] border border-border bg-white p-4 shadow-sm"
+                        >
+                            <img
+                                :src="selectedEquipmentItem.qr_code_svg_data_uri"
+                                :alt="`${t.equipment.qr_code}: ${selectedEquipmentItem.qr_code}`"
+                                class="size-52"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="mt-4 text-center">
+                        <code class="rounded-md bg-background px-3 py-1.5 text-sm font-medium">
+                            {{ selectedEquipmentItem.qr_code }}
+                        </code>
+                    </div>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="rounded-2xl border border-border bg-card p-4">
+                        <div class="text-sm text-muted-foreground">
+                            {{ t.equipment.responsible_user }}
+                        </div>
+                        <div class="mt-1 font-medium">
+                            {{
+                                userLabel(
+                                    selectedEquipmentItem.responsible_user,
+                                    t.equipment.not_assigned,
+                                )
+                            }}
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-border bg-card p-4">
+                        <div class="text-sm text-muted-foreground">
+                            {{ t.equipment.issued_to_user }}
+                        </div>
+                        <div class="mt-1 font-medium">
+                            {{
+                                userLabel(
+                                    selectedEquipmentItem.issued_to_user,
+                                    t.equipment.not_issued,
+                                )
+                            }}
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-border bg-card p-4">
+                        <div class="text-sm text-muted-foreground">
+                            {{ t.equipment.status }}
+                        </div>
+                        <div class="mt-2">
+                            <Badge
+                                variant="secondary"
+                                :class="statusMeta(selectedEquipmentItem.status)"
+                            >
+                                {{ selectedEquipmentItem.status_label }}
+                            </Badge>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-border bg-card p-4">
+                        <div class="text-sm text-muted-foreground">
+                            {{ t.equipment.last_updated }}
+                        </div>
+                        <div class="mt-1 font-medium">
+                            {{ formattedDate(selectedEquipmentItem.updated_at) }}
+                        </div>
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        class="gap-2"
+                        @click="printEquipmentQr"
+                    >
+                        <Printer class="size-4" />
+                        <span>{{ t.equipment.print_qr }}</span>
+                    </Button>
+                    <Button type="button" variant="outline" @click="closeDetailsDialog">
+                        {{ t.equipment.cancel }}
+                    </Button>
+                </DialogFooter>
+            </div>
+        </DialogContent>
+    </Dialog>
 
     <Dialog :open="dialogOpen" @update:open="(value) => (value ? (dialogOpen = true) : closeDialog())">
         <DialogContent class="sm:max-w-2xl">

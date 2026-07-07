@@ -82,6 +82,81 @@ test('tasks alias shows only standalone tasks and defaults to list view', functi
         );
 });
 
+test('tasks alias uses the saved user view preference and updates it from explicit view queries', function () {
+    $user = User::factory()->create([
+        'task_display_mode' => 'kanban',
+    ]);
+
+    ProjectTask::factory()->standalone()->create([
+        'creator_user_id' => $user->id,
+        'assignee_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+        'title' => 'Preferred view task',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('tasks.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/Index')
+            ->where('pageMode', 'tasks')
+            ->where('taskDisplayMode', 'kanban')
+        );
+
+    $this->actingAs($user)
+        ->get(route('tasks.index', ['view' => 'gantt']))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/Index')
+            ->where('pageMode', 'tasks')
+            ->where('taskDisplayMode', 'gantt')
+        );
+
+    expect($user->fresh()->task_display_mode)->toBe('gantt');
+
+    $this->actingAs($user)
+        ->get(route('tasks.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/Index')
+            ->where('pageMode', 'tasks')
+            ->where('taskDisplayMode', 'gantt')
+        );
+});
+
+test('explicit task view query works even before the persisted task view column is migrated', function () {
+    $user = User::factory()->create();
+
+    ProjectTask::factory()->standalone()->create([
+        'creator_user_id' => $user->id,
+        'assignee_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+        'title' => 'Column-less kanban task',
+    ]);
+
+    Schema::table('users', function ($table): void {
+        $table->dropColumn('task_display_mode');
+    });
+
+    $this->actingAs($user)
+        ->get(route('tasks.index', ['view' => 'kanban']))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/Index')
+            ->where('pageMode', 'tasks')
+            ->where('taskDisplayMode', 'kanban')
+        );
+
+    $this->actingAs($user)
+        ->get(route('tasks.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/Index')
+            ->where('pageMode', 'tasks')
+            ->where('taskDisplayMode', 'list')
+        );
+});
+
 test('tasks alias falls back to default stages when project task stages table is missing', function () {
     $user = User::factory()->create();
 
@@ -766,10 +841,16 @@ test('tasks page includes list, kanban, and gantt standalone views', function ()
     $projectsPage = file_get_contents(resource_path('js/pages/projects/Index.vue'));
 
     expect($projectsPage)
+        ->toContain('class="min-w-0 gap-6"')
+        ->toContain('class="min-w-0 space-y-4"')
         ->toContain("props.taskDisplayMode === 'list'")
         ->toContain("props.taskDisplayMode === 'kanban'")
         ->toContain('ganttGridTemplateColumns')
         ->toContain('kanbanColumns')
+        ->toContain('min-w-0 rounded-3xl border border-border bg-card p-5 shadow-sm')
+        ->toContain('scrollbar-x-visible max-w-full overflow-x-scroll pb-2')
+        ->toContain('flex min-w-max gap-4')
+        ->toContain('w-[320px] shrink-0 flex-col')
         ->toContain('view_mode')
         ->toContain('view_gantt');
 });

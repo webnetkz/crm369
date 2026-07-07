@@ -181,6 +181,12 @@ class MenuItem extends Model
                 'url' => '/equipment',
                 'sort_order' => 105,
             ],
+            'documentation' => [
+                'title_key' => 'ui.documentation.title',
+                'fallback_title' => 'Documentation',
+                'url' => '/documentation',
+                'sort_order' => 107,
+            ],
             'settings.profile' => [
                 'title_key' => 'ui.settings.profile',
                 'fallback_title' => 'Profile',
@@ -277,6 +283,7 @@ class MenuItem extends Model
             'warehouses',
             'tsd',
             'equipment',
+            'documentation',
         ];
     }
 

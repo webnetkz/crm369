@@ -20,6 +20,7 @@ return [
     'forgot_password_description' => 'Enter your email address and we will send you a password reset link',
     'full_name' => 'Full name',
     'last_name' => 'Last name',
+    'middle_name' => 'Middle name',
     'login_title' => 'Log in to your account',
     'new_verification_link_sent' => 'A new verification link has been sent to the email address you provided during registration.',
     'or_confirm_with_password' => 'Or confirm with your password',

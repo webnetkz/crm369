@@ -18,16 +18,17 @@ class ManagedUserProfileData
             : $user->group()->select(['id', 'name'])->first();
         $manager = $user->relationLoaded('manager')
             ? $user->manager
-            : $user->manager()->select(['id', 'name', 'last_name', 'email', 'position', 'avatar_path', 'avatar_scale', 'is_active'])->first();
+            : $user->manager()->select(['id', 'name', 'last_name', 'middle_name', 'email', 'position', 'avatar_path', 'avatar_scale', 'is_active'])->first();
         /** @var Collection<int, User> $subordinates */
         $subordinates = $user->relationLoaded('subordinates')
             ? $user->subordinates
-            : $user->subordinates()->select(['id', 'name', 'last_name', 'email', 'position', 'avatar_path', 'avatar_scale', 'is_active', 'manager_id'])->get();
+            : $user->subordinates()->select(['id', 'name', 'last_name', 'middle_name', 'email', 'position', 'avatar_path', 'avatar_scale', 'is_active', 'manager_id'])->get();
 
         return [
             'id' => $user->id,
             'name' => $user->name,
             'last_name' => $user->last_name,
+            'middle_name' => $user->middle_name,
             'email' => $user->email,
             'phone' => $user->phone,
             'position' => $user->position,
@@ -104,16 +105,21 @@ class ManagedUserProfileData
     }
 
     /**
-     * @return array{id: int, name: string, last_name: string|null, full_name: string, email: string, position: string|null, avatar: string|null, avatar_scale: float, is_active: bool}
+     * @return array{id: int, name: string, last_name: string|null, middle_name: string|null, full_name: string, email: string, position: string|null, avatar: string|null, avatar_scale: float, is_active: bool}
      */
     private function serializeStructureUser(User $user): array
     {
-        $fullName = trim($user->name.' '.($user->last_name ?? ''));
+        $fullName = trim(implode(' ', array_filter([
+            $user->name,
+            $user->last_name,
+            $user->middle_name,
+        ])));
 
         return [
             'id' => $user->id,
             'name' => $user->name,
             'last_name' => $user->last_name,
+            'middle_name' => $user->middle_name,
             'full_name' => $fullName !== '' ? $fullName : $user->email,
             'email' => $user->email,
             'position' => $user->position,

@@ -68,11 +68,13 @@ test('super admin can view every user and their group state', function () {
             ->has('users.data', 4)
             ->where('users.meta.per_page', 50)
             ->where('can.manage_users', true)
+            ->where('visibleUserTableColumns', [])
             ->has('groups')
         );
 
     $users = collect($response->inertiaProps('users.data'));
     $groups = collect($response->inertiaProps('groups'));
+    $managerOptions = collect($response->inertiaProps('managerOptions'));
 
     expect($users->firstWhere('email', $admin->email)['is_super_admin'])->toBeTrue()
         ->and($users->firstWhere('email', $admin->email)['can_be_impersonated'])->toBeFalse()
@@ -85,6 +87,8 @@ test('super admin can view every user and their group state', function () {
         ->and($users->firstWhere('email', $assignedUser->email)['group']['name'])->toBe('Managers')
         ->and($users->firstWhere('email', $simpleUser->email)['group'])->toBeNull()
         ->and($users->firstWhere('email', $simpleUser->email)['can_be_impersonated'])->toBeTrue()
+        ->and($managerOptions->firstWhere('email', $assignedUser->email))->toHaveKeys(['avatar', 'avatar_scale'])
+        ->and($managerOptions->firstWhere('email', $assignedUser->email)['avatar_scale'])->toBeNumeric()
         ->and($groups->pluck('name')->all())->toContain('Administrators', 'Managers');
 });
 
@@ -151,6 +155,59 @@ test('super admin can assign and remove a user group', function () {
         ->assertRedirect();
 
     expect($user->refresh()->user_group_id)->toBeNull();
+});
+
+test('users page hides action buttons only for the super admin user row', function () {
+    $usersPage = file_get_contents(resource_path('js/pages/settings/Users.vue'));
+
+    expect($usersPage)
+        ->toContain('const showUserActionsColumn = computed(() => {')
+        ->toContain('const showUserActions = (user: UserRow): boolean => {')
+        ->toContain('return !user.is_super_admin && showUserActionsColumn.value;')
+        ->toContain('v-if="showUserActions(user)"')
+        ->toContain('v-if="can.manage_accounts"')
+        ->toContain('v-if="can.manage_activation"')
+        ->toContain('v-if="can.impersonate_users"');
+});
+
+test('users page offers a dropdown to choose optional user table columns', function () {
+    $usersPage = file_get_contents(resource_path('js/pages/settings/Users.vue'));
+
+    expect($usersPage)
+        ->toContain('DropdownMenuCheckboxItem')
+        ->toContain('visibleUserTableColumns')
+        ->toContain('setUserTableColumnVisibility(')
+        ->toContain("isUserTableColumnVisible('position')")
+        ->toContain("isUserTableColumnVisible('manager')")
+        ->toContain("isUserTableColumnVisible('status')")
+        ->toContain("isUserTableColumnVisible('email_verified')")
+        ->toContain("isUserTableColumnVisible('group')");
+});
+
+test('users page stores the selected optional columns for the current viewer', function () {
+    config(['admin.super_admin_email' => 'admin@example.com']);
+
+    $admin = User::factory()->create([
+        'email' => 'admin@example.com',
+        'visible_user_table_columns' => ['status'],
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('settings.users.table-columns.update'), [
+            'visible_columns' => ['position', 'group', 'status'],
+        ])
+        ->assertRedirect();
+
+    expect($admin->fresh()->visible_user_table_columns)
+        ->toBe(['position', 'status', 'group']);
+
+    $this->actingAs($admin)
+        ->get(route('settings.users.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('settings/Users')
+            ->where('visibleUserTableColumns', ['position', 'status', 'group'])
+        );
 });
 
 test('super admin can search users by name last name and email', function () {

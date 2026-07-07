@@ -177,7 +177,9 @@ test('required custom deal field is validated on deal creation', function () {
 test('funnel sheet content keeps inner padding in the sidebar form', function () {
     $page = file_get_contents(resource_path('js/pages/funnels/Index.vue'));
 
-    expect($page)->toContain('<SheetContent class="w-full overflow-y-auto p-6 sm:max-w-2xl">');
+    expect($page)
+        ->toContain('<SheetContent class="w-full overflow-y-auto p-6 sm:max-w-2xl">')
+        ->toContain('scrollbar-x-visible overflow-x-scroll pb-2');
 });
 
 test('funnels sidebar item is wired for all users without a global access gate', function () {

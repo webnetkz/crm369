@@ -58,11 +58,53 @@ class HandleInertiaRequests extends Middleware
                 'isSuperAdmin' => $request->user()?->isSuperAdmin() ?? false,
                 'canViewUsers' => $request->user()?->canViewUsers() ?? false,
                 'canImpersonateUsers' => $request->user()?->canImpersonateUsers() ?? false,
+                'canAccessCompanyStructure' => $this->moduleEnabled('company-structure')
+                    ? ($request->user()?->canAccessCompanyStructure() ?? false)
+                    : false,
+                'canAccessNews' => $this->moduleEnabled('news')
+                    ? ($request->user()?->canAccessNews() ?? false)
+                    : false,
+                'canAccessProjects' => $this->moduleEnabled('projects')
+                    ? ($request->user()?->canAccessProjects() ?? false)
+                    : false,
+                'canAccessChats' => $this->moduleEnabled('chats')
+                    ? ($request->user()?->canAccessChats() ?? false)
+                    : false,
+                'canAccessKnowledgeBases' => $this->moduleEnabled('knowledge-bases')
+                    ? ($request->user()?->canAccessKnowledgeBases() ?? false)
+                    : false,
+                'canAccessForms' => $this->moduleEnabled('forms')
+                    ? ($request->user()?->canAccessForms() ?? false)
+                    : false,
+                'canAccessEdo' => $this->moduleEnabled('edo')
+                    ? ($request->user()?->canAccessEdo() ?? false)
+                    : false,
+                'canAccessFiles' => $this->moduleEnabled('files')
+                    ? ($request->user()?->canAccessFiles() ?? false)
+                    : false,
+                'canAccessProduction' => $this->moduleEnabled('production')
+                    ? ($request->user()?->canAccessProduction() ?? false)
+                    : false,
+                'canAccessWarehouses' => $this->moduleEnabled('warehouses')
+                    ? ($request->user()?->canAccessWarehouses() ?? false)
+                    : false,
+                'canAccessEquipment' => $this->moduleEnabled('equipment')
+                    ? ($request->user()?->canAccessEquipment() ?? false)
+                    : false,
+                'canAccessTsd' => $this->moduleEnabled('tsd')
+                    ? ($request->user()?->canAccessTsd() ?? false)
+                    : false,
                 'canManageApiTokens' => $this->moduleEnabled('api')
                     ? ($request->user()?->canManageApiTokens() ?? false)
                     : false,
                 'canManageWebhooks' => $this->moduleEnabled('webhooks')
                     ? ($request->user()?->canManageWebhooks() ?? false)
+                    : false,
+                'canManageMessengerIntegrations' => $this->moduleEnabled('integrations')
+                    ? ($request->user()?->canManageMessengerIntegrations() ?? false)
+                    : false,
+                'canManageBusinessProcesses' => $this->moduleEnabled('business-processes')
+                    ? ($request->user()?->canManageBusinessProcesses() ?? false)
                     : false,
                 'canAccessContacts' => $this->moduleEnabled('contacts')
                     ? ($request->user()?->canAccessContacts() ?? false)
@@ -127,6 +169,7 @@ class HandleInertiaRequests extends Middleware
 
         if (
             ! $this->moduleEnabled('chats')
+            || ! ($user?->canAccessChats() ?? false)
             || ! $user
             || ! Schema::hasTable('chat_conversations')
             || ! Schema::hasTable('chat_conversation_participants')
@@ -151,8 +194,10 @@ class HandleInertiaRequests extends Middleware
             'id' => $user->id,
             'name' => $user->name,
             'last_name' => $user->last_name,
+            'middle_name' => $user->middle_name,
             'email' => $user->email,
             'phone' => $user->phone,
+            'position' => $user->position,
             'avatar' => $user->avatar,
             'background_color' => $user->background_color,
             'background_image' => $user->background_image,
@@ -242,6 +287,7 @@ class HandleInertiaRequests extends Middleware
     {
         if (
             ! $this->moduleEnabled('knowledge-bases')
+            || ! $user->canAccessKnowledgeBases()
             || ! Schema::hasTable('knowledge_bases')
             || ! Schema::hasTable('knowledge_base_group')
             || ! Schema::hasTable('user_groups')

@@ -27,6 +27,8 @@ class UpdateUserGroupPermissionsRequest extends FormRequest
         return [
             'permissions' => ['sometimes', 'array'],
             'permissions.*' => ['string', Rule::in(UserGroup::availablePermissions())],
+            'configured_modules' => ['sometimes', 'array'],
+            'configured_modules.*' => ['string', Rule::in(UserGroup::configurableAccessModules())],
         ];
     }
 
@@ -40,5 +42,29 @@ class UpdateUserGroupPermissionsRequest extends FormRequest
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function configuredModules(): array
+    {
+        return collect($this->validated('configured_modules', []))
+            ->filter(fn (mixed $module): bool => is_string($module))
+            ->map(fn (string $module): string => trim($module))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function permissionPayload(): array
+    {
+        return UserGroup::normalizePermissionsWithConfiguredModules(
+            $this->permissions(),
+            $this->configuredModules(),
+        );
     }
 }

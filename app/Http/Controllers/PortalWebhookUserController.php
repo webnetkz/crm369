@@ -21,6 +21,7 @@ class PortalWebhookUserController extends Controller
                 'id',
                 'name',
                 'last_name',
+                'middle_name',
                 'email',
                 'phone',
                 'email_verified_at',
@@ -46,6 +47,7 @@ class PortalWebhookUserController extends Controller
                     $searchQuery
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('middle_name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%");
                 });
             })

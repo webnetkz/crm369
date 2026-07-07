@@ -554,6 +554,7 @@ export type CompanyStructurePerson = {
     id: number;
     name: string;
     last_name: string | null;
+    middle_name: string | null;
     full_name: string;
     email: string;
     avatar: string | null;
@@ -580,9 +581,12 @@ export type CompanyStructureManagerOption = {
     id: number;
     name: string;
     last_name: string | null;
+    middle_name: string | null;
     full_name: string;
     email: string;
     position: string | null;
+    avatar: string | null;
+    avatar_scale: number;
 };
 
 export type IssuedEquipmentSummary = {
@@ -605,6 +609,7 @@ export type ManagedUserProfile = {
     id: number;
     name: string;
     last_name: string | null;
+    middle_name: string | null;
     email: string;
     phone: string | null;
     position: string | null;
@@ -629,6 +634,7 @@ export type ManagedProfileSaveState = 'idle' | 'saving' | 'saved' | 'error';
 export type ManagedProfileFormState = {
     name: string;
     last_name: string;
+    middle_name: string;
     email: string;
     phone: string;
     position: string;

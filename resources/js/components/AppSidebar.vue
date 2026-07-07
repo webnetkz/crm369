@@ -2,6 +2,7 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     BellRing,
+    BookText,
     BookOpenText,
     Boxes,
     ClipboardList,
@@ -41,6 +42,7 @@ import { useSettingsNavigation } from '@/composables/useSettingsNavigation';
 import { resolveMenuIcon } from '@/lib/menuIcons';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
 import { index as companyStructureIndex } from '@/routes/company-structure';
+import { index as documentationIndex } from '@/routes/documentation';
 import { dashboard } from '@/routes';
 import { index as chatsIndex } from '@/routes/chats';
 import { index as contactsIndex } from '@/routes/contacts';
@@ -82,6 +84,10 @@ const hiddenMenuItems = computed(() => {
     return new Set(hiddenItems);
 });
 
+const enabledModules = computed(() => {
+    return new Set(page.props.portal?.enabledModules ?? []);
+});
+
 const knowledgeBaseMenuItems = computed<MenuKnowledgeBaseItem[]>(() => {
     return Array.isArray(page.props.menu?.knowledgeBases)
         ? page.props.menu.knowledgeBases
@@ -102,9 +108,13 @@ const isMenuItemVisible = (key: string): boolean => {
     return !hiddenMenuItems.value.has(key);
 };
 
+const isModuleEnabled = (key: string): boolean => {
+    return enabledModules.value.has(key);
+};
+
 const baseMainNavItems = computed<NavItem[]>(() => {
     const items: NavItem[] = [
-        ...(isMenuItemVisible('news')
+        ...(page.props.auth.canAccessNews && isMenuItemVisible('news')
             ? [
                   {
                       key: 'news',
@@ -134,7 +144,8 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(isMenuItemVisible('company-structure')
+        ...(page.props.auth.canAccessCompanyStructure &&
+        isMenuItemVisible('company-structure')
             ? [
                   {
                       key: 'company-structure',
@@ -144,7 +155,7 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(isMenuItemVisible('projects')
+        ...(page.props.auth.canAccessProjects && isMenuItemVisible('projects')
             ? [
                   {
                       key: 'projects',
@@ -164,7 +175,7 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(isMenuItemVisible('chats')
+        ...(page.props.auth.canAccessChats && isMenuItemVisible('chats')
             ? [
                   {
                       key: 'chats',
@@ -174,7 +185,8 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(isMenuItemVisible('knowledge-bases')
+        ...(page.props.auth.canAccessKnowledgeBases &&
+        isMenuItemVisible('knowledge-bases')
             ? [
                   {
                       key: 'knowledge-bases',
@@ -205,7 +217,7 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(isMenuItemVisible('forms')
+        ...(page.props.auth.canAccessForms && isMenuItemVisible('forms')
             ? [
                   {
                       key: 'forms',
@@ -225,7 +237,7 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(isMenuItemVisible('edo')
+        ...(page.props.auth.canAccessEdo && isMenuItemVisible('edo')
             ? [
                   {
                       key: 'edo',
@@ -235,7 +247,8 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(isMenuItemVisible('production')
+        ...(page.props.auth.canAccessProduction &&
+        isMenuItemVisible('production')
             ? [
                   {
                       key: 'production',
@@ -246,11 +259,6 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                           {
                               title: t.value.production.sections.overview.title,
                               href: productionIndex(),
-                          },
-                          {
-                              title: t.value.production.sections.warehouses
-                                  .title,
-                              href: showProductionSection('warehouses'),
                           },
                           {
                               title: t.value.production.sections.workshops
@@ -289,7 +297,8 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(isMenuItemVisible('warehouses')
+        ...(page.props.auth.canAccessWarehouses &&
+        isMenuItemVisible('warehouses')
             ? [
                   {
                       key: 'warehouses',
@@ -299,7 +308,7 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(isMenuItemVisible('tsd')
+        ...(page.props.auth.canAccessTsd && isMenuItemVisible('tsd')
             ? [
                   {
                       key: 'tsd',
@@ -309,13 +318,27 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(isMenuItemVisible('equipment')
+        ...(page.props.auth.canAccessEquipment &&
+        isMenuItemVisible('equipment')
             ? [
                   {
                       key: 'equipment',
                       title: t.value.equipment.title,
                       href: equipmentIndex(),
                       icon: Package,
+                  },
+              ]
+            : []),
+        ...(isMenuItemVisible('documentation') &&
+        (isModuleEnabled('api') ||
+            (isModuleEnabled('webhooks') && page.props.auth.canManageWebhooks))
+            ? [
+                  {
+                      key: 'documentation',
+                      title: t.value.documentation.title,
+                      href: documentationIndex.url(),
+                      icon: BookText,
+                      opensInNewTab: true,
                   },
               ]
             : []),

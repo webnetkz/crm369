@@ -118,6 +118,7 @@ test('disabled module routes return not found', function (string $module, string
     ['integrations', 'settings.integrations.edit'],
     ['business-processes', 'settings.business-processes.index'],
     ['webhooks', 'settings.webhooks.edit'],
+    ['webhooks', 'settings.webhooks.documentation.edit'],
 ]);
 
 test('disabled forms module also blocks public forms', function () {

@@ -9,11 +9,11 @@ import LocalizedFilePicker from '@/components/LocalizedFilePicker.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useLanguage } from '@/composables/useLanguage';
 import { getInitials } from '@/composables/useInitials';
+import { useLanguage } from '@/composables/useLanguage';
 import { edit } from '@/routes/profile';
-import type { IssuedEquipmentSummary } from '@/types/ui';
 import { send } from '@/routes/verification';
+import type { IssuedEquipmentSummary } from '@/types/ui';
 
 const props = defineProps<{
     issuedEquipment: IssuedEquipmentSummary[];
@@ -57,8 +57,10 @@ const profileForm = useForm({
     _method: 'patch',
     name: user.value.name,
     last_name: user.value.last_name ?? '',
+    middle_name: user.value.middle_name ?? '',
     email: user.value.email,
     phone: formatKazakhstanPhone(user.value.phone),
+    position: user.value.position ?? '',
     avatar: null as File | null,
     avatar_scale: user.value.avatar_scale ?? 1,
 });
@@ -232,6 +234,21 @@ const formatUserName = (person: {
             </div>
 
             <div class="grid gap-2">
+                <Label for="middle_name">{{ t.common.middle_name }}</Label>
+                <Input
+                    id="middle_name"
+                    v-model="profileForm.middle_name"
+                    class="mt-1 block w-full"
+                    autocomplete="additional-name"
+                    :placeholder="t.auth.middle_name"
+                />
+                <InputError
+                    class="mt-2"
+                    :message="profileForm.errors.middle_name"
+                />
+            </div>
+
+            <div class="grid gap-2">
                 <Label for="email">{{ t.common.email }}</Label>
                 <Input
                     id="email"
@@ -260,6 +277,21 @@ const formatUserName = (person: {
                     {{ t.profile.phone_help }}
                 </p>
                 <InputError class="mt-2" :message="profileForm.errors.phone" />
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="position">{{ t.company_structure.position }}</Label>
+                <Input
+                    id="position"
+                    v-model="profileForm.position"
+                    class="mt-1 block w-full"
+                    autocomplete="organization-title"
+                    :placeholder="t.company_structure.no_position"
+                />
+                <InputError
+                    class="mt-2"
+                    :message="profileForm.errors.position"
+                />
             </div>
 
             <section

@@ -24,6 +24,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -455,13 +456,52 @@ class ProjectController extends Controller
     {
         $taskDisplayMode = $request->string('view')->value();
 
+        if ($this->isValidTaskDisplayMode($taskDisplayMode)) {
+            $this->persistTaskDisplayMode($request, $taskDisplayMode);
+
+            return $taskDisplayMode;
+        }
+
+        if (! $this->canPersistTaskDisplayMode()) {
+            return ProjectPageData::VIEW_LIST;
+        }
+
+        $preferredTaskDisplayMode = $request->user()?->task_display_mode;
+
+        return $this->isValidTaskDisplayMode($preferredTaskDisplayMode)
+            ? $preferredTaskDisplayMode
+            : ProjectPageData::VIEW_LIST;
+    }
+
+    private function isValidTaskDisplayMode(?string $taskDisplayMode): bool
+    {
         return in_array($taskDisplayMode, [
             ProjectPageData::VIEW_LIST,
             ProjectPageData::VIEW_KANBAN,
             ProjectPageData::VIEW_GANTT,
-        ], true)
-            ? $taskDisplayMode
-            : ProjectPageData::VIEW_LIST;
+        ], true);
+    }
+
+    private function persistTaskDisplayMode(Request $request, string $taskDisplayMode): void
+    {
+        $user = $request->user();
+
+        if (
+            $user === null
+            || ! $this->canPersistTaskDisplayMode()
+            || $user->task_display_mode === $taskDisplayMode
+        ) {
+            return;
+        }
+
+        $user->forceFill([
+            'task_display_mode' => $taskDisplayMode,
+        ])->save();
+    }
+
+    private function canPersistTaskDisplayMode(): bool
+    {
+        return Schema::hasColumn('users', 'task_display_mode');
     }
 
     private function visibleProject(Request $request, Project $project): Project

@@ -15,6 +15,7 @@ return [
     'login' => 'Log in',
     'logout' => 'Log out',
     'last_name' => 'Last name',
+    'middle_name' => 'Middle name',
     'name' => 'Name',
     'next' => 'Next',
     'no_file_selected' => 'No file selected',

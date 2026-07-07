@@ -510,8 +510,17 @@ test('collapsed sidebar opens the parent settings item using its default href', 
     expect($navMain)->toContain('const useParentHrefWhenCollapsed = computed(() => {')
         ->and($navMain)->toContain("return state.value === 'collapsed' && !isMobile.value;")
         ->and($navMain)->toContain('v-if="item.items?.length && useParentHrefWhenCollapsed"')
-        ->and($navMain)->toContain('<Link v-else :href="item.href">')
+        ->and($navMain)->toContain(':href="item.href"')
         ->and($sidebar)->toContain('href: settingsItems[0]?.href ?? editMenu()');
+});
+
+test('mobile sidebar closes after selecting a navigation link', function () {
+    $navMain = file_get_contents(resource_path('js/components/NavMain.vue'));
+
+    expect($navMain)->toContain('const { isMobile, setOpenMobile, state } = useSidebar();')
+        ->and($navMain)->toContain('const handleMenuItemClick = (): void => {')
+        ->and($navMain)->toContain('setOpenMobile(false);')
+        ->and($navMain)->toContain('@click="handleMenuItemClick"');
 });
 
 test('tasks and projects sidebar item renders two submenu links', function () {

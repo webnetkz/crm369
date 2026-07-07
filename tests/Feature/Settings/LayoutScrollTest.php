@@ -11,8 +11,8 @@ test('settings layout uses a single scroll container for the main content', func
         ->and($sidebarInset)->toContain('flex min-h-0 w-full flex-1 flex-col')
         ->and($sidebarContent)->toContain('flex min-h-0 flex-1 flex-col gap-2 overflow-hidden')
         ->and($sidebarContent)->not->toContain('overflow-auto')
-        ->and($sidebarLayout)->toContain('class="min-h-0 overflow-y-auto overflow-x-hidden"')
-        ->and($appSidebar)->toContain('<SidebarContent class="overflow-y-auto overflow-x-hidden">');
+        ->and($sidebarLayout)->toContain('class="min-h-0 overflow-x-hidden overflow-y-auto"')
+        ->and($appSidebar)->toContain('<SidebarContent class="overflow-x-hidden overflow-y-auto">');
 });
 
 test('sidebar navigation does not render the platform group label', function () {
@@ -25,7 +25,7 @@ test('sidebar navigation does not render the platform group label', function () 
 test('sidebar uses a distinct icon for user groups', function () {
     $appSidebar = file_get_contents(resource_path('js/components/AppSidebar.vue'));
 
-    expect($appSidebar)->toContain('icon: UsersRound')
+    expect($appSidebar)->toContain('icon: Users')
         ->and($appSidebar)->toContain('icon: Network');
 });
 

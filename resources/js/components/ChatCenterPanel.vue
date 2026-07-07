@@ -17,8 +17,8 @@ import ChatMessageAttachments from '@/components/ChatMessageAttachments.vue';
 import ChatMessageComposer from '@/components/ChatMessageComposer.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { useChatCenterPresence } from '@/composables/useChatCenterPresence';
 import UserProfileSheet from '@/components/UserProfileSheet.vue';
+import { useChatCenterPresence } from '@/composables/useChatCenterPresence';
 import { useInitials } from '@/composables/useInitials';
 import { useLanguage } from '@/composables/useLanguage';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
@@ -43,8 +43,11 @@ type Props = {
 type ManagedProfilePayload = {
     name: string;
     last_name: string;
+    middle_name: string;
     email: string;
     phone: string;
+    position: string;
+    manager_id: number | null;
 };
 
 const props = withDefaults(defineProps<Props>(), {
@@ -76,8 +79,11 @@ const defaultKazakhstanPhonePrefix = '+7';
 const managedProfileForm = useForm({
     name: '',
     last_name: '',
+    middle_name: '',
     email: '',
     phone: defaultKazakhstanPhonePrefix,
+    position: '',
+    manager_id: '' as number | '',
 });
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -351,8 +357,14 @@ const avatarStyle = (
 const managedProfilePayload = (): ManagedProfilePayload => ({
     name: managedProfileForm.name,
     last_name: managedProfileForm.last_name,
+    middle_name: managedProfileForm.middle_name,
     email: managedProfileForm.email,
     phone: managedProfileForm.phone,
+    position: managedProfileForm.position,
+    manager_id:
+        managedProfileForm.manager_id === ''
+            ? null
+            : managedProfileForm.manager_id,
 });
 
 const clearManagedProfileSaveTimeout = (): void => {
@@ -369,8 +381,11 @@ const syncManagedProfileForm = (user: ManagedUserProfile | null): void => {
 
     managedProfileForm.name = user?.name ?? '';
     managedProfileForm.last_name = user?.last_name ?? '';
+    managedProfileForm.middle_name = user?.middle_name ?? '';
     managedProfileForm.email = user?.email ?? '';
     managedProfileForm.phone = formatKazakhstanPhone(user?.phone);
+    managedProfileForm.position = user?.position ?? '';
+    managedProfileForm.manager_id = user?.manager_id ?? '';
 
     managedProfileSnapshot.value = managedProfilePayload();
     managedProfileSaveState.value = 'idle';
@@ -419,8 +434,12 @@ const submitManagedProfileUpdate = async (): Promise<void> => {
                 ...user,
                 name: current.name,
                 last_name: current.last_name === '' ? null : current.last_name,
+                middle_name:
+                    current.middle_name === '' ? null : current.middle_name,
                 email: current.email,
                 phone: current.phone,
+                position: current.position === '' ? null : current.position,
+                manager_id: current.manager_id,
                 email_verified_at: emailChanged ? null : user.email_verified_at,
             };
             managedProfileSnapshot.value = managedProfilePayload();
@@ -578,8 +597,11 @@ watch(
     () => [
         managedProfileForm.name,
         managedProfileForm.last_name,
+        managedProfileForm.middle_name,
         managedProfileForm.email,
         managedProfileForm.phone,
+        managedProfileForm.position,
+        managedProfileForm.manager_id,
     ],
     () => {
         if (
