@@ -6,12 +6,14 @@ use App\Concerns\EnsuresContactsTableIsReady;
 use App\Http\Resources\ApiContactResource;
 use App\Http\Resources\ApiEdoDocumentResource;
 use App\Http\Resources\ApiEquipmentResource;
+use App\Http\Resources\ApiReferenceDirectoryResource;
 use App\Http\Resources\ApiUserResource;
 use App\Http\Resources\ApiWarehouseResource;
 use App\Models\Contact;
 use App\Models\EdoDocument;
 use App\Models\EquipmentItem;
 use App\Models\PortalWebhook;
+use App\Models\ReferenceDirectory;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Support\CompanyStructureData;
@@ -37,6 +39,7 @@ class PortalWebhookInvokeController extends Controller
             'users' => $this->usersPayload($resolvedWebhook),
             'company_structure' => $this->companyStructurePayload($resolvedWebhook),
             'contacts' => $this->contactsPayload($resolvedWebhook),
+            'directories' => $this->directoriesPayload($resolvedWebhook),
             'edo_documents' => $this->edoPayload($resolvedWebhook),
             'equipment_items' => $this->equipmentPayload($resolvedWebhook),
             'warehouses' => $this->warehousesPayload($resolvedWebhook),
@@ -91,6 +94,44 @@ class PortalWebhookInvokeController extends Controller
                 'destroy_template' => route('portal-webhooks.contacts.destroy', [
                     'portalWebhook' => $portalWebhook,
                     'contact' => '__CONTACT_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_DIRECTORIES_READ)) {
+            $endpoints['directories'] = [
+                'index' => route('portal-webhooks.directories.index', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'show_template' => route('portal-webhooks.directories.show', [
+                    'portalWebhook' => $portalWebhook,
+                    'referenceDirectory' => '__DIRECTORY_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_DIRECTORIES_WRITE)) {
+            $endpoints['directories_write'] = [
+                'store' => route('portal-webhooks.directories.store', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'update_template' => route('portal-webhooks.directories.update', [
+                    'portalWebhook' => $portalWebhook,
+                    'referenceDirectory' => '__DIRECTORY_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+                'destroy_template' => route('portal-webhooks.directories.destroy', [
+                    'portalWebhook' => $portalWebhook,
+                    'referenceDirectory' => '__DIRECTORY_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+                'record_store_template' => route('portal-webhooks.directories.records.store', [
+                    'portalWebhook' => $portalWebhook,
+                    'referenceDirectory' => '__DIRECTORY_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+                'record_update_template' => route('portal-webhooks.directories.records.update', [
+                    'portalWebhook' => $portalWebhook,
+                    'referenceDirectory' => '__DIRECTORY_ID__',
+                    'referenceDirectoryRecord' => '__RECORD_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+                'record_destroy_template' => route('portal-webhooks.directories.records.destroy', [
+                    'portalWebhook' => $portalWebhook,
+                    'referenceDirectory' => '__DIRECTORY_ID__',
+                    'referenceDirectoryRecord' => '__RECORD_ID__',
                 ]).'?token='.urlencode($plainTextToken),
             ];
         }
@@ -256,6 +297,30 @@ class PortalWebhookInvokeController extends Controller
             ->orderBy('name')
             ->get()
             ->map(fn (Contact $contact): array => (new ApiContactResource($contact))->resolve())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function directoriesPayload(PortalWebhook $portalWebhook): ?array
+    {
+        if (! $portalWebhook->hasPermission(PortalWebhook::PERMISSION_DIRECTORIES_READ)) {
+            return null;
+        }
+
+        return ReferenceDirectory::query()
+            ->withCount('records')
+            ->with([
+                'creator:id,name,last_name,email',
+                'updater:id,name,last_name,email',
+                'records.creator:id,name,last_name,email',
+                'records.updater:id,name,last_name,email',
+            ])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (ReferenceDirectory $directory): array => (new ApiReferenceDirectoryResource($directory))->resolve())
             ->values()
             ->all();
     }

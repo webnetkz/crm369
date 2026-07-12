@@ -23,6 +23,7 @@ const page = usePage();
 const user = computed(() => page.props.auth.user);
 const { t } = useLanguage();
 const localAvatarUrl = ref<string | null>(null);
+const persistedAvatarUrl = ref<string | null>(user.value.avatar ?? null);
 const defaultKazakhstanPhonePrefix = '+7';
 
 const formatKazakhstanPhone = (value: string | null | undefined): string => {
@@ -65,9 +66,9 @@ const profileForm = useForm({
     avatar_scale: user.value.avatar_scale ?? 1,
 });
 
-const avatarPreviewUrl = computed(
-    () => localAvatarUrl.value ?? user.value.avatar,
-);
+const avatarPreviewUrl = computed(() => {
+    return localAvatarUrl.value ?? persistedAvatarUrl.value;
+});
 
 const avatarPreviewStyle = computed(() => ({
     objectPosition: 'center',
@@ -94,12 +95,22 @@ const submitProfile = (): void => {
         forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
+            persistedAvatarUrl.value = page.props.auth.user.avatar ?? null;
+            clearLocalAvatarUrl();
             profileForm.avatar = null;
         },
     });
 };
 
 onBeforeUnmount(clearLocalAvatarUrl);
+
+watch(
+    () => user.value.avatar,
+    (avatar) => {
+        persistedAvatarUrl.value = avatar ?? null;
+    },
+    { immediate: true },
+);
 
 watch(
     () => profileForm.phone,
@@ -157,6 +168,7 @@ const formatUserName = (person: {
                     >
                         <img
                             v-if="avatarPreviewUrl"
+                            :key="avatarPreviewUrl"
                             :src="avatarPreviewUrl"
                             :alt="user.name"
                             class="size-full object-cover"

@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Head, Link, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, RefreshCw } from '@lucide/vue';
+import {
+    ArrowLeft,
+    Clock3,
+    MapPin,
+    MonitorSmartphone,
+    RefreshCw,
+    ShieldCheck,
+} from '@lucide/vue';
 import { useClipboard } from '@vueuse/core';
 import { watchEffect } from 'vue';
 import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
@@ -18,13 +25,42 @@ import { usePasswordGenerator } from '@/composables/usePasswordGenerator';
 import { edit as editProfile } from '@/routes/profile';
 import { edit } from '@/routes/security';
 
+type SessionRow = {
+    id: string;
+    ip_address: string | null;
+    user_agent: string | null;
+    browser: string | null;
+    platform: string | null;
+    device_type: string;
+    device_label: string;
+    is_current: boolean;
+    last_active_at: string;
+    last_active_at_diff: string;
+};
+
+type LoginActivityRow = {
+    id: number;
+    ip_address: string | null;
+    user_agent: string | null;
+    browser: string | null;
+    platform: string | null;
+    device_type: string;
+    device_label: string;
+    is_new_device: boolean;
+    is_new_ip: boolean;
+    logged_in_at: string;
+    logged_in_at_diff: string;
+};
+
 type Props = {
     passwordRules: string;
+    sessions: SessionRow[];
+    loginActivities: LoginActivityRow[];
 } & ManagePasskeysProps &
     ManageTwoFactorProps;
 
 const props = defineProps<Props>();
-const { t } = useLanguage();
+const { language, t } = useLanguage();
 const { copy } = useClipboard();
 const { generatePassword } = usePasswordGenerator();
 const form = useForm({
@@ -57,6 +93,20 @@ const applyGeneratedPassword = async (): Promise<void> => {
     } catch {
         //
     }
+};
+
+const formatDateTime = (value: string | null): string => {
+    if (!value) {
+        return '—';
+    }
+
+    return new Intl.DateTimeFormat(
+        language.value === 'ru' ? 'ru-RU' : 'en-US',
+        {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        },
+    ).format(new Date(value));
 };
 
 watchEffect(() => {
@@ -161,6 +211,158 @@ watchEffect(() => {
                 </Button>
             </div>
         </form>
+
+        <section class="space-y-6 rounded-2xl border border-border p-5">
+            <Heading
+                variant="small"
+                :title="t.security.sessions_title"
+                :description="t.security.sessions_description"
+            />
+
+            <div v-if="props.sessions.length" class="space-y-3">
+                <article
+                    v-for="session in props.sessions"
+                    :key="session.id"
+                    class="rounded-2xl border border-border/70 bg-muted/20 p-4"
+                >
+                    <div
+                        class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                    >
+                        <div class="space-y-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <MonitorSmartphone class="size-4" />
+                                <p class="font-medium">
+                                    {{ session.device_label }}
+                                </p>
+                                <span
+                                    v-if="session.is_current"
+                                    class="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+                                >
+                                    {{ t.security.current_session }}
+                                </span>
+                            </div>
+
+                            <p
+                                class="text-sm text-muted-foreground"
+                                :title="session.user_agent ?? undefined"
+                            >
+                                {{
+                                    session.user_agent ??
+                                    t.security.user_agent_unavailable
+                                }}
+                            </p>
+                        </div>
+
+                        <div
+                            class="flex items-center gap-2 text-sm text-muted-foreground"
+                        >
+                            <Clock3 class="size-4" />
+                            <span>{{
+                                formatDateTime(session.last_active_at)
+                            }}</span>
+                        </div>
+                    </div>
+
+                    <div
+                        class="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground"
+                    >
+                        <span class="inline-flex items-center gap-1.5">
+                            <MapPin class="size-4" />
+                            {{ t.security.ip_address }}:
+                            {{ session.ip_address ?? '—' }}
+                        </span>
+                        <span class="inline-flex items-center gap-1.5">
+                            <Clock3 class="size-4" />
+                            {{ t.security.last_activity }}:
+                            {{ session.last_active_at_diff }}
+                        </span>
+                    </div>
+                </article>
+            </div>
+
+            <p v-else class="text-sm text-muted-foreground">
+                {{ t.security.no_active_sessions }}
+            </p>
+        </section>
+
+        <section class="space-y-6 rounded-2xl border border-border p-5">
+            <Heading
+                variant="small"
+                :title="t.security.login_history_title"
+                :description="t.security.login_history_description"
+            />
+
+            <div v-if="props.loginActivities.length" class="space-y-3">
+                <article
+                    v-for="activity in props.loginActivities"
+                    :key="activity.id"
+                    class="rounded-2xl border border-border/70 bg-muted/20 p-4"
+                >
+                    <div
+                        class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                    >
+                        <div class="space-y-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <ShieldCheck class="size-4" />
+                                <p class="font-medium">
+                                    {{ activity.device_label }}
+                                </p>
+                                <span
+                                    v-if="activity.is_new_device"
+                                    class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/20 dark:text-amber-200"
+                                >
+                                    {{ t.security.new_device }}
+                                </span>
+                                <span
+                                    v-if="activity.is_new_ip"
+                                    class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800 dark:bg-sky-500/20 dark:text-sky-200"
+                                >
+                                    {{ t.security.new_ip }}
+                                </span>
+                            </div>
+
+                            <p
+                                class="text-sm text-muted-foreground"
+                                :title="activity.user_agent ?? undefined"
+                            >
+                                {{
+                                    activity.user_agent ??
+                                    t.security.user_agent_unavailable
+                                }}
+                            </p>
+                        </div>
+
+                        <div
+                            class="flex items-center gap-2 text-sm text-muted-foreground"
+                        >
+                            <Clock3 class="size-4" />
+                            <span>{{
+                                formatDateTime(activity.logged_in_at)
+                            }}</span>
+                        </div>
+                    </div>
+
+                    <div
+                        class="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground"
+                    >
+                        <span class="inline-flex items-center gap-1.5">
+                            <MapPin class="size-4" />
+                            {{ t.security.ip_address }}:
+                            {{ activity.ip_address ?? '—' }}
+                        </span>
+                        <span class="inline-flex items-center gap-1.5">
+                            <Clock3 class="size-4" />
+                            {{ t.security.logged_in_at }}:
+                            {{ activity.logged_in_at_diff }}
+                        </span>
+                    </div>
+                </article>
+            </div>
+
+            <p v-else class="text-sm text-muted-foreground">
+                {{ t.security.no_login_history }}
+            </p>
+        </section>
     </div>
 
     <ManageTwoFactor

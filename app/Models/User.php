@@ -194,6 +194,15 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * @return HasMany<UserLoginActivity, $this>
+     */
+    public function loginActivities(): HasMany
+    {
+        return $this->hasMany(UserLoginActivity::class)
+            ->latest('logged_in_at');
+    }
+
+    /**
      * @return HasMany<EquipmentItem, $this>
      */
     public function issuedEquipmentItems(): HasMany
@@ -349,6 +358,19 @@ class User extends Authenticatable implements PasskeyUser
         return $this->canAccessConfiguredModule('equipment', [
             UserGroup::PERMISSION_ACCESS_EQUIPMENT,
         ]);
+    }
+
+    public function canAccessDirectories(): bool
+    {
+        return $this->canAccessConfiguredModule('directories', [
+            UserGroup::PERMISSION_ACCESS_DIRECTORIES,
+            UserGroup::PERMISSION_MANAGE_DIRECTORIES,
+        ], false);
+    }
+
+    public function canManageDirectories(): bool
+    {
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_MANAGE_DIRECTORIES);
     }
 
     public function canManageBusinessProcesses(): bool

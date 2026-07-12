@@ -56,6 +56,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('access-warehouses', fn (User $user): bool => $user->canAccessWarehouses());
         Gate::define('access-equipment', fn (User $user): bool => $user->canAccessEquipment());
         Gate::define('access-tsd', fn (User $user): bool => $user->canAccessTsd());
+        Gate::define('access-directories', fn (User $user): bool => $user->canAccessDirectories());
+        Gate::define('manage-directories', fn (User $user): bool => $user->canManageDirectories());
         Gate::define('manage-messenger-integrations', fn (User $user): bool => $user->canManageMessengerIntegrations());
         Gate::define('manage-business-processes', fn (User $user): bool => $user->canManageBusinessProcesses());
         Gate::define('manage-webhooks', fn (User $user): bool => $user->canManageWebhooks());

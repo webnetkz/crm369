@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { useCsrfToken } from '@/composables/useCsrfToken';
 import { useLanguage } from '@/composables/useLanguage';
 import { usePasswordGenerator } from '@/composables/usePasswordGenerator';
 import { login } from '@/routes';
@@ -20,9 +21,11 @@ defineProps<{
 }>();
 
 const { t } = useLanguage();
+const csrfToken = useCsrfToken();
 const { copy } = useClipboard();
 const { generatePassword } = usePasswordGenerator();
 const form = useForm({
+    _token: csrfToken,
     name: '',
     email: '',
     password: '',

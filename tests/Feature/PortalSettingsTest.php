@@ -10,7 +10,9 @@ test('portal title uses CRM369 by default', function () {
     $this->get(route('login'))
         ->assertOk()
         ->assertSee('<title>CRM369</title>', false)
-        ->assertDontSee('<title>Laravel</title>', false);
+        ->assertDontSee('<title>Laravel</title>', false)
+        ->assertSee('<link rel="icon" href="/logo369.png" sizes="any">', false)
+        ->assertSee('<link rel="apple-touch-icon" href="/logo369.png">', false);
 });
 
 test('portal title uses configured company name', function () {
@@ -53,7 +55,7 @@ test('only super admin can open portal settings', function () {
         ->assertInertia(fn ($page) => $page
             ->component('settings/Portal')
             ->has('settings.company_name')
-            ->has('settings.logo_url')
+            ->where('settings.logo_url', '/logo369.png')
             ->where('settings.default_language', 'ru')
         );
 });

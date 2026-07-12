@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Requests\StartDirectChatRequest;
 use App\Http\Requests\StoreChatMessageRequest;
+use App\Http\Requests\UpdateChatMessageRequest;
 use App\Http\Resources\ApiChatMessageResource;
 use App\Models\ChatConversation;
+use App\Models\ChatMessage;
 use App\Support\ApiRequestContext;
+use App\Support\ChatMessageEditor;
+use App\Support\ChatMessageRemover;
 use App\Support\ChatMessageSender;
 use App\Support\ChatSidebarData;
 use App\Support\DirectConversationManager;
@@ -74,5 +78,46 @@ class ChatController
             'message' => __('ui.chat.message_sent'),
             'data' => (new ApiChatMessageResource($message))->resolve(),
         ], 201);
+    }
+
+    public function updateMessage(
+        UpdateChatMessageRequest $request,
+        ChatConversation $chatConversation,
+        ChatMessage $chatMessage,
+        ChatMessageEditor $chatMessageEditor,
+    ): JsonResponse {
+        $user = ApiRequestContext::subject($request);
+
+        abort_unless($chatMessage->chat_conversation_id === $chatConversation->id, 404);
+        abort_unless($chatConversation->hasParticipant($user), 403);
+        abort_unless($chatMessage->user_id === $user->id, 403);
+        abort_unless(! $chatMessage->wasDeleted(), 404);
+
+        $message = $chatMessageEditor->edit($chatMessage, $request->body());
+
+        return response()->json([
+            'message' => __('ui.chat.message_sent'),
+            'data' => (new ApiChatMessageResource($message))->resolve(),
+        ]);
+    }
+
+    public function destroyMessage(
+        Request $request,
+        ChatConversation $chatConversation,
+        ChatMessage $chatMessage,
+        ChatMessageRemover $chatMessageRemover,
+    ): JsonResponse {
+        $user = ApiRequestContext::subject($request);
+
+        abort_unless($chatMessage->chat_conversation_id === $chatConversation->id, 404);
+        abort_unless($chatConversation->hasParticipant($user), 403);
+        abort_unless($chatMessage->user_id === $user->id, 403);
+
+        $message = $chatMessageRemover->remove($chatMessage);
+
+        return response()->json([
+            'message' => __('ui.chat.message_sent'),
+            'data' => (new ApiChatMessageResource($message))->resolve(),
+        ]);
     }
 }

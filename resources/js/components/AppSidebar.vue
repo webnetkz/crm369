@@ -46,6 +46,7 @@ import { index as documentationIndex } from '@/routes/documentation';
 import { dashboard } from '@/routes';
 import { index as chatsIndex } from '@/routes/chats';
 import { index as contactsIndex } from '@/routes/contacts';
+import { index as directoriesIndex } from '@/routes/directories';
 import { index as edoIndex } from '@/routes/edo';
 import { index as formsIndex } from '@/routes/forms';
 import { index as newsIndex } from '@/routes/news';
@@ -234,6 +235,17 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                       title: t.value.contacts.title,
                       href: contactsIndex(),
                       icon: Users,
+                  },
+              ]
+            : []),
+        ...(page.props.auth.canAccessDirectories &&
+        isMenuItemVisible('directories')
+            ? [
+                  {
+                      key: 'directories',
+                      title: t.value.directories.title,
+                      href: directoriesIndex(),
+                      icon: BookOpenText,
                   },
               ]
             : []),

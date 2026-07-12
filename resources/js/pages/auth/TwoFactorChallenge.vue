@@ -10,6 +10,7 @@ import {
     InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { Spinner } from '@/components/ui/spinner';
+import { useCsrfToken } from '@/composables/useCsrfToken';
 import { useLanguage } from '@/composables/useLanguage';
 import { store } from '@/routes/two-factor/login';
 import type { TwoFactorConfigContent } from '@/types';
@@ -19,6 +20,7 @@ const showRecoveryInput = ref<boolean>(false);
 const code = ref<string>('');
 const challengeContainer = ref<HTMLElement | null>(null);
 const { t } = useLanguage();
+const csrfToken = useCsrfToken();
 
 const authConfigContent = computed<TwoFactorConfigContent>(() => {
     if (showRecoveryInput.value) {
@@ -100,6 +102,7 @@ watch(showRecoveryInput, () => {
         <template v-if="!showRecoveryInput">
             <Form
                 v-bind="store.form()"
+                :transform="(data) => ({ ...data, _token: csrfToken })"
                 class="space-y-4"
                 #default="{ errors, processing, clearErrors, submit }"
             >
@@ -162,6 +165,7 @@ watch(showRecoveryInput, () => {
         <template v-else>
             <Form
                 v-bind="store.form()"
+                :transform="(data) => ({ ...data, _token: csrfToken })"
                 class="space-y-4"
                 reset-on-error
                 #default="{ errors, processing, clearErrors }"

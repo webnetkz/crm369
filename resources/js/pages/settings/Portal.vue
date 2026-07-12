@@ -14,7 +14,7 @@ import type { Language } from '@/types';
 
 type PortalSettings = {
     company_name: string;
-    logo_url: string | null;
+    logo_url: string;
     default_language: Language;
 };
 

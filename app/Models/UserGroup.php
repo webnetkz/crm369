@@ -69,6 +69,10 @@ class UserGroup extends Model
 
     public const string PERMISSION_ACCESS_EQUIPMENT = 'access_equipment';
 
+    public const string PERMISSION_ACCESS_DIRECTORIES = 'access_directories';
+
+    public const string PERMISSION_MANAGE_DIRECTORIES = 'manage_directories';
+
     public const string PERMISSION_MANAGE_API_TOKENS = 'manage_api_tokens';
 
     public const string PERMISSION_MANAGE_WEBHOOKS = 'manage_webhooks';
@@ -232,6 +236,16 @@ class UserGroup extends Model
                 'description_key' => 'ui.admin.permission_access_equipment_description',
                 'module_key' => 'equipment',
             ],
+            self::PERMISSION_ACCESS_DIRECTORIES => [
+                'label_key' => 'ui.admin.permission_access_directories',
+                'description_key' => 'ui.admin.permission_access_directories_description',
+                'module_key' => 'directories',
+            ],
+            self::PERMISSION_MANAGE_DIRECTORIES => [
+                'label_key' => 'ui.admin.permission_manage_directories',
+                'description_key' => 'ui.admin.permission_manage_directories_description',
+                'module_key' => 'directories',
+            ],
             self::PERMISSION_MANAGE_API_TOKENS => [
                 'label_key' => 'ui.admin.permission_manage_api_tokens',
                 'description_key' => 'ui.admin.permission_manage_api_tokens_description',
@@ -281,6 +295,7 @@ class UserGroup extends Model
             'warehouses' => $portalModules['warehouses'],
             'tsd' => $portalModules['tsd'],
             'equipment' => $portalModules['equipment'],
+            'directories' => $portalModules['directories'],
             'api' => $portalModules['api'],
             'webhooks' => $portalModules['webhooks'],
             'integrations' => $portalModules['integrations'],
@@ -306,6 +321,7 @@ class UserGroup extends Model
             'warehouses',
             'tsd',
             'equipment',
+            'directories',
         ];
     }
 

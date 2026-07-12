@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { useCsrfToken } from '@/composables/useCsrfToken';
 import { useLanguage } from '@/composables/useLanguage';
 import { login } from '@/routes';
 import { email } from '@/routes/password';
@@ -16,6 +17,7 @@ defineProps<{
 }>();
 
 const { t } = useLanguage();
+const csrfToken = useCsrfToken();
 
 watchEffect(() => {
     setLayoutProps({
@@ -36,7 +38,11 @@ watchEffect(() => {
     </div>
 
     <div class="space-y-6">
-        <Form v-bind="email.form()" v-slot="{ errors, processing }">
+        <Form
+            v-bind="email.form()"
+            :transform="(data) => ({ ...data, _token: csrfToken })"
+            v-slot="{ errors, processing }"
+        >
             <div class="grid gap-2">
                 <Label for="email">{{ t.auth.email_address }}</Label>
                 <Input

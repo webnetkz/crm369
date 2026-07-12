@@ -11,17 +11,24 @@ const props = withDefaults(
         attachments?: File[];
         placeholder: string;
         sending?: boolean;
+        isEditing?: boolean;
+        canAttach?: boolean;
+        allowEmptySubmit?: boolean;
     }>(),
     {
         modelValue: '',
         attachments: () => [],
         sending: false,
+        isEditing: false,
+        canAttach: true,
+        allowEmptySubmit: false,
     },
 );
 
 const emit = defineEmits<{
     (e: 'update:modelValue', value: string): void;
     (e: 'update:attachments', value: File[]): void;
+    (e: 'cancel-edit'): void;
     (e: 'submit'): void;
 }>();
 
@@ -31,7 +38,11 @@ const fileInputElement = ref<HTMLInputElement | null>(null);
 const textareaElement = ref<HTMLTextAreaElement | null>(null);
 
 const canSubmit = computed(() => {
-    return props.modelValue.trim() !== '' || props.attachments.length > 0;
+    return (
+        props.allowEmptySubmit ||
+        props.modelValue.trim() !== '' ||
+        props.attachments.length > 0
+    );
 });
 
 const isDropActive = computed(() => dragDepth.value > 0);
@@ -53,7 +64,7 @@ const updateDraft = (event: Event): void => {
 };
 
 const openFilePicker = (): void => {
-    if (props.sending) {
+    if (props.sending || !props.canAttach) {
         return;
     }
 
@@ -126,7 +137,11 @@ const handleDraftKeydown = (event: KeyboardEvent): void => {
 };
 
 const handleDragEnter = (event: DragEvent): void => {
-    if (props.sending || !event.dataTransfer?.types.includes('Files')) {
+    if (
+        props.sending ||
+        !props.canAttach ||
+        !event.dataTransfer?.types.includes('Files')
+    ) {
         return;
     }
 
@@ -134,7 +149,7 @@ const handleDragEnter = (event: DragEvent): void => {
 };
 
 const handleDragOver = (event: DragEvent): void => {
-    if (props.sending) {
+    if (props.sending || !props.canAttach) {
         return;
     }
 
@@ -146,7 +161,11 @@ const handleDragOver = (event: DragEvent): void => {
 };
 
 const handleDragLeave = (event: DragEvent): void => {
-    if (props.sending || !event.dataTransfer?.types.includes('Files')) {
+    if (
+        props.sending ||
+        !props.canAttach ||
+        !event.dataTransfer?.types.includes('Files')
+    ) {
         return;
     }
 
@@ -157,7 +176,7 @@ const handleDrop = (event: DragEvent): void => {
     event.preventDefault();
     dragDepth.value = 0;
 
-    if (props.sending) {
+    if (props.sending || !props.canAttach) {
         return;
     }
 
@@ -182,6 +201,24 @@ const submit = (): void => {
         @dragleave="handleDragLeave"
         @drop="handleDrop"
     >
+        <div
+            v-if="isEditing"
+            class="flex items-center justify-between border-b border-border/70 px-4 py-3"
+        >
+            <div class="text-xs font-medium text-muted-foreground">
+                {{ t.chat.editing_message }}
+            </div>
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                :disabled="sending"
+                @click="emit('cancel-edit')"
+            >
+                {{ t.chat.cancel_edit }}
+            </Button>
+        </div>
+
         <div v-if="attachments.length > 0" class="border-b border-border/70 px-4 py-3">
             <div class="mb-2 text-xs font-medium text-muted-foreground">
                 {{ t.chat.attached_files }}
@@ -229,18 +266,19 @@ const submit = (): void => {
             type="file"
             class="sr-only"
             multiple
-            :disabled="sending"
+            :disabled="sending || !canAttach"
             @change="handleFileChange"
         />
 
         <Button
+            v-if="canAttach"
             type="button"
             variant="ghost"
             size="icon"
             class="absolute left-3 bottom-3 size-10 rounded-full text-muted-foreground hover:text-foreground"
             :title="t.chat.attach_files"
             :aria-label="t.chat.attach_files"
-            :disabled="sending"
+            :disabled="sending || !canAttach"
             @click="openFilePicker"
         >
             <Paperclip class="size-4" />

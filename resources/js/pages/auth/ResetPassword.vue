@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { useCsrfToken } from '@/composables/useCsrfToken';
 import { useLanguage } from '@/composables/useLanguage';
 import { update } from '@/routes/password';
 
@@ -18,6 +19,7 @@ const props = defineProps<{
 
 const inputEmail = ref(props.email);
 const { t } = useLanguage();
+const csrfToken = useCsrfToken();
 
 watchEffect(() => {
     setLayoutProps({
@@ -32,7 +34,7 @@ watchEffect(() => {
 
     <Form
         v-bind="update.form()"
-        :transform="(data) => ({ ...data, token, email })"
+        :transform="(data) => ({ ...data, _token: csrfToken, token, email })"
         :reset-on-success="['password', 'password_confirmation']"
         v-slot="{ errors, processing }"
     >

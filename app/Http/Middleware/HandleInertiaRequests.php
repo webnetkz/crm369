@@ -50,6 +50,7 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
+            'csrfToken' => csrf_token(),
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user()
@@ -93,6 +94,12 @@ class HandleInertiaRequests extends Middleware
                     : false,
                 'canAccessTsd' => $this->moduleEnabled('tsd')
                     ? ($request->user()?->canAccessTsd() ?? false)
+                    : false,
+                'canAccessDirectories' => $this->moduleEnabled('directories')
+                    ? ($request->user()?->canAccessDirectories() ?? false)
+                    : false,
+                'canManageDirectories' => $this->moduleEnabled('directories')
+                    ? ($request->user()?->canManageDirectories() ?? false)
                     : false,
                 'canManageApiTokens' => $this->moduleEnabled('api')
                     ? ($request->user()?->canManageApiTokens() ?? false)

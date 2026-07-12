@@ -19,6 +19,14 @@ type WebhookDocumentation = {
     contacts_store_url: string;
     contacts_update_url: string;
     contacts_destroy_url: string;
+    directories_index_url: string;
+    directories_show_url: string;
+    directories_store_url: string;
+    directories_update_url: string;
+    directories_destroy_url: string;
+    directory_records_store_url: string;
+    directory_records_update_url: string;
+    directory_records_destroy_url: string;
     equipment_index_url: string;
     equipment_show_url: string;
     equipment_store_url: string;
@@ -59,6 +67,8 @@ const PortalWebhookUsersReadPermission = 'users.read';
 const PortalWebhookCompanyStructureReadPermission = 'company-structure.read';
 const PortalWebhookContactsReadPermission = 'contacts.read';
 const PortalWebhookContactsWritePermission = 'contacts.write';
+const PortalWebhookDirectoriesReadPermission = 'directories.read';
+const PortalWebhookDirectoriesWritePermission = 'directories.write';
 const PortalWebhookEquipmentReadPermission = 'equipment.read';
 const PortalWebhookEquipmentWritePermission = 'equipment.write';
 const PortalWebhookEdoReadPermission = 'edo.read';
@@ -172,6 +182,62 @@ const endpointExamples = computed<EndpointExample[]>(() => [
         title: t.value.webhooks.documentation_endpoint_contacts_destroy_title,
         description: t.value.webhooks.documentation_endpoint_contacts_destroy_description,
         permission: PortalWebhookContactsWritePermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.directories_index_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_directories_index_title,
+        description: t.value.webhooks.documentation_endpoint_directories_index_description,
+        permission: PortalWebhookDirectoriesReadPermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.directories_show_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_directories_show_title,
+        description: t.value.webhooks.documentation_endpoint_directories_show_description,
+        permission: PortalWebhookDirectoriesReadPermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.directories_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_directories_store_title,
+        description: t.value.webhooks.documentation_endpoint_directories_store_description,
+        permission: PortalWebhookDirectoriesWritePermission,
+    },
+    {
+        method: 'PATCH',
+        path: `${props.documentation.directories_update_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_directories_update_title,
+        description: t.value.webhooks.documentation_endpoint_directories_update_description,
+        permission: PortalWebhookDirectoriesWritePermission,
+    },
+    {
+        method: 'DELETE',
+        path: `${props.documentation.directories_destroy_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_directories_destroy_title,
+        description: t.value.webhooks.documentation_endpoint_directories_destroy_description,
+        permission: PortalWebhookDirectoriesWritePermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.directory_records_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_directory_records_store_title,
+        description: t.value.webhooks.documentation_endpoint_directory_records_store_description,
+        permission: PortalWebhookDirectoriesWritePermission,
+    },
+    {
+        method: 'PATCH',
+        path: `${props.documentation.directory_records_update_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_directory_records_update_title,
+        description: t.value.webhooks.documentation_endpoint_directory_records_update_description,
+        permission: PortalWebhookDirectoriesWritePermission,
+    },
+    {
+        method: 'DELETE',
+        path: `${props.documentation.directory_records_destroy_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_directory_records_destroy_title,
+        description: t.value.webhooks.documentation_endpoint_directory_records_destroy_description,
+        permission: PortalWebhookDirectoriesWritePermission,
     },
     {
         method: 'GET',

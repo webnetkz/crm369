@@ -4,6 +4,7 @@ import { watchEffect } from 'vue';
 import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { useCsrfToken } from '@/composables/useCsrfToken';
 import { useLanguage } from '@/composables/useLanguage';
 import { logout } from '@/routes';
 import { send } from '@/routes/verification';
@@ -13,6 +14,7 @@ defineProps<{
 }>();
 
 const { t } = useLanguage();
+const csrfToken = useCsrfToken();
 
 watchEffect(() => {
     setLayoutProps({
@@ -34,6 +36,7 @@ watchEffect(() => {
 
     <Form
         v-bind="send.form()"
+        :transform="(data) => ({ ...data, _token: csrfToken })"
         class="space-y-6 text-center"
         v-slot="{ processing }"
     >

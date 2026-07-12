@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\PortalController;
 use App\Http\Controllers\Api\V1\PortalWebhookController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\ProjectController;
+use App\Http\Controllers\Api\V1\ReferenceDirectoryController as ApiReferenceDirectoryController;
 use App\Http\Controllers\Api\V1\TsdController as ApiTsdController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\UserGroupController;
@@ -54,6 +55,12 @@ Route::prefix('v1')->middleware(['module.enabled:api', 'auth:api', ResolveApiSub
         Route::post('chats/{chatConversation}/messages', [ChatController::class, 'storeMessage'])
             ->middleware('api.token:chat.write')
             ->name('api.v1.chats.messages.store');
+        Route::patch('chats/{chatConversation}/messages/{chatMessage}', [ChatController::class, 'updateMessage'])
+            ->middleware('api.token:chat.write')
+            ->name('api.v1.chats.messages.update');
+        Route::delete('chats/{chatConversation}/messages/{chatMessage}', [ChatController::class, 'destroyMessage'])
+            ->middleware('api.token:chat.write')
+            ->name('api.v1.chats.messages.destroy');
     });
 
     Route::middleware('module.enabled:company-structure')->group(function (): void {
@@ -81,6 +88,33 @@ Route::prefix('v1')->middleware(['module.enabled:api', 'auth:api', ResolveApiSub
         Route::delete('contacts/{contact}', [ContactController::class, 'destroy'])
             ->middleware('api.token:contacts.write')
             ->name('api.v1.contacts.destroy');
+    });
+
+    Route::middleware('module.enabled:directories')->group(function (): void {
+        Route::get('directories', [ApiReferenceDirectoryController::class, 'index'])
+            ->middleware(['api.token:directories.read', 'can:access-directories'])
+            ->name('api.v1.directories.index');
+        Route::get('directories/{referenceDirectory}', [ApiReferenceDirectoryController::class, 'show'])
+            ->middleware(['api.token:directories.read', 'can:access-directories'])
+            ->name('api.v1.directories.show');
+        Route::post('directories', [ApiReferenceDirectoryController::class, 'store'])
+            ->middleware(['api.token:directories.write', 'can:manage-directories'])
+            ->name('api.v1.directories.store');
+        Route::patch('directories/{referenceDirectory}', [ApiReferenceDirectoryController::class, 'update'])
+            ->middleware(['api.token:directories.write', 'can:manage-directories'])
+            ->name('api.v1.directories.update');
+        Route::delete('directories/{referenceDirectory}', [ApiReferenceDirectoryController::class, 'destroy'])
+            ->middleware(['api.token:directories.write', 'can:manage-directories'])
+            ->name('api.v1.directories.destroy');
+        Route::post('directories/{referenceDirectory}/records', [ApiReferenceDirectoryController::class, 'storeRecord'])
+            ->middleware(['api.token:directories.write', 'can:manage-directories'])
+            ->name('api.v1.directories.records.store');
+        Route::patch('directories/{referenceDirectory}/records/{referenceDirectoryRecord}', [ApiReferenceDirectoryController::class, 'updateRecord'])
+            ->middleware(['api.token:directories.write', 'can:manage-directories'])
+            ->name('api.v1.directories.records.update');
+        Route::delete('directories/{referenceDirectory}/records/{referenceDirectoryRecord}', [ApiReferenceDirectoryController::class, 'destroyRecord'])
+            ->middleware(['api.token:directories.write', 'can:manage-directories'])
+            ->name('api.v1.directories.records.destroy');
     });
 
     Route::middleware('module.enabled:edo')->group(function (): void {

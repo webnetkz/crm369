@@ -52,6 +52,27 @@ test('profile page shows issued equipment assigned to the current user', functio
         );
 });
 
+test('profile page exposes the selected avatar url', function () {
+    Storage::fake('public');
+
+    $avatarPath = 'avatars/42/current-avatar.jpg';
+
+    Storage::disk('public')->put($avatarPath, 'avatar-image');
+
+    $user = User::factory()->create([
+        'avatar_path' => $avatarPath,
+        'avatar_scale' => 1.15,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('profile.edit'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('auth.user.avatar', Storage::disk('public')->url($avatarPath))
+            ->where('auth.user.avatar_scale', 1.15)
+        );
+});
+
 test('profile page does not expose account deletion UI', function () {
     $profilePage = file_get_contents(resource_path('js/pages/settings/Profile.vue'));
 
@@ -144,6 +165,7 @@ test('profile page exposes last name, middle name, phone, and position fields', 
         ->toContain('profileForm.middle_name')
         ->toContain('profileForm.phone')
         ->toContain('profileForm.position')
+        ->toContain('persistedAvatarUrl')
         ->toContain('props.issuedEquipment.length > 0')
         ->toContain('t.profile.issued_equipment')
         ->toContain('equipmentItem.qr_code_svg_data_uri')

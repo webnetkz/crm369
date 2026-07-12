@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { useForm, usePage } from '@inertiajs/vue3';
 import {
+    ArrowLeft,
     MessageSquareMore,
+    Pencil,
     Search,
+    Trash2,
     Users,
 } from '@lucide/vue';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import { store as storeMessage } from '@/actions/App/Http/Controllers/ChatMessageController';
+import {
+    destroy as destroyMessage,
+    store as storeMessage,
+    update as updateMessage,
+} from '@/actions/App/Http/Controllers/ChatMessageController';
 import {
     index,
     showUserProfile,
@@ -68,6 +75,7 @@ const loadError = ref<string | null>(null);
 const search = ref('');
 const draft = ref('');
 const selectedAttachments = ref<File[]>([]);
+const editingMessageId = ref<number | null>(null);
 const activeConversationId = ref<number | null>(null);
 const selectedProfileUser = ref<ManagedUserProfile | null>(null);
 const selectedProfileCanEdit = ref(false);
@@ -106,6 +114,18 @@ const activeConversation = computed<ChatActiveConversation | null>(() => {
     return payload.value?.activeConversation ?? null;
 });
 
+const isEditingMessage = computed<boolean>(() => {
+    return editingMessageId.value !== null;
+});
+
+const editingMessage = computed(() => {
+    return (
+        activeConversation.value?.messages.find(
+            (message) => message.id === editingMessageId.value,
+        ) ?? null
+    );
+});
+
 const panelTitle = computed(() => {
     return props.mode === 'search'
         ? t.value.chat.search_title
@@ -139,7 +159,9 @@ const focusSearch = async (): Promise<void> => {
     searchInput.value?.focus();
 };
 
-const fetchSidebar = async (): Promise<void> => {
+const fetchSidebar = async (options?: {
+    suppressErrors?: boolean;
+}): Promise<void> => {
     const requestSequence = ++sidebarRequestSequence;
 
     sidebarAbortController?.abort();
@@ -181,7 +203,10 @@ const fetchSidebar = async (): Promise<void> => {
         }
 
         console.error(error);
-        loadError.value = t.value.common.error;
+
+        if (!options?.suppressErrors) {
+            loadError.value = t.value.common.error;
+        }
     } finally {
         if (requestSequence === sidebarRequestSequence) {
             sidebarAbortController = null;
@@ -191,7 +216,14 @@ const fetchSidebar = async (): Promise<void> => {
 };
 
 const openConversation = async (conversationId: number): Promise<void> => {
+    cancelEditingMessage();
     activeConversationId.value = conversationId;
+    await fetchSidebar();
+};
+
+const closeConversation = async (): Promise<void> => {
+    cancelEditingMessage();
+    activeConversationId.value = null;
     await fetchSidebar();
 };
 
@@ -266,7 +298,9 @@ const startConversationById = async (userId: number): Promise<void> => {
         );
 
         activeConversationId.value = data.conversationId;
-        await fetchSidebar();
+        await fetchSidebar({
+            suppressErrors: true,
+        });
     } catch (error) {
         console.error(error);
         loadError.value = t.value.common.error;
@@ -275,10 +309,71 @@ const startConversationById = async (userId: number): Promise<void> => {
     }
 };
 
-const sendMessage = async (): Promise<void> => {
+const cancelEditingMessage = (): void => {
+    editingMessageId.value = null;
+    draft.value = '';
+    selectedAttachments.value = [];
+};
+
+const startEditingMessage = (message: ChatActiveConversation['messages'][number]): void => {
+    if (sending.value || message.isDeleted) {
+        return;
+    }
+
+    editingMessageId.value = message.id;
+    draft.value = message.body;
+    selectedAttachments.value = [];
+};
+
+const removeMessage = async (
+    message: ChatActiveConversation['messages'][number],
+): Promise<void> => {
+    if (
+        sending.value ||
+        !activeConversationId.value ||
+        message.isDeleted
+    ) {
+        return;
+    }
+
+    sending.value = true;
+    loadError.value = null;
+
+    try {
+        await fetchSameOriginJson(
+            destroyMessage.url([activeConversationId.value, message.id]),
+            {
+                method: 'DELETE',
+            },
+        );
+
+        if (editingMessageId.value === message.id) {
+            cancelEditingMessage();
+        }
+
+        await fetchSidebar({
+            suppressErrors: true,
+        });
+    } catch (error) {
+        console.error(error);
+        loadError.value = t.value.common.error;
+    } finally {
+        sending.value = false;
+    }
+};
+
+const submitMessage = async (): Promise<void> => {
+    const canSubmitEmptyEdit =
+        editingMessage.value !== null &&
+        editingMessage.value.attachments.length > 0;
+
     if (
         !activeConversationId.value ||
-        (draft.value.trim() === '' && selectedAttachments.value.length === 0) ||
+        (
+            draft.value.trim() === '' &&
+            selectedAttachments.value.length === 0 &&
+            !canSubmitEmptyEdit
+        ) ||
         sending.value
     ) {
         return;
@@ -288,6 +383,28 @@ const sendMessage = async (): Promise<void> => {
     loadError.value = null;
 
     try {
+        if (editingMessageId.value !== null) {
+            await fetchSameOriginJson(
+                updateMessage.url([
+                    activeConversationId.value,
+                    editingMessageId.value,
+                ]),
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        body: draft.value,
+                    }),
+                },
+            );
+
+            cancelEditingMessage();
+            await fetchSidebar({
+                suppressErrors: true,
+            });
+
+            return;
+        }
+
         const formData = new FormData();
 
         formData.append('body', draft.value);
@@ -306,7 +423,9 @@ const sendMessage = async (): Promise<void> => {
 
         draft.value = '';
         selectedAttachments.value = [];
-        await fetchSidebar();
+        await fetchSidebar({
+            suppressErrors: true,
+        });
     } catch (error) {
         console.error(error);
         loadError.value = t.value.common.error;
@@ -656,7 +775,8 @@ onBeforeUnmount(() => {
 <template>
     <div class="flex h-full min-h-0 flex-col lg:flex-row">
         <div
-            class="flex min-h-0 w-full flex-col border-b border-border bg-muted/20 lg:w-[24rem] lg:border-r lg:border-b-0"
+            class="min-h-0 w-full flex-col border-b border-border bg-muted/20 lg:flex lg:w-[24rem] lg:border-r lg:border-b-0"
+            :class="activeConversation ? 'hidden' : 'flex'"
         >
             <div class="border-b border-border px-5 py-5 text-left">
                 <h2 class="text-base font-semibold text-foreground">
@@ -888,10 +1008,23 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <div class="flex min-h-0 flex-1 flex-col bg-background">
+        <div
+            class="min-h-0 flex-1 flex-col bg-background lg:flex"
+            :class="activeConversation ? 'flex' : 'hidden lg:flex'"
+        >
             <div v-if="activeConversation" class="flex min-h-0 flex-1 flex-col">
                 <div class="border-b border-border px-6 py-5">
                     <div class="flex items-center gap-3 text-left">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            class="size-10 shrink-0 lg:hidden"
+                            :title="t.common.back"
+                            @click="closeConversation"
+                        >
+                            <ArrowLeft class="size-5" />
+                        </Button>
                         <button
                             type="button"
                             class="shrink-0"
@@ -947,7 +1080,9 @@ onBeforeUnmount(() => {
                             <div
                                 class="rounded-3xl px-4 py-3 text-sm break-words whitespace-pre-wrap shadow-sm"
                                 :class="
-                                    message.isOwn
+                                    message.isDeleted
+                                        ? 'border border-dashed border-border bg-muted/20 italic text-muted-foreground'
+                                        : message.isOwn
                                         ? 'bg-primary text-primary-foreground'
                                         : 'border border-border bg-muted/35 text-foreground'
                                 "
@@ -976,6 +1111,34 @@ onBeforeUnmount(() => {
                                 }}
                                 ·
                                 {{ formatDateTime(message.createdAt, true) }}
+                                <template v-if="message.isDeleted">
+                                    · {{ t.chat.deleted }}
+                                </template>
+                                <template v-else-if="message.isEdited">
+                                    · {{ t.chat.edited }}
+                                </template>
+                                <button
+                                    v-if="message.isOwn && !message.isDeleted"
+                                    type="button"
+                                    class="ml-2 inline-flex size-6 items-center justify-center rounded-full transition hover:bg-muted hover:text-foreground"
+                                    :title="t.chat.edit_message"
+                                    :aria-label="t.chat.edit_message"
+                                    :disabled="sending"
+                                    @click="startEditingMessage(message)"
+                                >
+                                    <Pencil class="size-3" />
+                                </button>
+                                <button
+                                    v-if="message.isOwn && !message.isDeleted"
+                                    type="button"
+                                    class="ml-1 inline-flex size-6 items-center justify-center rounded-full transition hover:bg-muted hover:text-foreground"
+                                    :title="t.chat.delete_message"
+                                    :aria-label="t.chat.delete_message"
+                                    :disabled="sending"
+                                    @click="removeMessage(message)"
+                                >
+                                    <Trash2 class="size-3" />
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -989,9 +1152,16 @@ onBeforeUnmount(() => {
                     <ChatMessageComposer
                         v-model="draft"
                         v-model:attachments="selectedAttachments"
+                        :is-editing="isEditingMessage"
+                        :can-attach="!isEditingMessage"
+                        :allow-empty-submit="
+                            isEditingMessage &&
+                            (editingMessage?.attachments.length ?? 0) > 0
+                        "
                         :sending="sending"
                         :placeholder="t.chat.message_placeholder"
-                        @submit="sendMessage"
+                        @cancel-edit="cancelEditingMessage"
+                        @submit="submitMessage"
                     />
                 </div>
             </div>

@@ -12,11 +12,13 @@ import PasswordInput from '@/components/PasswordInput.vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { useCsrfToken } from '@/composables/useCsrfToken';
 import { useLanguage } from '@/composables/useLanguage';
 import { edit as editProfile } from '@/routes/profile';
 import { store } from '@/routes/password/confirm';
 
 const { t } = useLanguage();
+const csrfToken = useCsrfToken();
 
 watchEffect(() => {
     setLayoutProps({
@@ -53,6 +55,7 @@ watchEffect(() => {
 
     <Form
         v-bind="store.form()"
+        :transform="(data) => ({ ...data, _token: csrfToken })"
         reset-on-success
         v-slot="{ errors, processing }"
     >

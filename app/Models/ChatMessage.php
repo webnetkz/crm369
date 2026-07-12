@@ -16,15 +16,29 @@ use Illuminate\Support\Carbon;
  * @property int $chat_conversation_id
  * @property int $user_id
  * @property string $body
+ * @property string|null $original_body
  * @property Collection<int, ChatMessageAttachment> $attachments
+ * @property Carbon|null $edited_at
+ * @property Carbon|null $deleted_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['chat_conversation_id', 'user_id', 'body'])]
+#[Fillable(['chat_conversation_id', 'user_id', 'body', 'original_body', 'edited_at', 'deleted_at'])]
 class ChatMessage extends Model
 {
     /** @use HasFactory<ChatMessageFactory> */
     use HasFactory;
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'edited_at' => 'datetime',
+            'deleted_at' => 'datetime',
+        ];
+    }
 
     /**
      * @return BelongsTo<ChatConversation, $this>
@@ -48,5 +62,15 @@ class ChatMessage extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(ChatMessageAttachment::class);
+    }
+
+    public function wasEdited(): bool
+    {
+        return $this->edited_at !== null;
+    }
+
+    public function wasDeleted(): bool
+    {
+        return $this->deleted_at !== null;
     }
 }

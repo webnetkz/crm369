@@ -24,6 +24,7 @@ use App\Http\Controllers\PortalWebhookContactController;
 use App\Http\Controllers\PortalWebhookEdoController;
 use App\Http\Controllers\PortalWebhookEquipmentController;
 use App\Http\Controllers\PortalWebhookInvokeController;
+use App\Http\Controllers\PortalWebhookReferenceDirectoryController;
 use App\Http\Controllers\PortalWebhookTsdController;
 use App\Http\Controllers\PortalWebhookUserController;
 use App\Http\Controllers\PortalWebhookWarehouseController;
@@ -32,6 +33,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectTaskConversationController;
 use App\Http\Controllers\PublicEdoSigningController;
 use App\Http\Controllers\PublicPortalFormController;
+use App\Http\Controllers\ReferenceDirectoryController;
 use App\Http\Controllers\TsdController;
 use App\Http\Controllers\WarehouseController;
 use Illuminate\Http\Request;
@@ -74,6 +76,30 @@ Route::patch('portal-webhooks/{portalWebhook}/contacts/{contact}', [PortalWebhoo
 Route::delete('portal-webhooks/{portalWebhook}/contacts/{contact}', [PortalWebhookContactController::class, 'destroy'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:contacts.write', 'module.enabled:contacts'])
     ->name('portal-webhooks.contacts.destroy');
+Route::get('portal-webhooks/{portalWebhook}/directories', [PortalWebhookReferenceDirectoryController::class, 'index'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.read', 'module.enabled:directories'])
+    ->name('portal-webhooks.directories.index');
+Route::get('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}', [PortalWebhookReferenceDirectoryController::class, 'show'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.read', 'module.enabled:directories'])
+    ->name('portal-webhooks.directories.show');
+Route::post('portal-webhooks/{portalWebhook}/directories', [PortalWebhookReferenceDirectoryController::class, 'store'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.write', 'module.enabled:directories'])
+    ->name('portal-webhooks.directories.store');
+Route::patch('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}', [PortalWebhookReferenceDirectoryController::class, 'update'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.write', 'module.enabled:directories'])
+    ->name('portal-webhooks.directories.update');
+Route::delete('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}', [PortalWebhookReferenceDirectoryController::class, 'destroy'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.write', 'module.enabled:directories'])
+    ->name('portal-webhooks.directories.destroy');
+Route::post('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}/records', [PortalWebhookReferenceDirectoryController::class, 'storeRecord'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.write', 'module.enabled:directories'])
+    ->name('portal-webhooks.directories.records.store');
+Route::patch('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}/records/{referenceDirectoryRecord}', [PortalWebhookReferenceDirectoryController::class, 'updateRecord'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.write', 'module.enabled:directories'])
+    ->name('portal-webhooks.directories.records.update');
+Route::delete('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}/records/{referenceDirectoryRecord}', [PortalWebhookReferenceDirectoryController::class, 'destroyRecord'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.write', 'module.enabled:directories'])
+    ->name('portal-webhooks.directories.records.destroy');
 Route::get('portal-webhooks/{portalWebhook}/edo/documents', [PortalWebhookEdoController::class, 'index'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:edo.read', 'module.enabled:edo'])
     ->name('portal-webhooks.edo.index');
@@ -182,6 +208,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('contacts.destroy');
     });
 
+    Route::middleware(['module.enabled:directories', 'can:access-directories'])->group(function () {
+        Route::get('directories', [ReferenceDirectoryController::class, 'index'])->name('directories.index');
+        Route::get('directories/{referenceDirectory}', [ReferenceDirectoryController::class, 'show'])->name('directories.show');
+        Route::get('directories/{referenceDirectory}/export', [ReferenceDirectoryController::class, 'exportCsv'])->name('directories.export');
+        Route::get('directories/{referenceDirectory}/template', [ReferenceDirectoryController::class, 'downloadCsvTemplate'])->name('directories.template');
+    });
+
+    Route::middleware(['module.enabled:directories', 'can:manage-directories'])->group(function () {
+        Route::post('directories', [ReferenceDirectoryController::class, 'store'])->name('directories.store');
+        Route::patch('directories/{referenceDirectory}', [ReferenceDirectoryController::class, 'update'])->name('directories.update');
+        Route::delete('directories/{referenceDirectory}', [ReferenceDirectoryController::class, 'destroy'])->name('directories.destroy');
+        Route::post('directories/{referenceDirectory}/import', [ReferenceDirectoryController::class, 'importCsv'])->name('directories.import');
+        Route::post('directories/{referenceDirectory}/records', [ReferenceDirectoryController::class, 'storeRecord'])->name('directories.records.store');
+        Route::patch('directories/{referenceDirectory}/records/{referenceDirectoryRecord}', [ReferenceDirectoryController::class, 'updateRecord'])->name('directories.records.update');
+        Route::delete('directories/{referenceDirectory}/records/{referenceDirectoryRecord}', [ReferenceDirectoryController::class, 'destroyRecord'])->name('directories.records.destroy');
+    });
+
     Route::middleware(['module.enabled:files', 'can:access-files'])->group(function () {
         Route::get('files', [FileController::class, 'index'])->name('files.index');
         Route::post('files/directories', [FileController::class, 'storeDirectory'])->name('files.directories.store');
@@ -213,6 +256,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('chats/direct', [ChatSidebarController::class, 'startDirect'])->name('chats.direct.store');
         Route::get('chats/users/{user}/profile', [ChatSidebarController::class, 'showUserProfile'])->name('chats.users.show');
         Route::post('chats/{chatConversation}/messages', [ChatMessageController::class, 'store'])->name('chats.messages.store');
+        Route::patch('chats/{chatConversation}/messages/{chatMessage}', [ChatMessageController::class, 'update'])->name('chats.messages.update');
+        Route::delete('chats/{chatConversation}/messages/{chatMessage}', [ChatMessageController::class, 'destroy'])->name('chats.messages.destroy');
         Route::get('chats/attachments/{chatMessageAttachment}/preview', [ChatMessageController::class, 'previewAttachment'])
             ->whereNumber('chatMessageAttachment')
             ->name('chats.attachments.preview');

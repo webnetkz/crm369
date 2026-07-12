@@ -6,6 +6,8 @@
         @php($portalSetting = \App\Models\PortalSetting::current())
         @php($portalIconUrl = $portalSetting->logoUrl())
         @php($customBackgroundColor = auth()->user()?->background_color)
+        @php($viteEntryPoints = ['resources/css/app.css', 'resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])
+        @php($isMobileAppRequest = str_contains(request()->userAgent() ?? '', 'CRM369MobileApp'))
 
         {{-- Inline script to detect system dark mode preference and apply it immediately --}}
         <script>
@@ -53,7 +55,14 @@
 
         @fonts
 
-        @vite(['resources/css/app.css', 'resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])
+        @if ($isMobileAppRequest)
+            {{
+                \Illuminate\Support\Facades\Vite::useHotFile(storage_path('framework/crm369-mobile-vite.hot'))
+                    ->withEntryPoints($viteEntryPoints)
+            }}
+        @else
+            @vite($viteEntryPoints)
+        @endif
         <x-inertia::head>
             <title>{{ $portalSetting->companyName() }}</title>
         </x-inertia::head>

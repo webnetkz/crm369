@@ -23,6 +23,7 @@ declare module 'vite/client' {
 declare module '@inertiajs/core' {
     export interface InertiaConfig {
         sharedPageProps: {
+            csrfToken: string;
             name: string;
             auth: Auth;
             portal: Portal;

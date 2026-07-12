@@ -22,6 +22,8 @@ class PortalSetting extends Model
 {
     public const string DEFAULT_COMPANY_NAME = 'CRM369';
 
+    public const string DEFAULT_LOGO_URL = '/logo369.png';
+
     /**
      * @var array<int, string>
      */
@@ -77,6 +79,10 @@ class PortalSetting extends Model
             'contacts' => [
                 'title_key' => 'ui.contacts.title',
                 'description_key' => 'ui.contacts.description',
+            ],
+            'directories' => [
+                'title_key' => 'ui.directories.title',
+                'description_key' => 'ui.directories.description',
             ],
             'edo' => [
                 'title_key' => 'ui.edo.title',
@@ -161,10 +167,10 @@ class PortalSetting extends Model
         return $this->company_name ?: self::DEFAULT_COMPANY_NAME;
     }
 
-    public function logoUrl(): ?string
+    public function logoUrl(): string
     {
         if (! $this->logo_path) {
-            return null;
+            return self::DEFAULT_LOGO_URL;
         }
 
         return '/storage/'.ltrim($this->logo_path, '/');

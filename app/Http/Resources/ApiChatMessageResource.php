@@ -20,28 +20,35 @@ class ApiChatMessageResource extends JsonResource
         $message = $this->resource;
         $viewer = $request->user();
         $message->loadMissing(['user', 'attachments']);
+        $isDeleted = $message->wasDeleted();
 
         return [
             'id' => $message->id,
             'chat_conversation_id' => $message->chat_conversation_id,
-            'body' => $message->body,
+            'body' => $isDeleted ? __('ui.chat.deleted_message') : $message->body,
             'created_at' => $message->created_at?->toISOString(),
+            'edited_at' => $isDeleted ? null : $message->edited_at?->toISOString(),
+            'deleted_at' => $message->deleted_at?->toISOString(),
             'updated_at' => $message->updated_at?->toISOString(),
+            'is_edited' => ! $isDeleted && $message->wasEdited(),
+            'is_deleted' => $isDeleted,
             'is_own' => $viewer ? $message->user_id === $viewer->id : false,
             'user' => $message->user
                 ? (new ApiUserResource($message->user))->resolve()
                 : null,
-            'attachments' => $message->attachments
-                ->map(fn (ChatMessageAttachment $attachment): array => [
-                    'id' => $attachment->id,
-                    'original_name' => $attachment->original_name,
-                    'mime_type' => $attachment->mime_type,
-                    'extension' => $attachment->extension,
-                    'size_bytes' => $attachment->size_bytes,
-                    'download_url' => route('chats.attachments.download', $attachment),
-                ])
-                ->values()
-                ->all(),
+            'attachments' => $isDeleted
+                ? []
+                : $message->attachments
+                    ->map(fn (ChatMessageAttachment $attachment): array => [
+                        'id' => $attachment->id,
+                        'original_name' => $attachment->original_name,
+                        'mime_type' => $attachment->mime_type,
+                        'extension' => $attachment->extension,
+                        'size_bytes' => $attachment->size_bytes,
+                        'download_url' => route('chats.attachments.download', $attachment),
+                    ])
+                    ->values()
+                    ->all(),
         ];
     }
 }

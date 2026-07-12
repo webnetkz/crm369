@@ -14,6 +14,7 @@ return [
     'funnels' => require __DIR__.'/ui/funnels.php',
     'forms' => require __DIR__.'/ui/forms.php',
     'contacts' => require __DIR__.'/ui/contacts.php',
+    'directories' => require __DIR__.'/ui/directories.php',
     'edo' => require __DIR__.'/ui/edo.php',
     'files' => require __DIR__.'/ui/files.php',
     'production' => require __DIR__.'/ui/production.php',

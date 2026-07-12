@@ -54,6 +54,8 @@ export type Auth = {
     canAccessWarehouses: boolean;
     canAccessEquipment: boolean;
     canAccessTsd: boolean;
+    canAccessDirectories: boolean;
+    canManageDirectories: boolean;
     canManageApiTokens: boolean;
     canManageWebhooks: boolean;
     canManageMessengerIntegrations: boolean;

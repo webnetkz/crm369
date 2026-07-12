@@ -46,6 +46,14 @@ type WebhookDocumentation = {
     contacts_store_url: string;
     contacts_update_url: string;
     contacts_destroy_url: string;
+    directories_index_url: string;
+    directories_show_url: string;
+    directories_store_url: string;
+    directories_update_url: string;
+    directories_destroy_url: string;
+    directory_records_store_url: string;
+    directory_records_update_url: string;
+    directory_records_destroy_url: string;
     equipment_index_url: string;
     equipment_show_url: string;
     equipment_store_url: string;
@@ -354,6 +362,78 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
                 t.value.webhooks
                     .documentation_endpoint_contacts_store_description,
             permission: 'contacts.write',
+        },
+        {
+            method: 'GET',
+            path: `${props.webhookDocumentation.directories_index_url}?token=${tokenPlaceholder}`,
+            title: t.value.webhooks.documentation_endpoint_directories_index_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_directories_index_description,
+            permission: 'directories.read',
+        },
+        {
+            method: 'GET',
+            path: `${props.webhookDocumentation.directories_show_url}?token=${tokenPlaceholder}`,
+            title: t.value.webhooks.documentation_endpoint_directories_show_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_directories_show_description,
+            permission: 'directories.read',
+        },
+        {
+            method: 'POST',
+            path: `${props.webhookDocumentation.directories_store_url}?token=${tokenPlaceholder}`,
+            title: t.value.webhooks.documentation_endpoint_directories_store_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_directories_store_description,
+            permission: 'directories.write',
+        },
+        {
+            method: 'PATCH',
+            path: `${props.webhookDocumentation.directories_update_url}?token=${tokenPlaceholder}`,
+            title: t.value.webhooks.documentation_endpoint_directories_update_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_directories_update_description,
+            permission: 'directories.write',
+        },
+        {
+            method: 'DELETE',
+            path: `${props.webhookDocumentation.directories_destroy_url}?token=${tokenPlaceholder}`,
+            title: t.value.webhooks.documentation_endpoint_directories_destroy_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_directories_destroy_description,
+            permission: 'directories.write',
+        },
+        {
+            method: 'POST',
+            path: `${props.webhookDocumentation.directory_records_store_url}?token=${tokenPlaceholder}`,
+            title: t.value.webhooks.documentation_endpoint_directory_records_store_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_directory_records_store_description,
+            permission: 'directories.write',
+        },
+        {
+            method: 'PATCH',
+            path: `${props.webhookDocumentation.directory_records_update_url}?token=${tokenPlaceholder}`,
+            title: t.value.webhooks.documentation_endpoint_directory_records_update_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_directory_records_update_description,
+            permission: 'directories.write',
+        },
+        {
+            method: 'DELETE',
+            path: `${props.webhookDocumentation.directory_records_destroy_url}?token=${tokenPlaceholder}`,
+            title: t.value.webhooks.documentation_endpoint_directory_records_destroy_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_directory_records_destroy_description,
+            permission: 'directories.write',
         },
         {
             method: 'GET',

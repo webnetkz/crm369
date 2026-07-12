@@ -151,6 +151,12 @@ class MenuItem extends Model
                 'url' => '/contacts',
                 'sort_order' => 90,
             ],
+            'directories' => [
+                'title_key' => 'ui.directories.title',
+                'fallback_title' => 'Directories',
+                'url' => '/directories',
+                'sort_order' => 92,
+            ],
             'edo' => [
                 'title_key' => 'ui.edo.title',
                 'fallback_title' => 'Document signing',
@@ -278,6 +284,7 @@ class MenuItem extends Model
             'funnels',
             'forms',
             'contacts',
+            'directories',
             'edo',
             'production',
             'warehouses',

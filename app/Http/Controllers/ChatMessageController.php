@@ -3,9 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreChatMessageRequest;
+use App\Http\Requests\UpdateChatMessageRequest;
 use App\Models\ChatConversation;
+use App\Models\ChatMessage;
 use App\Models\ChatMessageAttachment;
 use App\Support\ChatMessageData;
+use App\Support\ChatMessageEditor;
+use App\Support\ChatMessageRemover;
 use App\Support\ChatMessageSender;
 use App\Support\TaskConversationManager;
 use Illuminate\Http\JsonResponse;
@@ -44,6 +48,60 @@ class ChatMessageController extends Controller
         ]);
     }
 
+    public function update(
+        UpdateChatMessageRequest $request,
+        ChatConversation $chatConversation,
+        ChatMessage $chatMessage,
+        ChatMessageData $chatMessageData,
+        ChatMessageEditor $chatMessageEditor,
+    ): JsonResponse {
+        $user = $request->user();
+        abort_unless($user !== null, 401);
+
+        abort_unless($chatMessage->chat_conversation_id === $chatConversation->id, 404);
+        abort_unless($chatMessage->user_id === $user->id, 403);
+        abort_unless(! $chatMessage->wasDeleted(), 404);
+
+        if ($chatConversation->type === ChatConversation::TYPE_TASK) {
+            $chatConversation->loadMissing('task');
+            abort_unless($chatConversation->isAccessibleBy($user), 403);
+        } else {
+            abort_unless($chatConversation->hasParticipant($user), 403);
+        }
+
+        $message = $chatMessageEditor->edit($chatMessage, $request->body());
+
+        return response()->json([
+            'message' => $chatMessageData->serialize($message, $user),
+        ]);
+    }
+
+    public function destroy(
+        ChatConversation $chatConversation,
+        ChatMessage $chatMessage,
+        ChatMessageData $chatMessageData,
+        ChatMessageRemover $chatMessageRemover,
+    ): JsonResponse {
+        $user = request()->user();
+        abort_unless($user !== null, 401);
+
+        abort_unless($chatMessage->chat_conversation_id === $chatConversation->id, 404);
+        abort_unless($chatMessage->user_id === $user->id, 403);
+
+        if ($chatConversation->type === ChatConversation::TYPE_TASK) {
+            $chatConversation->loadMissing('task');
+            abort_unless($chatConversation->isAccessibleBy($user), 403);
+        } else {
+            abort_unless($chatConversation->hasParticipant($user), 403);
+        }
+
+        $message = $chatMessageRemover->remove($chatMessage);
+
+        return response()->json([
+            'message' => $chatMessageData->serialize($message, $user),
+        ]);
+    }
+
     public function downloadAttachment(ChatMessageAttachment $chatMessageAttachment): StreamedResponse
     {
         $user = request()->user();
@@ -51,9 +109,11 @@ class ChatMessageController extends Controller
 
         $chatMessageAttachment->loadMissing('message.conversation.task');
 
-        $conversation = $chatMessageAttachment->message?->conversation;
+        $message = $chatMessageAttachment->message;
+        $conversation = $message?->conversation;
 
         abort_unless($conversation !== null && $conversation->isAccessibleBy($user), 403);
+        abort_unless($message !== null && ! $message->wasDeleted(), 404);
 
         return Storage::disk($chatMessageAttachment->disk)
             ->download($chatMessageAttachment->path, $chatMessageAttachment->original_name);
@@ -68,9 +128,11 @@ class ChatMessageController extends Controller
 
         $chatMessageAttachment->loadMissing('message.conversation.task');
 
-        $conversation = $chatMessageAttachment->message?->conversation;
+        $message = $chatMessageAttachment->message;
+        $conversation = $message?->conversation;
 
         abort_unless($conversation !== null && $conversation->isAccessibleBy($user), 403);
+        abort_unless($message !== null && ! $message->wasDeleted(), 404);
         abort_unless($chatMessageData->isPreviewableImage($chatMessageAttachment), 404);
 
         return response()->file(

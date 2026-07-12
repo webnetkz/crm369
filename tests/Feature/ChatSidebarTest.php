@@ -212,6 +212,188 @@ test('chat messages preserve line breaks when stored and returned', function () 
         ->assertJsonPath('activeConversation.messages.0.body', $body);
 });
 
+test('users can edit their messages while preserving the original body', function () {
+    $user = User::factory()->create();
+    $recipient = User::factory()->create();
+
+    $conversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $recipient->id,
+        'last_message_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+        'last_read_at' => now(),
+    ]);
+
+    $message = ChatMessage::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+        'body' => 'Первый текст',
+    ]);
+
+    $this->actingAs($user)
+        ->patch(route('chats.messages.update', [$conversation, $message]), [
+            'body' => 'Второй текст',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('message.body', 'Второй текст')
+        ->assertJsonPath('message.isEdited', true)
+        ->assertJsonPath('message.editedAt', fn (mixed $value): bool => is_string($value) && $value !== '');
+
+    $this->actingAs($user)
+        ->patch(route('chats.messages.update', [$conversation, $message]), [
+            'body' => 'Третий текст',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('message.body', 'Третий текст')
+        ->assertJsonPath('message.isEdited', true);
+
+    expect($message->refresh())
+        ->body->toBe('Третий текст')
+        ->original_body->toBe('Первый текст')
+        ->edited_at->not->toBeNull();
+
+    $this->actingAs($user)
+        ->get(route('chats.sidebar', ['conversation' => $conversation->id]))
+        ->assertSuccessful()
+        ->assertJsonPath('activeConversation.messages.0.body', 'Третий текст')
+        ->assertJsonPath('activeConversation.messages.0.isEdited', true)
+        ->assertJsonPath('activeConversation.messages.0.editedAt', fn (mixed $value): bool => is_string($value) && $value !== '');
+});
+
+test('users cannot edit messages created by other participants', function () {
+    $user = User::factory()->create();
+    $recipient = User::factory()->create();
+
+    $conversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $recipient->id,
+        'last_message_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+        'last_read_at' => now(),
+    ]);
+
+    $message = ChatMessage::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+        'body' => 'Original recipient text',
+    ]);
+
+    $this->actingAs($user)
+        ->patch(route('chats.messages.update', [$conversation, $message]), [
+            'body' => 'Forbidden edit',
+        ])
+        ->assertForbidden();
+
+    expect($message->refresh())
+        ->body->toBe('Original recipient text')
+        ->original_body->toBeNull()
+        ->edited_at->toBeNull();
+});
+
+test('users can delete their messages while preserving the original record', function () {
+    $user = User::factory()->create();
+    $recipient = User::factory()->create();
+
+    $conversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $recipient->id,
+        'last_message_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+        'last_read_at' => now(),
+    ]);
+
+    $message = ChatMessage::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+        'body' => 'Удаляемый текст',
+    ]);
+
+    $this->actingAs($user)
+        ->delete(route('chats.messages.destroy', [$conversation, $message]))
+        ->assertSuccessful()
+        ->assertJsonPath('message.body', __('ui.chat.deleted_message'))
+        ->assertJsonPath('message.isDeleted', true)
+        ->assertJsonPath('message.deletedAt', fn (mixed $value): bool => is_string($value) && $value !== '')
+        ->assertJsonPath('message.attachments', []);
+
+    expect($message->refresh())
+        ->body->toBe('Удаляемый текст')
+        ->deleted_at->not->toBeNull();
+
+    $this->actingAs($user)
+        ->get(route('chats.sidebar', ['conversation' => $conversation->id]))
+        ->assertSuccessful()
+        ->assertJsonPath('activeConversation.messages.0.body', __('ui.chat.deleted_message'))
+        ->assertJsonPath('activeConversation.messages.0.isDeleted', true)
+        ->assertJsonPath('activeConversation.messages.0.attachments', [])
+        ->assertJsonPath('conversations.0.excerpt', __('ui.chat.deleted_message'));
+});
+
+test('users cannot delete messages created by other participants', function () {
+    $user = User::factory()->create();
+    $recipient = User::factory()->create();
+
+    $conversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $recipient->id,
+        'last_message_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+        'last_read_at' => now(),
+    ]);
+
+    $message = ChatMessage::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+        'body' => 'Чужое сообщение',
+    ]);
+
+    $this->actingAs($user)
+        ->delete(route('chats.messages.destroy', [$conversation, $message]))
+        ->assertForbidden();
+
+    expect($message->refresh()->deleted_at)->toBeNull();
+});
+
 test('chat messages can include attachments and expose download links', function () {
     Storage::fake('local');
 
@@ -314,6 +496,51 @@ test('image chat attachments expose preview links and can be rendered inline', f
         ->assertHeader('x-content-type-options', 'nosniff');
 
     expect($previewResponse->headers->get('content-type'))->toContain('image/png');
+});
+
+test('attachments of deleted chat messages are no longer accessible', function () {
+    Storage::fake('local');
+
+    $user = User::factory()->create();
+    $recipient = User::factory()->create();
+
+    $conversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $recipient->id,
+        'last_message_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+        'last_read_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('chats.messages.store', $conversation), [
+            'body' => 'Сообщение с файлом',
+            'attachments' => [
+                UploadedFile::fake()->create('brief.txt', 12, 'text/plain'),
+            ],
+        ])
+        ->assertSuccessful();
+
+    $message = ChatMessage::query()->with('attachments')->latest('id')->firstOrFail();
+    $attachment = $message->attachments->firstOrFail();
+
+    $this->actingAs($user)
+        ->delete(route('chats.messages.destroy', [$conversation, $message]))
+        ->assertSuccessful();
+
+    $this->actingAs($user)
+        ->get(route('chats.attachments.download', $attachment))
+        ->assertNotFound();
 });
 
 test('users cannot open or post messages into conversations they do not participate in', function () {

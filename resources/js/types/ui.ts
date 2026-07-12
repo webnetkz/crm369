@@ -40,7 +40,7 @@ export type PaginatedCollection<T> = {
 
 export type Portal = {
     companyName: string;
-    logoUrl: string | null;
+    logoUrl: string;
     defaultLanguage: Language;
     enabledModules: string[];
 };
@@ -676,6 +676,10 @@ export type ChatMessageItem = {
     id: number;
     body: string;
     createdAt: string | null;
+    editedAt: string | null;
+    deletedAt: string | null;
+    isEdited: boolean;
+    isDeleted: boolean;
     isOwn: boolean;
     user: ChatUserSummary;
     attachments: ChatAttachmentItem[];

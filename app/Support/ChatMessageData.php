@@ -23,16 +23,24 @@ class ChatMessageData
             'attachments',
         ]);
 
+        $isDeleted = $message->wasDeleted();
+
         return [
             'id' => $message->id,
-            'body' => $message->body,
+            'body' => $isDeleted ? __('ui.chat.deleted_message') : $message->body,
             'createdAt' => $message->created_at?->toISOString(),
+            'editedAt' => $isDeleted ? null : $message->edited_at?->toISOString(),
+            'deletedAt' => $message->deleted_at?->toISOString(),
+            'isEdited' => ! $isDeleted && $message->wasEdited(),
+            'isDeleted' => $isDeleted,
             'isOwn' => $message->user_id === $viewer->id,
             'user' => $this->serializeUserSummary($message->user),
-            'attachments' => $message->attachments
-                ->map(fn (ChatMessageAttachment $attachment): array => $this->serializeAttachment($attachment))
-                ->values()
-                ->all(),
+            'attachments' => $isDeleted
+                ? []
+                : $message->attachments
+                    ->map(fn (ChatMessageAttachment $attachment): array => $this->serializeAttachment($attachment))
+                    ->values()
+                    ->all(),
         ];
     }
 
@@ -40,6 +48,10 @@ class ChatMessageData
     {
         if (! $message) {
             return null;
+        }
+
+        if ($message->wasDeleted()) {
+            return __('ui.chat.deleted_message');
         }
 
         $body = trim($message->body);

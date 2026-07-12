@@ -64,6 +64,10 @@ class PortalWebhook extends Model
 
     public const string PERMISSION_EQUIPMENT_WRITE = 'equipment.write';
 
+    public const string PERMISSION_DIRECTORIES_READ = 'directories.read';
+
+    public const string PERMISSION_DIRECTORIES_WRITE = 'directories.write';
+
     public const string PERMISSION_TSD_READ = 'tsd.read';
 
     public const string PERMISSION_TSD_WRITE = 'tsd.write';
@@ -162,6 +166,14 @@ class PortalWebhook extends Model
             self::PERMISSION_EQUIPMENT_WRITE => [
                 'label_key' => 'ui.webhooks.permission_equipment_write',
                 'description_key' => 'ui.webhooks.permission_equipment_write_description',
+            ],
+            self::PERMISSION_DIRECTORIES_READ => [
+                'label_key' => 'ui.webhooks.permission_directories_read',
+                'description_key' => 'ui.webhooks.permission_directories_read_description',
+            ],
+            self::PERMISSION_DIRECTORIES_WRITE => [
+                'label_key' => 'ui.webhooks.permission_directories_write',
+                'description_key' => 'ui.webhooks.permission_directories_write_description',
             ],
             self::PERMISSION_TSD_READ => [
                 'label_key' => 'ui.webhooks.permission_tsd_read',

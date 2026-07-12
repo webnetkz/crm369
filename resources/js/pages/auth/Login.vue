@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Form, Head, setLayoutProps } from '@inertiajs/vue3';
-import { watchEffect } from 'vue';
+import { Head, setLayoutProps } from '@inertiajs/vue3';
+import { ref, watchEffect } from 'vue';
 import InputError from '@/components/InputError.vue';
 import PasskeyVerify from '@/components/PasskeyVerify.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { useCsrfToken } from '@/composables/useCsrfToken';
 import { useLanguage } from '@/composables/useLanguage';
 import { register } from '@/routes';
 import { store } from '@/routes/login';
@@ -21,6 +22,13 @@ defineProps<{
 }>();
 
 const { t } = useLanguage();
+const csrfToken = useCsrfToken();
+const isSubmitting = ref(false);
+const loginUrl = store.url();
+
+const submitLogin = (): void => {
+    isSubmitting.value = true;
+};
 
 watchEffect(() => {
     setLayoutProps({
@@ -42,12 +50,13 @@ watchEffect(() => {
 
     <PasskeyVerify />
 
-    <Form
-        v-bind="store.form()"
-        :reset-on-success="['password']"
-        v-slot="{ errors, processing }"
+    <form
+        :action="loginUrl"
+        method="post"
         class="flex flex-col gap-6"
+        @submit="submitLogin"
     >
+        <input type="hidden" name="_token" :value="csrfToken" />
         <div class="grid gap-6">
             <div class="grid gap-2">
                 <Label for="email">{{ t.auth.email_address }}</Label>
@@ -61,7 +70,7 @@ watchEffect(() => {
                     autocomplete="email"
                     placeholder="email@example.com"
                 />
-                <InputError :message="errors.email" />
+                <InputError :message="$page.props.errors?.email" />
             </div>
 
             <div class="grid gap-2">
@@ -84,7 +93,7 @@ watchEffect(() => {
                     autocomplete="current-password"
                     :placeholder="t.common.password"
                 />
-                <InputError :message="errors.password" />
+                <InputError :message="$page.props.errors?.password" />
             </div>
 
             <div class="flex items-center justify-between">
@@ -98,10 +107,10 @@ watchEffect(() => {
                 type="submit"
                 class="mt-4 w-full"
                 :tabindex="4"
-                :disabled="processing"
+                :disabled="isSubmitting"
                 data-test="login-button"
             >
-                <Spinner v-if="processing" />
+                <Spinner v-if="isSubmitting" />
                 {{ t.common.login }}
             </Button>
         </div>
@@ -110,5 +119,5 @@ watchEffect(() => {
             {{ t.auth.dont_have_account }}
             <TextLink :href="register()" :tabindex="5">{{ t.common.register }}</TextLink>
         </div>
-    </Form>
+    </form>
 </template>
