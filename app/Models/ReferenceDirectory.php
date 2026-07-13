@@ -17,12 +17,13 @@ use Illuminate\Support\Str;
  * @property string $slug
  * @property string|null $description
  * @property array<int, array{key: string, label: string, type: string, is_required: bool}>|null $columns
+ * @property bool $csv_exchange_enabled
  * @property int|null $created_by_user_id
  * @property int|null $updated_by_user_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'slug', 'description', 'columns', 'created_by_user_id', 'updated_by_user_id'])]
+#[Fillable(['name', 'slug', 'description', 'columns', 'csv_exchange_enabled', 'created_by_user_id', 'updated_by_user_id'])]
 class ReferenceDirectory extends Model
 {
     public const string FIELD_TYPE_TEXT = 'text';
@@ -45,6 +46,7 @@ class ReferenceDirectory extends Model
     {
         return [
             'columns' => 'json:unicode',
+            'csv_exchange_enabled' => 'boolean',
             'created_by_user_id' => 'integer',
             'updated_by_user_id' => 'integer',
         ];

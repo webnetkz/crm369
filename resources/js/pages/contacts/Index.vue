@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { Head, router, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { Ban, Building2, Pencil, Plus, Search, Trash2, UserRound } from '@lucide/vue';
+import { Ban, Building2, Download, Pencil, Plus, Search, Trash2, Upload, UserRound } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
 import {
+    downloadCsvTemplate,
     destroy,
+    exportCsv,
+    importCsv,
     store,
     update,
 } from '@/actions/App/Http/Controllers/ContactController';
@@ -130,6 +133,11 @@ const filtersForm = useForm<Filters>({
     blacklist: props.filters.blacklist,
     per_page: props.filters.per_page,
 });
+const csvImportForm = useForm({
+    delimiter: ';',
+    file: null as File | null,
+});
+const csvImportInput = ref<HTMLInputElement | null>(null);
 
 const contactForm = useForm({
     _method: '' as '' | 'patch',
@@ -340,6 +348,59 @@ const closeDialog = (): void => {
     resetContactForm();
 };
 
+const downloadContactsCsv = (): void => {
+    window.location.assign(
+        exportCsv.url({
+            query: {
+                delimiter: csvImportForm.delimiter,
+            },
+        }),
+    );
+};
+
+const downloadContactsCsvTemplate = (): void => {
+    window.location.assign(
+        downloadCsvTemplate.url({
+            query: {
+                delimiter: csvImportForm.delimiter,
+            },
+        }),
+    );
+};
+
+const openContactsCsvImport = (): void => {
+    csvImportForm.clearErrors();
+    csvImportForm.file = null;
+
+    if (csvImportInput.value) {
+        csvImportInput.value.value = '';
+        csvImportInput.value.click();
+    }
+};
+
+const handleContactsCsvFileChange = (event: Event): void => {
+    const input = event.target as HTMLInputElement;
+    csvImportForm.file = input.files?.[0] ?? null;
+};
+
+const submitContactsCsvImport = (): void => {
+    if (csvImportForm.file === null) {
+        return;
+    }
+
+    csvImportForm.post(importCsv.url(), {
+        preserveScroll: true,
+        onSuccess: () => {
+            csvImportForm.reset();
+        },
+        onFinish: () => {
+            if (csvImportInput.value) {
+                csvImportInput.value.value = '';
+            }
+        },
+    });
+};
+
 const closeRequisitesDialog = (): void => {
     requisitesDialogOpen.value = false;
 };
@@ -489,6 +550,14 @@ onBeforeUnmount(clearLocalAvatarUrl);
 <template>
     <Head :title="t.contacts.title" />
 
+    <input
+        ref="csvImportInput"
+        type="file"
+        accept=".csv,text/csv"
+        class="hidden"
+        @change="handleContactsCsvFileChange"
+    />
+
     <div class="space-y-8">
         <section
             class="rounded-3xl border border-border bg-gradient-to-br from-primary/10 via-background to-background p-6"
@@ -500,6 +569,32 @@ onBeforeUnmount(clearLocalAvatarUrl);
             />
 
             <div class="mt-6 flex flex-wrap gap-3">
+                <Button
+                    type="button"
+                    variant="outline"
+                    @click="downloadContactsCsv"
+                >
+                    <Download class="size-4" />
+                    {{ t.contacts.csv_export }}
+                </Button>
+                <Button
+                    v-if="canCreateAny"
+                    type="button"
+                    variant="outline"
+                    @click="downloadContactsCsvTemplate"
+                >
+                    <Download class="size-4" />
+                    {{ t.contacts.csv_download_template }}
+                </Button>
+                <Button
+                    v-if="canCreateAny"
+                    type="button"
+                    variant="outline"
+                    @click="openContactsCsvImport"
+                >
+                    <Upload class="size-4" />
+                    {{ t.contacts.csv_import }}
+                </Button>
                 <Button
                     v-if="canCreateType('person')"
                     type="button"
@@ -517,6 +612,39 @@ onBeforeUnmount(clearLocalAvatarUrl);
                     <Plus class="size-4" />
                     {{ t.contacts.create_company }}
                 </Button>
+            </div>
+
+            <div class="mt-4 grid gap-2 rounded-2xl border border-dashed border-border/70 p-4">
+                <p class="text-sm text-muted-foreground">
+                    {{ t.contacts.csv_description }}
+                </p>
+                <div class="flex flex-col gap-2 md:flex-row md:items-end">
+                    <div class="grid gap-2">
+                        <Label for="contacts-csv-delimiter">
+                            {{ t.contacts.csv_delimiter }}
+                        </Label>
+                        <Input
+                            id="contacts-csv-delimiter"
+                            v-model="csvImportForm.delimiter"
+                            :placeholder="t.contacts.csv_delimiter_placeholder"
+                            class="w-28"
+                        />
+                    </div>
+                    <Button
+                        v-if="canCreateAny"
+                        type="button"
+                        :disabled="csvImportForm.processing || csvImportForm.file === null"
+                        @click="submitContactsCsvImport"
+                    >
+                        <Upload class="size-4" />
+                        {{ t.contacts.csv_import }}
+                    </Button>
+                </div>
+                <p class="text-xs text-muted-foreground">
+                    {{ t.contacts.csv_delimiter_hint }}
+                </p>
+                <InputError :message="csvImportForm.errors.delimiter" />
+                <InputError :message="csvImportForm.errors.file" />
             </div>
         </section>
 

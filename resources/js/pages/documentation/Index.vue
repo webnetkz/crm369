@@ -48,9 +48,12 @@ type WebhookDocumentation = {
     contacts_destroy_url: string;
     directories_index_url: string;
     directories_show_url: string;
+    directories_export_url: string;
+    directories_template_url: string;
     directories_store_url: string;
     directories_update_url: string;
     directories_destroy_url: string;
+    directories_import_url: string;
     directory_records_store_url: string;
     directory_records_update_url: string;
     directory_records_destroy_url: string;
@@ -382,6 +385,24 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
             permission: 'directories.read',
         },
         {
+            method: 'GET',
+            path: `${props.webhookDocumentation.directories_export_url}?token=${tokenPlaceholder}`,
+            title: t.value.webhooks.documentation_endpoint_directories_export_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_directories_export_description,
+            permission: 'directories.read',
+        },
+        {
+            method: 'GET',
+            path: `${props.webhookDocumentation.directories_template_url}?token=${tokenPlaceholder}`,
+            title: t.value.webhooks.documentation_endpoint_directories_template_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_directories_template_description,
+            permission: 'directories.read',
+        },
+        {
             method: 'POST',
             path: `${props.webhookDocumentation.directories_store_url}?token=${tokenPlaceholder}`,
             title: t.value.webhooks.documentation_endpoint_directories_store_title,
@@ -406,6 +427,15 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
             description:
                 t.value.webhooks
                     .documentation_endpoint_directories_destroy_description,
+            permission: 'directories.write',
+        },
+        {
+            method: 'POST',
+            path: `${props.webhookDocumentation.directories_import_url}?token=${tokenPlaceholder}`,
+            title: t.value.webhooks.documentation_endpoint_directories_import_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_directories_import_description,
             permission: 'directories.write',
         },
         {

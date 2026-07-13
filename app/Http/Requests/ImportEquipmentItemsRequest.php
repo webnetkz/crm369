@@ -2,17 +2,20 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\InteractsWithCsvImport;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ImportEquipmentItemsRequest extends FormRequest
 {
+    use InteractsWithCsvImport;
+
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return false;
+        return $this->user() !== null;
     }
 
     /**
@@ -22,8 +25,16 @@ class ImportEquipmentItemsRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            //
-        ];
+        return $this->csvImportRules();
+    }
+
+    public function after(): array
+    {
+        return $this->csvImportAfter();
+    }
+
+    protected function csvDelimiterValidationKey(): string
+    {
+        return 'ui.equipment.csv_delimiter_invalid';
     }
 }

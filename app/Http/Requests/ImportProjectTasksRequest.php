@@ -2,11 +2,15 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\InteractsWithCsvImport;
 use App\Models\Project;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ImportProjectTasksRequest extends FormRequest
 {
+    use InteractsWithCsvImport;
+
     public function authorize(): bool
     {
         $user = $this->user();
@@ -25,12 +29,20 @@ class ImportProjectTasksRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
-        return [
-            'file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
-        ];
+        return $this->csvImportRules();
+    }
+
+    public function after(): array
+    {
+        return $this->csvImportAfter();
+    }
+
+    protected function csvDelimiterValidationKey(): string
+    {
+        return 'ui.projects.csv_delimiter_invalid';
     }
 }

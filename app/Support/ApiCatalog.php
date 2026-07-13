@@ -73,9 +73,12 @@ class ApiCatalog
                 'endpoints' => [
                     $this->endpoint('GET', '/api/v1/directories', 'ui.api.endpoint_directories_index', ApiAccessToken::PERMISSION_DIRECTORIES_READ, 'ui.api.access_scope_based'),
                     $this->endpoint('GET', '/api/v1/directories/{referenceDirectory}', 'ui.api.endpoint_directories_show', ApiAccessToken::PERMISSION_DIRECTORIES_READ, 'ui.api.access_scope_based'),
+                    $this->endpoint('GET', '/api/v1/directories/{referenceDirectory}/export', 'ui.api.endpoint_directories_export', ApiAccessToken::PERMISSION_DIRECTORIES_READ, 'ui.api.access_scope_based', 'text/csv'),
+                    $this->endpoint('GET', '/api/v1/directories/{referenceDirectory}/template', 'ui.api.endpoint_directories_template', ApiAccessToken::PERMISSION_DIRECTORIES_READ, 'ui.api.access_scope_based', 'text/csv'),
                     $this->endpoint('POST', '/api/v1/directories', 'ui.api.endpoint_directories_store', ApiAccessToken::PERMISSION_DIRECTORIES_WRITE, 'ui.api.access_admin_or_super_admin'),
                     $this->endpoint('PATCH', '/api/v1/directories/{referenceDirectory}', 'ui.api.endpoint_directories_update', ApiAccessToken::PERMISSION_DIRECTORIES_WRITE, 'ui.api.access_admin_or_super_admin'),
                     $this->endpoint('DELETE', '/api/v1/directories/{referenceDirectory}', 'ui.api.endpoint_directories_destroy', ApiAccessToken::PERMISSION_DIRECTORIES_WRITE, 'ui.api.access_admin_or_super_admin'),
+                    $this->endpoint('POST', '/api/v1/directories/{referenceDirectory}/import', 'ui.api.endpoint_directories_import', ApiAccessToken::PERMISSION_DIRECTORIES_WRITE, 'ui.api.access_admin_or_super_admin', 'multipart/form-data'),
                     $this->endpoint('POST', '/api/v1/directories/{referenceDirectory}/records', 'ui.api.endpoint_directory_records_store', ApiAccessToken::PERMISSION_DIRECTORIES_WRITE, 'ui.api.access_admin_or_super_admin'),
                     $this->endpoint('PATCH', '/api/v1/directories/{referenceDirectory}/records/{referenceDirectoryRecord}', 'ui.api.endpoint_directory_records_update', ApiAccessToken::PERMISSION_DIRECTORIES_WRITE, 'ui.api.access_admin_or_super_admin'),
                     $this->endpoint('DELETE', '/api/v1/directories/{referenceDirectory}/records/{referenceDirectoryRecord}', 'ui.api.endpoint_directory_records_destroy', ApiAccessToken::PERMISSION_DIRECTORIES_WRITE, 'ui.api.access_admin_or_super_admin'),

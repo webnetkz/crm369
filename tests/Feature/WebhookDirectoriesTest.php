@@ -4,6 +4,7 @@ use App\Models\PortalWebhook;
 use App\Models\ReferenceDirectory;
 use App\Models\ReferenceDirectoryRecord;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
 
 function directoriesWebhookSuperAdmin(): User
@@ -25,6 +26,7 @@ function directoriesWebhookPayload(string $name = 'Partners', string $slug = 'pa
         'name' => $name,
         'slug' => $slug,
         'description' => 'Partner reference directory.',
+        'csv_exchange_enabled' => true,
         'columns' => [
             [
                 'label' => 'Partner name',
@@ -75,6 +77,9 @@ test('webhook settings and documentation expose directories endpoints and permis
             ->component('settings/WebhookDocumentation')
             ->where('documentation.directories_index_url', url('/portal-webhooks').'/{webhook_id}/directories')
             ->where('documentation.directories_show_url', url('/portal-webhooks').'/{webhook_id}/directories/{directory_id}')
+            ->where('documentation.directories_export_url', url('/portal-webhooks').'/{webhook_id}/directories/{directory_id}/export')
+            ->where('documentation.directories_template_url', url('/portal-webhooks').'/{webhook_id}/directories/{directory_id}/template')
+            ->where('documentation.directories_import_url', url('/portal-webhooks').'/{webhook_id}/directories/{directory_id}/import')
             ->where('documentation.directory_records_store_url', url('/portal-webhooks').'/{webhook_id}/directories/{directory_id}/records')
             ->where('documentation.directory_records_update_url', url('/portal-webhooks').'/{webhook_id}/directories/{directory_id}/records/{record_id}')
             ->where('documentation.directory_records_destroy_url', url('/portal-webhooks').'/{webhook_id}/directories/{directory_id}/records/{record_id}')
@@ -128,6 +133,20 @@ test('webhook directories read permission exposes directories in invoke payload 
         ->assertJsonPath(
             'endpoints.directories.show_template',
             route('portal-webhooks.directories.show', [
+                'portalWebhook' => $webhook,
+                'referenceDirectory' => '__DIRECTORY_ID__',
+            ]).'?token=directories-read-token',
+        )
+        ->assertJsonPath(
+            'endpoints.directories.export_template',
+            route('portal-webhooks.directories.export', [
+                'portalWebhook' => $webhook,
+                'referenceDirectory' => '__DIRECTORY_ID__',
+            ]).'?token=directories-read-token',
+        )
+        ->assertJsonPath(
+            'endpoints.directories.download_template_template',
+            route('portal-webhooks.directories.template', [
                 'portalWebhook' => $webhook,
                 'referenceDirectory' => '__DIRECTORY_ID__',
             ]).'?token=directories-read-token',
@@ -224,4 +243,135 @@ test('webhook directories write endpoints require write permission', function ()
         route('portal-webhooks.directories.store', $webhook).'?token=directories-read-only-token',
         directoriesWebhookPayload(),
     )->assertForbidden();
+});
+
+test('webhook directories support csv export template download and import', function () {
+    $admin = directoriesWebhookSuperAdmin();
+    $directory = ReferenceDirectory::factory()->create(directoriesWebhookPayload());
+    $directory->records()->create([
+        'values' => [
+            'partner_name' => 'Contoso',
+            'priority' => 3,
+            'verified' => true,
+        ],
+        'created_by_user_id' => $admin->id,
+        'updated_by_user_id' => $admin->id,
+    ]);
+
+    $webhook = PortalWebhook::factory()->create([
+        'permissions' => [
+            PortalWebhook::PERMISSION_DIRECTORIES_READ,
+            PortalWebhook::PERMISSION_DIRECTORIES_WRITE,
+        ],
+    ]);
+    $webhook->issueToken('directories-csv-token');
+
+    $this->get(route('portal-webhooks.invoke', $webhook).'?token=directories-csv-token')
+        ->assertOk()
+        ->assertJsonPath(
+            'endpoints.directories_write.import_template',
+            route('portal-webhooks.directories.import', [
+                'portalWebhook' => $webhook,
+                'referenceDirectory' => '__DIRECTORY_ID__',
+            ]).'?token=directories-csv-token',
+        );
+
+    $exportResponse = $this->get(
+        route('portal-webhooks.directories.export', [
+            'portalWebhook' => $webhook,
+            'referenceDirectory' => $directory,
+            'delimiter' => '|',
+            'token' => 'directories-csv-token',
+        ]),
+    )
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($exportResponse->streamedContent())
+        ->toContain('partner_name|priority|verified')
+        ->toContain('Contoso|3|true');
+
+    $templateResponse = $this->get(
+        route('portal-webhooks.directories.template', [
+            'portalWebhook' => $webhook,
+            'referenceDirectory' => $directory,
+            'delimiter' => ';',
+            'token' => 'directories-csv-token',
+        ]),
+    )
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($templateResponse->streamedContent())
+        ->toContain('partner_name;priority;verified')
+        ->toContain('"'.__('ui.directories.csv_template_sample_value').'"'.';123;true');
+
+    $csv = <<<'CSV'
+partner_name;priority;verified
+Fabrikam;8;false
+CSV;
+
+    $this->withHeaders([
+        'Accept' => 'application/json',
+        'X-Webhook-Token' => 'directories-csv-token',
+    ])->post(
+        route('portal-webhooks.directories.import', [$webhook, $directory]),
+        [
+            'delimiter' => ';',
+            'file' => UploadedFile::fake()->createWithContent('directory.csv', $csv),
+        ],
+    )
+        ->assertOk()
+        ->assertJsonPath('data.imported_count', 1);
+
+    expect(ReferenceDirectoryRecord::query()->where('reference_directory_id', $directory->id)->count())->toBe(2)
+        ->and(
+            ReferenceDirectoryRecord::query()
+                ->where('reference_directory_id', $directory->id)
+                ->latest('id')
+                ->firstOrFail()
+                ->values
+        )->toMatchArray([
+            'partner_name' => 'Fabrikam',
+            'priority' => 8,
+            'verified' => false,
+        ]);
+});
+
+test('webhook directory csv endpoints are forbidden when csv exchange is disabled', function () {
+    $directory = ReferenceDirectory::factory()->create([
+        ...directoriesWebhookPayload(),
+        'csv_exchange_enabled' => false,
+    ]);
+
+    $webhook = PortalWebhook::factory()->create([
+        'permissions' => [
+            PortalWebhook::PERMISSION_DIRECTORIES_READ,
+            PortalWebhook::PERMISSION_DIRECTORIES_WRITE,
+        ],
+    ]);
+    $webhook->issueToken('directories-disabled-token');
+
+    $csv = <<<'CSV'
+partner_name;priority;verified
+Fabrikam;8;false
+CSV;
+
+    $this->get(route('portal-webhooks.directories.export', [$webhook, $directory]).'?token=directories-disabled-token')
+        ->assertForbidden();
+
+    $this->get(route('portal-webhooks.directories.template', [$webhook, $directory]).'?token=directories-disabled-token')
+        ->assertForbidden();
+
+    $this->withHeaders([
+        'Accept' => 'application/json',
+        'X-Webhook-Token' => 'directories-disabled-token',
+    ])->post(
+        route('portal-webhooks.directories.import', [$webhook, $directory]),
+        [
+            'delimiter' => ';',
+            'file' => UploadedFile::fake()->createWithContent('directory.csv', $csv),
+        ],
+    )
+        ->assertForbidden();
 });

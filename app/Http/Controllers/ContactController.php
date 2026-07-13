@@ -4,17 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Concerns\EnsuresContactsTableIsReady;
 use App\Http\Requests\FilterContactsIndexRequest;
+use App\Http\Requests\ImportContactsRequest;
 use App\Http\Requests\StoreContactRequest;
 use App\Http\Requests\UpdateContactRequest;
 use App\Http\Resources\ApiContactResource;
 use App\Models\Contact;
 use App\Models\User;
 use App\Support\ContactAvatarManager;
+use App\Support\ContactCsvService;
+use App\Support\CsvDelimiter;
 use App\Support\PaginationData;
 use App\Support\PerPageOptions;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ContactController extends Controller
 {
@@ -131,6 +136,63 @@ class ContactController extends Controller
         return back();
     }
 
+    public function exportCsv(
+        Request $request,
+        ContactCsvService $contactCsvService,
+    ): StreamedResponse {
+        $this->ensureContactsTableExists();
+
+        $user = $request->user();
+        abort_unless($user !== null, 403);
+
+        $contacts = Contact::query()
+            ->visibleTo($user)
+            ->orderBy('type')
+            ->orderBy('name')
+            ->get();
+
+        return $contactCsvService->download(
+            $contacts,
+            'contacts-'.now()->format('Y-m-d-H-i-s').'.csv',
+            $this->resolveCsvDelimiter($request),
+        );
+    }
+
+    public function downloadCsvTemplate(
+        Request $request,
+        ContactCsvService $contactCsvService,
+    ): StreamedResponse {
+        $this->ensureContactsTableExists();
+
+        $user = $request->user();
+        abort_unless($user !== null, 403);
+
+        return $contactCsvService->downloadTemplate(
+            'contacts-template-'.now()->format('Y-m-d-H-i-s').'.csv',
+            $this->resolveCsvDelimiter($request),
+        );
+    }
+
+    public function importCsv(
+        ImportContactsRequest $request,
+        ContactCsvService $contactCsvService,
+    ): RedirectResponse {
+        $this->ensureContactsTableExists();
+
+        $importedCount = $contactCsvService->import(
+            $request->uploadedFile(),
+            $request->user(),
+            $request->delimiter(),
+        );
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('ui.contacts.csv_import_success', ['count' => $importedCount]),
+        ]);
+
+        return back();
+    }
+
     /**
      * @return array<int, array{value: string, label: string}>
      */
@@ -154,5 +216,18 @@ class ContactController extends Controller
         }
 
         return count($availableTypes) === 1 ? $availableTypes[0] : 'all';
+    }
+
+    private function resolveCsvDelimiter(Request $request): string
+    {
+        $request->validate([
+            'delimiter' => ['nullable', 'string', 'max:10'],
+        ]);
+
+        $delimiter = CsvDelimiter::normalize($request->input('delimiter'));
+
+        abort_if($delimiter === null, 422, __('ui.contacts.csv_delimiter_invalid'));
+
+        return $delimiter;
     }
 }

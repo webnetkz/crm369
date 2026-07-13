@@ -2,17 +2,26 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\InteractsWithCsvImport;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ImportContactsRequest extends FormRequest
 {
+    use InteractsWithCsvImport;
+
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return false;
+        $user = $this->user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->canAccessPersonContacts() || $user->canAccessCompanyContacts();
     }
 
     /**
@@ -22,8 +31,16 @@ class ImportContactsRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            //
-        ];
+        return $this->csvImportRules();
+    }
+
+    public function after(): array
+    {
+        return $this->csvImportAfter();
+    }
+
+    protected function csvDelimiterValidationKey(): string
+    {
+        return 'ui.contacts.csv_delimiter_invalid';
     }
 }

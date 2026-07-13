@@ -97,6 +97,12 @@ Route::prefix('v1')->middleware(['module.enabled:api', 'auth:api', ResolveApiSub
         Route::get('directories/{referenceDirectory}', [ApiReferenceDirectoryController::class, 'show'])
             ->middleware(['api.token:directories.read', 'can:access-directories'])
             ->name('api.v1.directories.show');
+        Route::get('directories/{referenceDirectory}/export', [ApiReferenceDirectoryController::class, 'exportCsv'])
+            ->middleware(['api.token:directories.read', 'can:access-directories'])
+            ->name('api.v1.directories.export');
+        Route::get('directories/{referenceDirectory}/template', [ApiReferenceDirectoryController::class, 'downloadCsvTemplate'])
+            ->middleware(['api.token:directories.read', 'can:access-directories'])
+            ->name('api.v1.directories.template');
         Route::post('directories', [ApiReferenceDirectoryController::class, 'store'])
             ->middleware(['api.token:directories.write', 'can:manage-directories'])
             ->name('api.v1.directories.store');
@@ -106,6 +112,9 @@ Route::prefix('v1')->middleware(['module.enabled:api', 'auth:api', ResolveApiSub
         Route::delete('directories/{referenceDirectory}', [ApiReferenceDirectoryController::class, 'destroy'])
             ->middleware(['api.token:directories.write', 'can:manage-directories'])
             ->name('api.v1.directories.destroy');
+        Route::post('directories/{referenceDirectory}/import', [ApiReferenceDirectoryController::class, 'importCsv'])
+            ->middleware(['api.token:directories.write', 'can:manage-directories'])
+            ->name('api.v1.directories.import');
         Route::post('directories/{referenceDirectory}/records', [ApiReferenceDirectoryController::class, 'storeRecord'])
             ->middleware(['api.token:directories.write', 'can:manage-directories'])
             ->name('api.v1.directories.records.store');

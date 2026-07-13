@@ -41,8 +41,11 @@ class ProjectTaskCsvService
     /**
      * @param  Collection<int, ProjectTask>  $tasks
      */
-    public function download(Collection $tasks, string $fileName): StreamedResponse
-    {
+    public function download(
+        Collection $tasks,
+        string $fileName,
+        string $delimiter = ';',
+    ): StreamedResponse {
         $tasksByParent = $tasks
             ->sortBy([
                 ['sort_order', 'asc'],
@@ -51,7 +54,7 @@ class ProjectTaskCsvService
             ])
             ->groupBy(fn (ProjectTask $task): string => (string) ($task->parent_task_id ?? 'root'));
 
-        return response()->streamDownload(function () use ($tasksByParent): void {
+        return response()->streamDownload(function () use ($tasksByParent, $delimiter): void {
             $output = fopen('php://output', 'wb');
 
             if ($output === false) {
@@ -59,7 +62,7 @@ class ProjectTaskCsvService
             }
 
             fwrite($output, "\xEF\xBB\xBF");
-            fputcsv($output, self::HEADERS);
+            fputcsv($output, self::HEADERS, $delimiter);
 
             foreach ($this->flattenForExport($tasksByParent) as $task) {
                 fputcsv($output, [
@@ -77,7 +80,7 @@ class ProjectTaskCsvService
                         ->pluck('email')
                         ->filter(fn (mixed $email): bool => is_string($email) && $email !== '')
                         ->implode('|'),
-                ]);
+                ], $delimiter);
             }
 
             fclose($output);
@@ -86,9 +89,43 @@ class ProjectTaskCsvService
         ]);
     }
 
-    public function import(UploadedFile $file, User $actor, ?Project $project = null): int
+    public function downloadTemplate(string $fileName, string $delimiter = ';'): StreamedResponse
     {
-        $rows = $this->parseRows($file, $project);
+        return response()->streamDownload(function () use ($delimiter): void {
+            $output = fopen('php://output', 'wb');
+
+            if ($output === false) {
+                return;
+            }
+
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, self::HEADERS, $delimiter);
+            fputcsv($output, [
+                'task_launch',
+                '',
+                'Launch plan',
+                'Prepare a release checklist',
+                ProjectTask::STATUS_TODO,
+                ProjectTask::IMPORTANCE_NORMAL,
+                5,
+                '2026-01-15T09:00:00+00:00',
+                0,
+                'assignee@example.com',
+                'helper@example.com',
+            ], $delimiter);
+            fclose($output);
+        }, $fileName, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    public function import(
+        UploadedFile $file,
+        User $actor,
+        ?Project $project = null,
+        string $delimiter = ';',
+    ): int {
+        $rows = $this->parseRows($file, $project, $delimiter);
 
         return DB::transaction(function () use ($rows, $actor, $project): int {
             $createdTasks = [];
@@ -163,8 +200,11 @@ class ProjectTaskCsvService
      *     co_assignee_user_ids: array<int, int>
      * }>
      */
-    private function parseRows(UploadedFile $file, ?Project $project = null): array
-    {
+    private function parseRows(
+        UploadedFile $file,
+        ?Project $project = null,
+        string $delimiter = ';',
+    ): array {
         $handle = fopen($file->getRealPath(), 'rb');
 
         if ($handle === false) {
@@ -173,7 +213,7 @@ class ProjectTaskCsvService
             ]);
         }
 
-        $header = fgetcsv($handle);
+        $header = fgetcsv($handle, 0, $delimiter);
 
         if ($header === false) {
             fclose($handle);
@@ -204,7 +244,7 @@ class ProjectTaskCsvService
         $seenTaskKeys = [];
         $rowNumber = 1;
 
-        while (($row = fgetcsv($handle)) !== false) {
+        while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
             $rowNumber++;
 
             if ($this->rowIsEmpty($row)) {
@@ -347,6 +387,11 @@ class ProjectTaskCsvService
             ->trim()
             ->lower()
             ->value();
+    }
+
+    public static function normalizeDelimiter(mixed $delimiter): ?string
+    {
+        return CsvDelimiter::normalize($delimiter);
     }
 
     /**

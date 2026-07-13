@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ImportReferenceDirectoryRecordsRequest;
 use App\Http\Requests\StoreReferenceDirectoryRecordRequest;
 use App\Http\Requests\StoreReferenceDirectoryRequest;
 use App\Http\Requests\UpdateReferenceDirectoryRecordRequest;
@@ -11,8 +12,10 @@ use App\Http\Resources\ApiReferenceDirectoryResource;
 use App\Models\PortalWebhook;
 use App\Models\ReferenceDirectory;
 use App\Models\ReferenceDirectoryRecord;
+use App\Support\ReferenceDirectoryCsvService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PortalWebhookReferenceDirectoryController extends Controller
 {
@@ -163,6 +166,63 @@ class PortalWebhookReferenceDirectoryController extends Controller
         ]);
     }
 
+    public function exportCsv(
+        Request $request,
+        PortalWebhook $portalWebhook,
+        ReferenceDirectory $referenceDirectory,
+        ReferenceDirectoryCsvService $referenceDirectoryCsvService,
+    ): StreamedResponse {
+        $this->ensureCsvExchangeEnabled($referenceDirectory);
+
+        return $referenceDirectoryCsvService->downloadRecords(
+            $referenceDirectory,
+            $referenceDirectory->slug.'-records-'.now()->format('Y-m-d-H-i-s').'.csv',
+            $this->resolveCsvDelimiter($request),
+        );
+    }
+
+    public function downloadCsvTemplate(
+        Request $request,
+        PortalWebhook $portalWebhook,
+        ReferenceDirectory $referenceDirectory,
+        ReferenceDirectoryCsvService $referenceDirectoryCsvService,
+    ): StreamedResponse {
+        $this->ensureCsvExchangeEnabled($referenceDirectory);
+
+        return $referenceDirectoryCsvService->downloadTemplate(
+            $referenceDirectory,
+            $referenceDirectory->slug.'-template-'.now()->format('Y-m-d-H-i-s').'.csv',
+            $this->resolveCsvDelimiter($request),
+        );
+    }
+
+    public function importCsv(
+        ImportReferenceDirectoryRecordsRequest $request,
+        PortalWebhook $portalWebhook,
+        ReferenceDirectory $referenceDirectory,
+        ReferenceDirectoryCsvService $referenceDirectoryCsvService,
+    ): JsonResponse {
+        $this->ensureCsvExchangeEnabled($referenceDirectory);
+
+        $importedCount = $referenceDirectoryCsvService->import(
+            $referenceDirectory,
+            $request->uploadedFile(),
+            null,
+            $request->delimiter(),
+        );
+
+        return response()->json([
+            'webhook' => [
+                'id' => $portalWebhook->id,
+                'name' => $portalWebhook->name,
+            ],
+            'message' => __('ui.directories.csv_import_success', ['count' => $importedCount]),
+            'data' => [
+                'imported_count' => $importedCount,
+            ],
+        ]);
+    }
+
     private function resolveDirectoryRecord(
         ReferenceDirectory $referenceDirectory,
         ReferenceDirectoryRecord $referenceDirectoryRecord,
@@ -170,5 +230,23 @@ class PortalWebhookReferenceDirectoryController extends Controller
         abort_unless($referenceDirectoryRecord->reference_directory_id === $referenceDirectory->id, 404);
 
         return $referenceDirectoryRecord;
+    }
+
+    private function resolveCsvDelimiter(Request $request): string
+    {
+        $request->validate([
+            'delimiter' => ['nullable', 'string', 'max:10'],
+        ]);
+
+        $delimiter = ReferenceDirectoryCsvService::normalizeDelimiter($request->input('delimiter'));
+
+        abort_if($delimiter === null, 422, __('ui.directories.csv_delimiter_invalid'));
+
+        return $delimiter;
+    }
+
+    private function ensureCsvExchangeEnabled(ReferenceDirectory $referenceDirectory): void
+    {
+        abort_unless($referenceDirectory->csv_exchange_enabled, 403, __('ui.directories.csv_disabled'));
     }
 }

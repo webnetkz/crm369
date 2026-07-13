@@ -99,21 +99,7 @@ class ReferenceDirectoryCsvService
 
     public static function normalizeDelimiter(mixed $delimiter): ?string
     {
-        if (! is_string($delimiter)) {
-            return ';';
-        }
-
-        $normalized = trim($delimiter);
-
-        if ($normalized === '') {
-            return ';';
-        }
-
-        if (in_array(Str::lower($normalized), ['\\t', 'tab'], true)) {
-            return "\t";
-        }
-
-        return mb_strlen($normalized) === 1 ? $normalized : null;
+        return CsvDelimiter::normalize($delimiter);
     }
 
     /**

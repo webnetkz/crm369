@@ -72,6 +72,7 @@ type DirectorySummary = {
     description: string | null;
     columns: DirectoryColumn[];
     records_count: number;
+    csv_exchange_enabled: boolean;
 };
 
 type ActiveDirectory = DirectorySummary & {
@@ -125,6 +126,7 @@ const directoryForm = useForm({
     name: '',
     slug: '',
     description: '',
+    csv_exchange_enabled: true,
     columns: [blankColumn()] as EditableColumn[],
 });
 
@@ -138,6 +140,9 @@ const csvImportForm = useForm({
 
 const activeDirectoryColumns = computed<DirectoryColumn[]>(() => {
     return props.activeDirectory?.columns ?? [];
+});
+const isActiveDirectoryCsvEnabled = computed<boolean>(() => {
+    return props.activeDirectory?.csv_exchange_enabled === true;
 });
 
 watchEffect(() => {
@@ -166,6 +171,7 @@ const openCreateDirectory = (): void => {
         name: '',
         slug: '',
         description: '',
+        csv_exchange_enabled: true,
         columns: [blankColumn()],
     });
     directoryForm.reset();
@@ -183,6 +189,7 @@ const openEditDirectory = (): void => {
         name: props.activeDirectory.name,
         slug: props.activeDirectory.slug,
         description: props.activeDirectory.description ?? '',
+        csv_exchange_enabled: props.activeDirectory.csv_exchange_enabled,
         columns:
             props.activeDirectory.columns.length > 0
                 ? props.activeDirectory.columns.map((column) => ({
@@ -667,7 +674,10 @@ const submitCsvImport = (): void => {
                             </p>
                         </div>
 
-                        <div class="grid w-full gap-4 lg:max-w-xl">
+                        <div
+                            v-if="isActiveDirectoryCsvEnabled"
+                            class="grid w-full gap-4 lg:max-w-xl"
+                        >
                             <div class="grid gap-2">
                                 <Label for="directory-csv-delimiter">
                                     {{ t.directories.csv_delimiter }}
@@ -736,6 +746,18 @@ const submitCsvImport = (): void => {
                                     </Button>
                                 </div>
                             </form>
+                        </div>
+
+                        <div
+                            v-else
+                            class="w-full rounded-2xl border border-dashed border-border bg-muted/20 p-4 lg:max-w-xl"
+                        >
+                            <div class="text-sm font-medium">
+                                {{ t.directories.csv_disabled }}
+                            </div>
+                            <p class="mt-2 text-sm text-muted-foreground">
+                                {{ t.directories.csv_disabled_description }}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -906,6 +928,31 @@ const submitCsvImport = (): void => {
                             :class="textareaClass"
                         />
                         <InputError :message="directoryForm.errors.description" />
+                    </div>
+
+                    <div class="rounded-2xl border border-border bg-background/70 p-4">
+                        <div class="flex items-start gap-3">
+                            <Checkbox
+                                id="directory-csv-exchange-enabled"
+                                :model-value="directoryForm.csv_exchange_enabled"
+                                @update:model-value="
+                                    (value) =>
+                                        (directoryForm.csv_exchange_enabled =
+                                            value === true)
+                                "
+                            />
+                            <div class="space-y-1">
+                                <Label for="directory-csv-exchange-enabled">
+                                    {{ t.directories.csv_exchange_enabled }}
+                                </Label>
+                                <p class="text-sm text-muted-foreground">
+                                    {{ t.directories.csv_exchange_enabled_hint }}
+                                </p>
+                            </div>
+                        </div>
+                        <InputError
+                            :message="directoryForm.errors.csv_exchange_enabled"
+                        />
                     </div>
 
                     <div class="space-y-4">

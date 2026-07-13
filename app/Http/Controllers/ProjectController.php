@@ -15,6 +15,7 @@ use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\ProjectTaskStage;
 use App\Models\User;
+use App\Support\CsvDelimiter;
 use App\Support\ProjectPageData;
 use App\Support\ProjectTaskAssignmentNotifier;
 use App\Support\ProjectTaskChangeLogger;
@@ -77,6 +78,19 @@ class ProjectController extends Controller
         return $projectTaskCsvService->download(
             $this->standaloneTasksForExport($user),
             'standalone-tasks-'.now()->format('Y-m-d-H-i-s').'.csv',
+            $this->resolveCsvDelimiter($request),
+        );
+    }
+
+    public function downloadStandaloneTasksTemplate(
+        Request $request,
+        ProjectTaskCsvService $projectTaskCsvService,
+    ): StreamedResponse {
+        abort_unless($request->user() !== null, 401);
+
+        return $projectTaskCsvService->downloadTemplate(
+            'standalone-tasks-template-'.now()->format('Y-m-d-H-i-s').'.csv',
+            $this->resolveCsvDelimiter($request),
         );
     }
 
@@ -87,7 +101,12 @@ class ProjectController extends Controller
         $user = $request->user();
         abort_unless($user !== null, 401);
 
-        $importedCount = $projectTaskCsvService->import($request->file('file'), $user);
+        $importedCount = $projectTaskCsvService->import(
+            $request->uploadedFile(),
+            $user,
+            null,
+            $request->delimiter(),
+        );
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -122,6 +141,20 @@ class ProjectController extends Controller
         return $projectTaskCsvService->download(
             $this->projectTasksForExport($request, $visibleProject),
             $visibleProject->slug.'-tasks-'.now()->format('Y-m-d-H-i-s').'.csv',
+            $this->resolveCsvDelimiter($request),
+        );
+    }
+
+    public function downloadProjectTasksTemplate(
+        Request $request,
+        Project $project,
+        ProjectTaskCsvService $projectTaskCsvService,
+    ): StreamedResponse {
+        $visibleProject = $this->visibleProject($request, $project);
+
+        return $projectTaskCsvService->downloadTemplate(
+            $visibleProject->slug.'-tasks-template-'.now()->format('Y-m-d-H-i-s').'.csv',
+            $this->resolveCsvDelimiter($request),
         );
     }
 
@@ -133,7 +166,12 @@ class ProjectController extends Controller
         $visibleProject = $this->visibleProject($request, $project);
         abort_unless($request->user()->canWorkOnProject($visibleProject), 403);
 
-        $importedCount = $projectTaskCsvService->import($request->file('file'), $request->user(), $visibleProject);
+        $importedCount = $projectTaskCsvService->import(
+            $request->uploadedFile(),
+            $request->user(),
+            $visibleProject,
+            $request->delimiter(),
+        );
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -610,5 +648,18 @@ class ProjectController extends Controller
             ->orderBy('due_at')
             ->orderByDesc('created_at')
             ->get();
+    }
+
+    private function resolveCsvDelimiter(Request $request): string
+    {
+        $request->validate([
+            'delimiter' => ['nullable', 'string', 'max:10'],
+        ]);
+
+        $delimiter = CsvDelimiter::normalize($request->input('delimiter'));
+
+        abort_if($delimiter === null, 422, __('ui.projects.csv_delimiter_invalid'));
+
+        return $delimiter;
     }
 }

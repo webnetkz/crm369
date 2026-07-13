@@ -25,6 +25,7 @@ function directoriesWebPayload(string $name = 'Employee Registry', string $slug 
         'name' => $name,
         'slug' => $slug,
         'description' => 'Reusable employee reference data.',
+        'csv_exchange_enabled' => true,
         'columns' => [
             [
                 'label' => 'Full name',
@@ -108,6 +109,7 @@ test('super admin can manage directories and their records from the web module',
 
     expect($directory->slug)->toBe('employee-registry')
         ->and($directory->created_by_user_id)->toBe($user->id)
+        ->and($directory->csv_exchange_enabled)->toBeTrue()
         ->and($directory->columnDefinitions())->toHaveCount(4)
         ->and($directory->columnDefinitions()[0]['key'])->toBe('full_name');
 
@@ -118,6 +120,7 @@ test('super admin can manage directories and their records from the web module',
             ->component('directories/Index')
             ->where('activeDirectory.id', $directory->id)
             ->where('activeDirectory.slug', 'employee-registry')
+            ->where('activeDirectory.csv_exchange_enabled', true)
             ->where('activeDirectory.records', [])
         );
 
@@ -153,16 +156,20 @@ test('super admin can manage directories and their records from the web module',
     ]);
 
     $this->actingAs($user)
-        ->patch(route('directories.update', $directory), directoriesWebPayload(
-            name: 'Employee Registry Updated',
-            slug: 'employee-registry-updated',
-        ))
+        ->patch(route('directories.update', $directory), [
+            ...directoriesWebPayload(
+                name: 'Employee Registry Updated',
+                slug: 'employee-registry-updated',
+            ),
+            'csv_exchange_enabled' => false,
+        ])
         ->assertRedirect();
 
     $directory = $directory->fresh();
 
     expect($directory->name)->toBe('Employee Registry Updated')
         ->and($directory->slug)->toBe('employee-registry-updated')
+        ->and($directory->csv_exchange_enabled)->toBeFalse()
         ->and($directory->updated_by_user_id)->toBe($user->id);
 
     $this->actingAs($user)
@@ -245,4 +252,32 @@ CSV;
         ]);
 
     $response->assertSessionHasNoErrors();
+});
+
+test('directory csv endpoints are forbidden when csv exchange is disabled', function () {
+    $user = directoriesWebSuperAdmin();
+    $directory = ReferenceDirectory::factory()->create([
+        ...directoriesWebPayload(),
+        'csv_exchange_enabled' => false,
+    ]);
+
+    $csv = <<<'CSV'
+full_name;age;is_active;start_date
+Aruzhan Sarsenova;29;true;2026-07-09
+CSV;
+
+    $this->actingAs($user)
+        ->get(route('directories.export', $directory))
+        ->assertForbidden();
+
+    $this->actingAs($user)
+        ->get(route('directories.template', $directory))
+        ->assertForbidden();
+
+    $this->actingAs($user)
+        ->post(route('directories.import', $directory), [
+            'delimiter' => ';',
+            'file' => UploadedFile::fake()->createWithContent('directory.csv', $csv),
+        ])
+        ->assertForbidden();
 });

@@ -24,6 +24,7 @@ class ReferenceDirectoryFactory extends Factory
             'name' => $name,
             'slug' => Str::slug($name),
             'description' => fake()->sentence(),
+            'csv_exchange_enabled' => true,
             'columns' => [
                 [
                     'key' => 'title',

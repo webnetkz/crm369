@@ -212,6 +212,71 @@ test('super admin can blacklist contacts and filter them in the workspace', func
         ->toBeTrue();
 });
 
+test('super admin can export import contacts as csv and download a template', function () {
+    config(['admin.super_admin_email' => 'super@example.com']);
+
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+    ]);
+
+    Contact::factory()->company()->create([
+        'name' => 'Export Company',
+        'email' => 'export-company@example.com',
+        'company_requisites' => [
+            'bin' => '987654321012',
+            'legal_address' => 'Almaty, Abay 10',
+            'actual_address' => 'Almaty, Satpayev 11',
+            'bank_name' => 'Kaspi Bank',
+            'bank_bik' => 'CASPKZKA',
+            'iban' => 'KZ123456789012345678',
+            'kbe' => '17',
+        ],
+    ]);
+
+    $exportResponse = $this->actingAs($superAdmin)
+        ->get(route('contacts.export', ['delimiter' => '|']))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($exportResponse->streamedContent())
+        ->toContain('type|name|contact_person|position|email|phone|is_blacklisted|notes|iin|bin|legal_address|actual_address|bank_name|bank_bik|iban|kbe')
+        ->toContain('Export Company')
+        ->toContain('export-company@example.com');
+
+    $templateResponse = $this->actingAs($superAdmin)
+        ->get(route('contacts.template', ['delimiter' => ';']))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($templateResponse->streamedContent())
+        ->toContain('type;name;contact_person;position;email;phone;is_blacklisted;notes;iin;bin;legal_address;actual_address;bank_name;bank_bik;iban;kbe')
+        ->toContain('Example LLC');
+
+    $csv = <<<'CSV'
+type;name;contact_person;position;email;phone;is_blacklisted;notes;iin;bin;legal_address;actual_address;bank_name;bank_bik;iban;kbe
+person;Aruzhan Sarsenova;;;person-import@example.com;+77011234567;false;Important client;123456789013;;;;;;;
+company;Import Company;Dana Manager;Director;company-import@example.com;+77011234568;true;Strategic; ;123456789014;Almaty, Abay 10;Almaty, Satpayev 11;Kaspi Bank;CASPKZKA;KZ123456789012345679;17
+CSV;
+
+    $this->actingAs($superAdmin)
+        ->from(route('contacts.index'))
+        ->post(route('contacts.import'), [
+            'delimiter' => ';',
+            'file' => UploadedFile::fake()->createWithContent('contacts.csv', $csv),
+        ])
+        ->assertRedirect(route('contacts.index'));
+
+    $person = Contact::query()->where('email', 'person-import@example.com')->firstOrFail();
+    $company = Contact::query()->where('email', 'company-import@example.com')->firstOrFail();
+
+    expect($person->type)->toBe(Contact::TYPE_PERSON)
+        ->and($person->company_requisites['iin'])->toBe('123456789013')
+        ->and($company->type)->toBe(Contact::TYPE_COMPANY)
+        ->and($company->is_blacklisted)->toBeTrue()
+        ->and($company->company_requisites['bin'])->toBe('123456789014')
+        ->and($company->company_requisites['bank_name'])->toBe('Kaspi Bank');
+});
+
 test('super admin can add contact history comments', function () {
     config(['admin.super_admin_email' => 'super@example.com']);
 

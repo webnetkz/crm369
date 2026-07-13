@@ -2,6 +2,7 @@
 
 use App\Models\EquipmentItem;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('authenticated users can open equipment page and manage equipment items', function () {
@@ -132,4 +133,61 @@ test('equipment page includes a qr preview and print action in the details dialo
         ->and($page)->toContain("document.createElement('iframe')")
         ->and($page)->toContain('t.equipment.print_qr')
         ->not->toContain("window.open('', '_blank', 'noopener,noreferrer')");
+});
+
+test('authenticated users can export import equipment as csv and download a template', function () {
+    $user = User::factory()->create();
+    $responsibleUser = User::factory()->create([
+        'email' => 'responsible@example.com',
+    ]);
+    $issuedUser = User::factory()->create([
+        'email' => 'issued@example.com',
+    ]);
+
+    EquipmentItem::factory()->create([
+        'name' => 'Export Laptop',
+        'qr_code' => 'EQ-EXPORT-001',
+        'status' => EquipmentItem::STATUS_ON_BALANCE,
+        'responsible_user_id' => $responsibleUser->id,
+        'issued_to_user_id' => null,
+    ]);
+
+    $exportResponse = $this->actingAs($user)
+        ->get(route('equipment.export', ['delimiter' => '|']))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($exportResponse->streamedContent())
+        ->toContain('name|qr_code|status|responsible_user_email|issued_to_user_email')
+        ->toContain('Export Laptop')
+        ->toContain('responsible@example.com');
+
+    $templateResponse = $this->actingAs($user)
+        ->get(route('equipment.template', ['delimiter' => ';']))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($templateResponse->streamedContent())
+        ->toContain('name;qr_code;status;responsible_user_email;issued_to_user_email')
+        ->toContain('EQ-LENOVO-001');
+
+    $csv = <<<'CSV'
+name;qr_code;status;responsible_user_email;issued_to_user_email
+Imported Printer;EQ-IMPORT-001;issued;responsible@example.com;issued@example.com
+CSV;
+
+    $this->actingAs($user)
+        ->from(route('equipment.index'))
+        ->post(route('equipment.import'), [
+            'delimiter' => ';',
+            'file' => UploadedFile::fake()->createWithContent('equipment.csv', $csv),
+        ])
+        ->assertRedirect(route('equipment.index'));
+
+    $importedItem = EquipmentItem::query()->where('qr_code', 'EQ-IMPORT-001')->firstOrFail();
+
+    expect($importedItem->name)->toBe('Imported Printer')
+        ->and($importedItem->status)->toBe(EquipmentItem::STATUS_ISSUED)
+        ->and($importedItem->responsible_user_id)->toBe($responsibleUser->id)
+        ->and($importedItem->issued_to_user_id)->toBe($issuedUser->id);
 });

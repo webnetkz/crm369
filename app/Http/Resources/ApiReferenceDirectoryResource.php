@@ -22,6 +22,7 @@ class ApiReferenceDirectoryResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'description' => $this->description,
+            'csv_exchange_enabled' => (bool) $this->csv_exchange_enabled,
             'columns' => $this->columnDefinitions(),
             'records_count' => $this->records_count ?? ($this->relationLoaded('records') ? $this->records->count() : 0),
             'records' => $this->when(

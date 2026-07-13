@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\FilterUsersIndexRequest;
+use App\Http\Requests\Settings\ImportUsersRequest;
 use App\Http\Requests\Settings\ResetManagedUserPasswordRequest;
 use App\Http\Requests\Settings\StoreManagedUserRequest;
 use App\Http\Requests\Settings\UpdateManagedUserProfileRequest;
@@ -14,16 +15,20 @@ use App\Models\PortalSetting;
 use App\Models\User;
 use App\Models\UserGroup;
 use App\Notifications\SystemNotification;
+use App\Support\CsvDelimiter;
 use App\Support\ManagedUserProfileData;
 use App\Support\PaginationData;
 use App\Support\PerPageOptions;
+use App\Support\UserCsvService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UserController extends Controller
 {
@@ -136,6 +141,48 @@ class UserController extends Controller
             ])),
             'canEdit' => $managedUserProfileData->canEdit(request()->user(), $user),
         ]);
+    }
+
+    public function exportCsv(Request $request, UserCsvService $userCsvService): StreamedResponse
+    {
+        abort_unless($request->user()?->can('view-users') ?? false, 403);
+
+        $users = User::query()
+            ->with(['group:id,name', 'manager:id,email'])
+            ->orderBy('name')
+            ->orderBy('last_name')
+            ->get();
+
+        return $userCsvService->download(
+            $users,
+            'users-'.now()->format('Y-m-d-H-i-s').'.csv',
+            $this->resolveCsvDelimiter($request),
+        );
+    }
+
+    public function downloadCsvTemplate(Request $request, UserCsvService $userCsvService): StreamedResponse
+    {
+        abort_unless($request->user()?->can('manage-user-accounts') ?? false, 403);
+
+        return $userCsvService->downloadTemplate(
+            'users-template-'.now()->format('Y-m-d-H-i-s').'.csv',
+            $this->resolveCsvDelimiter($request),
+        );
+    }
+
+    public function importCsv(ImportUsersRequest $request, UserCsvService $userCsvService): RedirectResponse
+    {
+        $importedCount = $userCsvService->import(
+            $request->uploadedFile(),
+            $request->delimiter(),
+        );
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('ui.admin.csv_import_success', ['count' => $importedCount]),
+        ]);
+
+        return back();
     }
 
     public function store(StoreManagedUserRequest $request): RedirectResponse
@@ -297,6 +344,19 @@ class UserController extends Controller
     private function canPersistVisibleUserTableColumns(): bool
     {
         return Schema::hasColumn('users', 'visible_user_table_columns');
+    }
+
+    private function resolveCsvDelimiter(Request $request): string
+    {
+        $request->validate([
+            'delimiter' => ['nullable', 'string', 'max:10'],
+        ]);
+
+        $delimiter = CsvDelimiter::normalize($request->input('delimiter'));
+
+        abort_if($delimiter === null, 422, __('ui.admin.csv_delimiter_invalid'));
+
+        return $delimiter;
     }
 
     /**

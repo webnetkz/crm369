@@ -22,6 +22,8 @@ import {
 } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
 import {
+    downloadProjectTasksTemplate,
+    downloadStandaloneTasksTemplate,
     destroy as destroyProject,
     destroyWorkspaceTask,
     exportProjectTasks,
@@ -196,6 +198,7 @@ const taskStageForm = useForm({
     color: '#64748B',
 });
 const taskCsvImportForm = useForm({
+    delimiter: ';',
     file: null as File | null,
 });
 
@@ -788,8 +791,32 @@ const submitProject = (): void => {
 const downloadTaskCsv = (projectId: number | null): void => {
     window.location.assign(
         projectId === null
-            ? exportStandaloneTasks.url()
-            : exportProjectTasks.url(projectId),
+            ? exportStandaloneTasks.url({
+                  query: {
+                      delimiter: taskCsvImportForm.delimiter,
+                  },
+              })
+            : exportProjectTasks.url(projectId, {
+                  query: {
+                      delimiter: taskCsvImportForm.delimiter,
+                  },
+              }),
+    );
+};
+
+const downloadTaskCsvTemplate = (projectId: number | null): void => {
+    window.location.assign(
+        projectId === null
+            ? downloadStandaloneTasksTemplate.url({
+                  query: {
+                      delimiter: taskCsvImportForm.delimiter,
+                  },
+              })
+            : downloadProjectTasksTemplate.url(projectId, {
+                  query: {
+                      delimiter: taskCsvImportForm.delimiter,
+                  },
+              }),
     );
 };
 
@@ -1794,6 +1821,16 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 size="sm"
                                 variant="outline"
                                 :disabled="taskCsvImportForm.processing"
+                                @click="downloadTaskCsvTemplate(null)"
+                            >
+                                <Download class="size-4" />
+                                {{ t.projects.download_tasks_csv_template }}
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                :disabled="taskCsvImportForm.processing"
                                 @click="openTaskCsvImport(null)"
                             >
                                 <Upload class="size-4" />
@@ -1808,6 +1845,34 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 {{ t.projects.create_task }}
                             </Button>
                         </div>
+                    </div>
+
+                    <div class="mt-4 grid gap-2 rounded-2xl border border-dashed border-border p-4">
+                        <div class="flex flex-col gap-2 md:flex-row md:items-end">
+                            <div class="grid gap-2">
+                                <Label for="standalone-tasks-csv-delimiter">
+                                    {{ t.projects.csv_delimiter }}
+                                </Label>
+                                <Input
+                                    id="standalone-tasks-csv-delimiter"
+                                    v-model="taskCsvImportForm.delimiter"
+                                    :placeholder="t.projects.csv_delimiter_placeholder"
+                                    class="w-28"
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                :disabled="taskCsvImportForm.processing || taskCsvImportForm.file === null"
+                                @click="submitTaskCsvImport(null)"
+                            >
+                                <Upload class="size-4" />
+                                {{ t.projects.import_tasks_csv }}
+                            </Button>
+                        </div>
+                        <p class="text-xs text-muted-foreground">
+                            {{ t.projects.csv_delimiter_hint }}
+                        </p>
+                        <InputError :message="taskCsvImportForm.errors.delimiter" />
                     </div>
 
                     <InputError :message="standaloneTaskImportError" />
@@ -2300,6 +2365,17 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 size="sm"
                                 variant="outline"
                                 :disabled="taskCsvImportForm.processing"
+                                @click="downloadTaskCsvTemplate(props.activeProject.id)"
+                            >
+                                <Download class="size-4" />
+                                {{ t.projects.download_tasks_csv_template }}
+                            </Button>
+                            <Button
+                                v-if="props.can.workOnActiveProject"
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                :disabled="taskCsvImportForm.processing"
                                 @click="
                                     openTaskCsvImport(props.activeProject.id)
                                 "
@@ -2368,10 +2444,41 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                             @click="openCreateTask()"
                         >
                             <Plus class="size-4" />
-                            {{ t.projects.create_task }}
-                        </Button>
+                                {{ t.projects.create_task }}
+                            </Button>
+                        </div>
+
+                        <div
+                            v-if="props.can.workOnActiveProject"
+                            class="mt-4 grid gap-2 rounded-2xl border border-dashed border-border p-4"
+                        >
+                            <div class="flex flex-col gap-2 md:flex-row md:items-end">
+                                <div class="grid gap-2">
+                                    <Label for="project-tasks-csv-delimiter">
+                                        {{ t.projects.csv_delimiter }}
+                                    </Label>
+                                    <Input
+                                        id="project-tasks-csv-delimiter"
+                                        v-model="taskCsvImportForm.delimiter"
+                                        :placeholder="t.projects.csv_delimiter_placeholder"
+                                        class="w-28"
+                                    />
+                                </div>
+                                <Button
+                                    type="button"
+                                    :disabled="taskCsvImportForm.processing || taskCsvImportForm.file === null"
+                                    @click="submitTaskCsvImport(props.activeProject.id)"
+                                >
+                                    <Upload class="size-4" />
+                                    {{ t.projects.import_tasks_csv }}
+                                </Button>
+                            </div>
+                            <p class="text-xs text-muted-foreground">
+                                {{ t.projects.csv_delimiter_hint }}
+                            </p>
+                            <InputError :message="taskCsvImportForm.errors.delimiter" />
+                        </div>
                     </div>
-                </div>
 
                 <div class="space-y-4">
                     <div

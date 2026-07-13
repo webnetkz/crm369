@@ -105,6 +105,14 @@ class PortalWebhookInvokeController extends Controller
                     'portalWebhook' => $portalWebhook,
                     'referenceDirectory' => '__DIRECTORY_ID__',
                 ]).'?token='.urlencode($plainTextToken),
+                'export_template' => route('portal-webhooks.directories.export', [
+                    'portalWebhook' => $portalWebhook,
+                    'referenceDirectory' => '__DIRECTORY_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+                'download_template_template' => route('portal-webhooks.directories.template', [
+                    'portalWebhook' => $portalWebhook,
+                    'referenceDirectory' => '__DIRECTORY_ID__',
+                ]).'?token='.urlencode($plainTextToken),
             ];
         }
 
@@ -116,6 +124,10 @@ class PortalWebhookInvokeController extends Controller
                     'referenceDirectory' => '__DIRECTORY_ID__',
                 ]).'?token='.urlencode($plainTextToken),
                 'destroy_template' => route('portal-webhooks.directories.destroy', [
+                    'portalWebhook' => $portalWebhook,
+                    'referenceDirectory' => '__DIRECTORY_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+                'import_template' => route('portal-webhooks.directories.import', [
                     'portalWebhook' => $portalWebhook,
                     'referenceDirectory' => '__DIRECTORY_ID__',
                 ]).'?token='.urlencode($plainTextToken),

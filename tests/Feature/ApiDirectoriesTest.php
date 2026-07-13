@@ -4,6 +4,7 @@ use App\Models\ApiAccessToken;
 use App\Models\ReferenceDirectory;
 use App\Models\ReferenceDirectoryRecord;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
 
 function directoriesApiSuperAdmin(): User
@@ -50,6 +51,7 @@ function directoriesApiPayload(string $name = 'Suppliers', string $slug = 'suppl
         'name' => $name,
         'slug' => $slug,
         'description' => 'Supplier reference directory.',
+        'csv_exchange_enabled' => true,
         'columns' => [
             [
                 'label' => 'Company',
@@ -105,6 +107,18 @@ test('api settings include directories documentation and permissions', function 
                             && $endpoint['permission'] === ApiAccessToken::PERMISSION_DIRECTORIES_READ
                     )
                     && collect($section['endpoints'])->contains(
+                        fn (array $endpoint): bool => $endpoint['path'] === '/api/v1/directories/{referenceDirectory}/export'
+                            && $endpoint['content_type'] === 'text/csv'
+                    )
+                    && collect($section['endpoints'])->contains(
+                        fn (array $endpoint): bool => $endpoint['path'] === '/api/v1/directories/{referenceDirectory}/template'
+                            && $endpoint['content_type'] === 'text/csv'
+                    )
+                    && collect($section['endpoints'])->contains(
+                        fn (array $endpoint): bool => $endpoint['path'] === '/api/v1/directories/{referenceDirectory}/import'
+                            && $endpoint['content_type'] === 'multipart/form-data'
+                    )
+                    && collect($section['endpoints'])->contains(
                         fn (array $endpoint): bool => $endpoint['path'] === '/api/v1/directories/{referenceDirectory}/records'
                             && $endpoint['permission'] === ApiAccessToken::PERMISSION_DIRECTORIES_WRITE
                     )
@@ -147,6 +161,7 @@ test('api tokens can manage directories and their records', function () {
         ->assertCreated()
         ->assertJsonPath('message', __('ui.directories.created_success'))
         ->assertJsonPath('data.slug', 'suppliers')
+        ->assertJsonPath('data.csv_exchange_enabled', true)
         ->assertJsonPath('data.records_count', 0);
 
     $directoryId = $createResponse->json('data.id');
@@ -155,6 +170,7 @@ test('api tokens can manage directories and their records', function () {
         ->getJson(route('api.v1.directories.show', $directoryId))
         ->assertOk()
         ->assertJsonPath('data.id', $directoryId)
+        ->assertJsonPath('data.csv_exchange_enabled', true)
         ->assertJsonPath('data.columns.0.key', 'company')
         ->assertJsonPath('data.records', []);
 
@@ -216,5 +232,109 @@ test('api directories write endpoints require write permission', function () {
 
     $this->withHeaders(directoriesApiHeadersFor($token))
         ->postJson(route('api.v1.directories.store'), directoriesApiPayload())
+        ->assertForbidden();
+});
+
+test('api directories support csv export template download and import', function () {
+    $admin = directoriesApiSuperAdmin();
+
+    $token = issueDirectoriesApiTokenFor($admin, [
+        ApiAccessToken::PERMISSION_DIRECTORIES_READ,
+        ApiAccessToken::PERMISSION_DIRECTORIES_WRITE,
+    ]);
+
+    $directory = ReferenceDirectory::factory()->create(directoriesApiPayload());
+    $directory->records()->create([
+        'values' => [
+            'company' => 'Northwind Trade',
+            'rating' => 5,
+            'approved' => true,
+        ],
+        'created_by_user_id' => $admin->id,
+        'updated_by_user_id' => $admin->id,
+    ]);
+
+    $exportResponse = $this->withHeaders(directoriesApiHeadersFor($token))
+        ->get(route('api.v1.directories.export', ['referenceDirectory' => $directory, 'delimiter' => '|']))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($exportResponse->streamedContent())
+        ->toContain('company|rating|approved')
+        ->toContain('"Northwind Trade"|5|true');
+
+    $templateResponse = $this->withHeaders(directoriesApiHeadersFor($token))
+        ->get(route('api.v1.directories.template', ['referenceDirectory' => $directory, 'delimiter' => ';']))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($templateResponse->streamedContent())
+        ->toContain('company;rating;approved')
+        ->toContain('"'.__('ui.directories.csv_template_sample_value').'"'.';123;true');
+
+    $csv = <<<'CSV'
+company;rating;approved
+Litware;9;false
+CSV;
+
+    $this->withHeaders(directoriesApiHeadersFor($token))
+        ->post(route('api.v1.directories.import', $directory), [
+            'delimiter' => ';',
+            'file' => UploadedFile::fake()->createWithContent('directory.csv', $csv),
+        ], [
+            'Accept' => 'application/json',
+            'Authorization' => 'Bearer '.$token,
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.imported_count', 1);
+
+    expect(ReferenceDirectoryRecord::query()->where('reference_directory_id', $directory->id)->count())->toBe(2)
+        ->and(
+            ReferenceDirectoryRecord::query()
+                ->where('reference_directory_id', $directory->id)
+                ->latest('id')
+                ->firstOrFail()
+                ->values
+        )->toMatchArray([
+            'company' => 'Litware',
+            'rating' => 9,
+            'approved' => false,
+        ]);
+});
+
+test('api directory csv endpoints are forbidden when csv exchange is disabled', function () {
+    $admin = directoriesApiSuperAdmin();
+
+    $token = issueDirectoriesApiTokenFor($admin, [
+        ApiAccessToken::PERMISSION_DIRECTORIES_READ,
+        ApiAccessToken::PERMISSION_DIRECTORIES_WRITE,
+    ]);
+
+    $directory = ReferenceDirectory::factory()->create([
+        ...directoriesApiPayload(),
+        'csv_exchange_enabled' => false,
+    ]);
+
+    $csv = <<<'CSV'
+company;rating;approved
+Litware;9;false
+CSV;
+
+    $this->withHeaders(directoriesApiHeadersFor($token))
+        ->get(route('api.v1.directories.export', $directory))
+        ->assertForbidden();
+
+    $this->withHeaders(directoriesApiHeadersFor($token))
+        ->get(route('api.v1.directories.template', $directory))
+        ->assertForbidden();
+
+    $this->withHeaders(directoriesApiHeadersFor($token))
+        ->post(route('api.v1.directories.import', $directory), [
+            'delimiter' => ';',
+            'file' => UploadedFile::fake()->createWithContent('directory.csv', $csv),
+        ], [
+            'Accept' => 'application/json',
+            'Authorization' => 'Bearer '.$token,
+        ])
         ->assertForbidden();
 });

@@ -32,6 +32,9 @@ class StoreReferenceDirectoryRequest extends FormRequest
                 ? Str::slug($slug)
                 : (is_string($name) ? Str::slug($name) : null),
             'description' => $this->normalizeNullableString($this->input('description')),
+            'csv_exchange_enabled' => $this->has('csv_exchange_enabled')
+                ? $this->boolean('csv_exchange_enabled')
+                : true,
             'columns' => collect((array) $this->input('columns', []))
                 ->filter(fn (mixed $column): bool => is_array($column))
                 ->map(fn (array $column): array => [
@@ -54,6 +57,7 @@ class StoreReferenceDirectoryRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['required', 'string', 'max:255', Rule::unique('reference_directories', 'slug')],
             'description' => ['nullable', 'string', 'max:10000'],
+            'csv_exchange_enabled' => ['required', 'boolean'],
             'columns' => ['required', 'array', 'list', 'min:1', 'max:50'],
             'columns.*.key' => ['nullable', 'string', 'max:50'],
             'columns.*.label' => ['required', 'string', 'max:255'],
@@ -68,7 +72,7 @@ class StoreReferenceDirectoryRequest extends FormRequest
     }
 
     /**
-     * @return array{name: string, slug: string, description: ?string, columns: array<int, array{key: string, label: string, type: string, is_required: bool}>}
+     * @return array{name: string, slug: string, description: ?string, csv_exchange_enabled: bool, columns: array<int, array{key: string, label: string, type: string, is_required: bool}>}
      */
     public function directoryPayload(): array
     {
@@ -76,6 +80,7 @@ class StoreReferenceDirectoryRequest extends FormRequest
             'name' => $this->validated('name'),
             'slug' => $this->validated('slug'),
             'description' => $this->validated('description'),
+            'csv_exchange_enabled' => (bool) $this->validated('csv_exchange_enabled'),
             'columns' => ReferenceDirectory::normalizeColumns($this->validated('columns', [])),
         ];
     }

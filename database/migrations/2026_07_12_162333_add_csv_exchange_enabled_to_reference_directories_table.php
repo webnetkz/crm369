@@ -11,8 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('reference_directories', function (Blueprint $table) {
-            //
+        Schema::table('reference_directories', function (Blueprint $table): void {
+            $table->boolean('csv_exchange_enabled')
+                ->default(true)
+                ->after('columns');
         });
     }
 
@@ -21,8 +23,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('reference_directories', function (Blueprint $table) {
-            //
+        Schema::table('reference_directories', function (Blueprint $table): void {
+            $table->dropColumn('csv_exchange_enabled');
         });
     }
 };

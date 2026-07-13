@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Models\UserGroup;
+use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('only the configured super admin can open user management settings', function () {
@@ -107,6 +108,75 @@ test('super admin can create user groups', function () {
         ->assertRedirect();
 
     $this->assertModelExists(UserGroup::query()->where('name', 'Support')->first());
+});
+
+test('super admin can export import users as csv and download a template', function () {
+    config(['admin.super_admin_email' => 'admin@example.com']);
+
+    $admin = User::factory()->create([
+        'email' => 'admin@example.com',
+    ]);
+    $group = UserGroup::factory()->create([
+        'name' => 'Managers',
+    ]);
+    $manager = User::factory()->create([
+        'email' => 'manager@example.com',
+    ]);
+    User::factory()->create([
+        'name' => 'Existing',
+        'last_name' => 'User',
+        'email' => 'existing@example.com',
+        'phone' => '+77001234567',
+        'position' => 'Lead',
+        'manager_id' => $manager->id,
+        'user_group_id' => $group->id,
+        'is_active' => true,
+        'email_verified_at' => now(),
+    ]);
+
+    $exportResponse = $this->actingAs($admin)
+        ->get(route('settings.users.export', ['delimiter' => '|']))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($exportResponse->streamedContent())
+        ->toContain('name|last_name|middle_name|email|phone|position|manager_email|group_name|is_active|email_verified')
+        ->toContain('existing@example.com')
+        ->toContain('manager@example.com')
+        ->toContain('Managers');
+
+    $templateResponse = $this->actingAs($admin)
+        ->get(route('settings.users.template', ['delimiter' => ';']))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($templateResponse->streamedContent())
+        ->toContain('name;last_name;middle_name;email;phone;position;manager_email;group_name;is_active;email_verified')
+        ->toContain('aruzhan@example.com');
+
+    $csv = <<<'CSV'
+name;last_name;middle_name;email;phone;position;manager_email;group_name;is_active;email_verified
+Aruzhan;Sarsenova;;aruzhan@example.com;87011234567;Manager;manager@example.com;Managers;false;true
+CSV;
+
+    $this->actingAs($admin)
+        ->from(route('settings.users.index'))
+        ->post(route('settings.users.import'), [
+            'delimiter' => ';',
+            'file' => UploadedFile::fake()->createWithContent('users.csv', $csv),
+        ])
+        ->assertRedirect(route('settings.users.index'));
+
+    $importedUser = User::query()->where('email', 'aruzhan@example.com')->firstOrFail();
+
+    expect($importedUser->name)->toBe('Aruzhan')
+        ->and($importedUser->last_name)->toBe('Sarsenova')
+        ->and($importedUser->phone)->toBe('+77011234567')
+        ->and($importedUser->position)->toBe('Manager')
+        ->and($importedUser->manager_id)->toBe($manager->id)
+        ->and($importedUser->user_group_id)->toBe($group->id)
+        ->and($importedUser->is_active)->toBeFalse()
+        ->and($importedUser->email_verified_at)->not->toBeNull();
 });
 
 test('super admin can paginate user groups with supported page sizes', function () {

@@ -11,18 +11,25 @@ import {
     CircleCheck,
     CircleX,
     Columns3,
+    Download,
     KeyRound,
     LogIn,
     RefreshCw,
     RotateCcw,
     Search,
     SlidersHorizontal,
+    Upload,
     UserPlus,
     X,
 } from '@lucide/vue';
 import { useClipboard } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
-import { show as showManagedUser } from '@/actions/App/Http/Controllers/Settings/UserController';
+import {
+    downloadCsvTemplate as downloadUsersCsvTemplate,
+    exportCsv as exportUsersCsv,
+    importCsv as importUsersCsv,
+    show as showManagedUser,
+} from '@/actions/App/Http/Controllers/Settings/UserController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import PaginationControls from '@/components/PaginationControls.vue';
@@ -157,6 +164,11 @@ const createUserForm = useForm({
     email_verified: false,
 });
 
+const csvImportForm = useForm({
+    delimiter: ';',
+    file: null as File | null,
+});
+
 const passwordForm = useForm({
     password: '',
     password_confirmation: '',
@@ -180,6 +192,7 @@ const filtersForm = useForm<UserFilters>({
     registered_to: props.filters.registered_to,
     per_page: props.filters.per_page,
 });
+const usersCsvInput = ref<HTMLInputElement | null>(null);
 
 const visibleUsers = computed(() => props.users.data);
 const userTableColumnOptions = computed<UserTableOptionalColumnOption[]>(() => [
@@ -256,6 +269,59 @@ const submitCreateUser = (): void => {
     createUserForm.post(store.url(), {
         preserveScroll: true,
         onSuccess: () => closeCreateUserDialog(),
+    });
+};
+
+const downloadUsersCsvFile = (): void => {
+    window.location.assign(
+        exportUsersCsv.url({
+            query: {
+                delimiter: csvImportForm.delimiter,
+            },
+        }),
+    );
+};
+
+const downloadUsersCsvTemplateFile = (): void => {
+    window.location.assign(
+        downloadUsersCsvTemplate.url({
+            query: {
+                delimiter: csvImportForm.delimiter,
+            },
+        }),
+    );
+};
+
+const openUsersCsvImport = (): void => {
+    csvImportForm.clearErrors();
+    csvImportForm.file = null;
+
+    if (usersCsvInput.value) {
+        usersCsvInput.value.value = '';
+        usersCsvInput.value.click();
+    }
+};
+
+const handleUsersCsvFileChange = (event: Event): void => {
+    const input = event.target as HTMLInputElement;
+    csvImportForm.file = input.files?.[0] ?? null;
+};
+
+const submitUsersCsvImport = (): void => {
+    if (csvImportForm.file === null) {
+        return;
+    }
+
+    csvImportForm.post(importUsersCsv.url(), {
+        preserveScroll: true,
+        onSuccess: () => {
+            csvImportForm.reset();
+        },
+        onFinish: () => {
+            if (usersCsvInput.value) {
+                usersCsvInput.value.value = '';
+            }
+        },
     });
 };
 
@@ -796,6 +862,14 @@ const formatStructureSummary = (
 <template>
     <Head :title="t.admin.users_title" />
 
+    <input
+        ref="usersCsvInput"
+        type="file"
+        accept=".csv,text/csv"
+        class="hidden"
+        @change="handleUsersCsvFileChange"
+    />
+
     <h1 class="sr-only">{{ t.admin.users_title }}</h1>
 
     <div class="space-y-6">
@@ -815,6 +889,35 @@ const formatStructureSummary = (
                 </div>
 
                 <div class="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        @click="downloadUsersCsvFile"
+                    >
+                        <Download class="size-4" />
+                        {{ t.admin.csv_export }}
+                    </Button>
+                    <Button
+                        v-if="can.manage_accounts"
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        @click="downloadUsersCsvTemplateFile"
+                    >
+                        <Download class="size-4" />
+                        {{ t.admin.csv_download_template }}
+                    </Button>
+                    <Button
+                        v-if="can.manage_accounts"
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        @click="openUsersCsvImport"
+                    >
+                        <Upload class="size-4" />
+                        {{ t.admin.csv_import }}
+                    </Button>
                     <Button
                         v-if="can.manage_accounts"
                         type="button"
@@ -886,6 +989,39 @@ const formatStructureSummary = (
                         {{ t.admin.reset_filters }}
                     </Button>
                 </div>
+            </div>
+
+            <div class="grid gap-2 rounded-lg border border-dashed border-border p-3">
+                <p class="text-sm text-muted-foreground">
+                    {{ t.admin.csv_description }}
+                </p>
+                <div class="flex flex-col gap-2 md:flex-row md:items-end">
+                    <div class="grid gap-2">
+                        <Label for="users-csv-delimiter">
+                            {{ t.admin.csv_delimiter }}
+                        </Label>
+                        <Input
+                            id="users-csv-delimiter"
+                            v-model="csvImportForm.delimiter"
+                            :placeholder="t.admin.csv_delimiter_placeholder"
+                            class="w-28"
+                        />
+                    </div>
+                    <Button
+                        v-if="can.manage_accounts"
+                        type="button"
+                        :disabled="csvImportForm.processing || csvImportForm.file === null"
+                        @click="submitUsersCsvImport"
+                    >
+                        <Upload class="size-4" />
+                        {{ t.admin.csv_import }}
+                    </Button>
+                </div>
+                <p class="text-xs text-muted-foreground">
+                    {{ t.admin.csv_delimiter_hint }}
+                </p>
+                <InputError :message="csvImportForm.errors.delimiter" />
+                <InputError :message="csvImportForm.errors.file" />
             </div>
 
             <div class="relative">

@@ -255,12 +255,12 @@ test('standalone tasks can be exported to csv', function () {
     ]);
 
     $response = $this->actingAs($user)
-        ->get(route('tasks.export'))
+        ->get(route('tasks.export', ['delimiter' => '|']))
         ->assertSuccessful()
         ->assertHeader('content-type', 'text/csv; charset=UTF-8');
 
     expect($response->streamedContent())
-        ->toContain('task_key,parent_task_key,title,description,status,importance,complexity,due_at,sort_order,assignee_email,co_assignee_emails')
+        ->toContain('task_key|parent_task_key|title|description|status|importance|complexity|due_at|sort_order|assignee_email|co_assignee_emails')
         ->toContain('Parent export task')
         ->toContain('Child export task')
         ->toContain('assignee@example.com')
@@ -273,14 +273,15 @@ test('standalone tasks can be imported from csv with parent links', function () 
     $coAssignee = User::factory()->create(['email' => 'helper@example.com']);
 
     $csv = <<<'CSV'
-task_key,parent_task_key,title,description,status,importance,complexity,due_at,sort_order,assignee_email,co_assignee_emails
-launch,,Launch plan,Plan the release,in_progress,high,7,2026-07-03T09:00:00+00:00,2,assignee@example.com,helper@example.com
-checklist,launch,Prepare checklist,,todo,normal,3,,5,,
+task_key;parent_task_key;title;description;status;importance;complexity;due_at;sort_order;assignee_email;co_assignee_emails
+launch;;Launch plan;Plan the release;in_progress;high;7;2026-07-03T09:00:00+00:00;2;assignee@example.com;helper@example.com
+checklist;launch;Prepare checklist;;todo;normal;3;;5;;
 CSV;
 
     $response = $this->actingAs($user)
         ->from(route('tasks.index'))
         ->post(route('tasks.import'), [
+            'delimiter' => ';',
             'file' => UploadedFile::fake()->createWithContent('tasks.csv', $csv),
         ])
         ->assertRedirect(route('tasks.index'));
@@ -311,13 +312,14 @@ test('project task csv import requires project member assignees', function () {
     $project->members()->sync([$owner->id]);
 
     $csv = <<<'CSV'
-task_key,parent_task_key,title,description,status,importance,complexity,due_at,sort_order,assignee_email,co_assignee_emails
-launch,,Launch plan,Plan the release,in_progress,high,7,,2,outsider@example.com,
+task_key;parent_task_key;title;description;status;importance;complexity;due_at;sort_order;assignee_email;co_assignee_emails
+launch;;Launch plan;Plan the release;in_progress;high;7;;2;outsider@example.com;
 CSV;
 
     $this->actingAs($owner)
         ->from(route('projects.show', $project))
         ->post(route('projects.tasks.import', $project), [
+            'delimiter' => ';',
             'file' => UploadedFile::fake()->createWithContent('project-tasks.csv', $csv),
         ])
         ->assertRedirect(route('projects.show', $project))
@@ -325,6 +327,34 @@ CSV;
 
     expect(ProjectTask::query()->where('project_id', $project->id)->count())->toBe(0)
         ->and($outsider->email)->toBe('outsider@example.com');
+});
+
+test('task csv templates can be downloaded with a custom delimiter for standalone and project tasks', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create([
+        'owner_user_id' => $user->id,
+        'created_by_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+    ]);
+    $project->members()->sync([$user->id]);
+
+    $standaloneTemplateResponse = $this->actingAs($user)
+        ->get(route('tasks.template', ['delimiter' => '|']))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($standaloneTemplateResponse->streamedContent())
+        ->toContain('task_key|parent_task_key|title|description|status|importance|complexity|due_at|sort_order|assignee_email|co_assignee_emails')
+        ->toContain('task_launch');
+
+    $projectTemplateResponse = $this->actingAs($user)
+        ->get(route('projects.tasks.template', ['project' => $project, 'delimiter' => ';']))
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    expect($projectTemplateResponse->streamedContent())
+        ->toContain('task_key;parent_task_key;title;description;status;importance;complexity;due_at;sort_order;assignee_email;co_assignee_emails')
+        ->toContain('task_launch');
 });
 
 test('standalone task can be moved across kanban stages and is closed when moved to done', function () {

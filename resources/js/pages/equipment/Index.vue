@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { Head, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { Eye, Hash, Package, PencilLine, Plus, Printer, UserCog, Wrench } from '@lucide/vue';
+import { Download, Eye, Hash, Package, PencilLine, Plus, Printer, Upload, UserCog, Wrench } from '@lucide/vue';
 import { computed, ref, watchEffect } from 'vue';
+import {
+    downloadCsvTemplate,
+    exportCsv,
+    importCsv,
+} from '@/actions/App/Http/Controllers/EquipmentController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
@@ -80,11 +85,16 @@ const form = useForm({
     responsible_user_id: emptyUserValue,
     issued_to_user_id: emptyUserValue,
 });
+const csvImportForm = useForm({
+    delimiter: ';',
+    file: null as File | null,
+});
 
 const dialogOpen = ref(false);
 const editingEquipmentId = ref<number | null>(null);
 const detailsDialogOpen = ref(false);
 const selectedEquipmentItem = ref<EquipmentItem | null>(null);
+const csvImportInput = ref<HTMLInputElement | null>(null);
 
 const isEditing = computed(() => editingEquipmentId.value !== null);
 
@@ -335,6 +345,59 @@ const printEquipmentQr = (): void => {
     printFrame.srcdoc = printMarkup;
 };
 
+const downloadEquipmentCsv = (): void => {
+    window.location.assign(
+        exportCsv.url({
+            query: {
+                delimiter: csvImportForm.delimiter,
+            },
+        }),
+    );
+};
+
+const downloadEquipmentCsvTemplate = (): void => {
+    window.location.assign(
+        downloadCsvTemplate.url({
+            query: {
+                delimiter: csvImportForm.delimiter,
+            },
+        }),
+    );
+};
+
+const openEquipmentCsvImport = (): void => {
+    csvImportForm.clearErrors();
+    csvImportForm.file = null;
+
+    if (csvImportInput.value) {
+        csvImportInput.value.value = '';
+        csvImportInput.value.click();
+    }
+};
+
+const handleEquipmentCsvFileChange = (event: Event): void => {
+    const input = event.target as HTMLInputElement;
+    csvImportForm.file = input.files?.[0] ?? null;
+};
+
+const submitEquipmentCsvImport = (): void => {
+    if (csvImportForm.file === null) {
+        return;
+    }
+
+    csvImportForm.post(importCsv.url(), {
+        preserveScroll: true,
+        onSuccess: () => {
+            csvImportForm.reset();
+        },
+        onFinish: () => {
+            if (csvImportInput.value) {
+                csvImportInput.value.value = '';
+            }
+        },
+    });
+};
+
 const maintenanceStatusDescription = computed(() => {
     return props.statusOptions
         .filter((statusOption) => ['maintenance', 'repair'].includes(statusOption.value))
@@ -346,22 +409,78 @@ const maintenanceStatusDescription = computed(() => {
 <template>
     <Head :title="t.equipment.title" />
 
+    <input
+        ref="csvImportInput"
+        type="file"
+        accept=".csv,text/csv"
+        class="hidden"
+        @change="handleEquipmentCsvFileChange"
+    />
+
     <h1 class="sr-only">{{ t.equipment.title }}</h1>
 
     <div class="space-y-8">
         <div
-            class="flex flex-col gap-4 rounded-3xl border border-border bg-card p-6 lg:flex-row lg:items-start lg:justify-between"
+            class="flex flex-col gap-4 rounded-3xl border border-border bg-card p-6"
         >
-            <Heading
-                variant="small"
-                :title="t.equipment.title"
-                :description="t.equipment.description"
-            />
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <Heading
+                    variant="small"
+                    :title="t.equipment.title"
+                    :description="t.equipment.description"
+                />
 
-            <Button type="button" class="gap-2 self-start" @click="openCreateDialog">
-                <Plus class="size-4" />
-                <span>{{ t.equipment.create_item }}</span>
-            </Button>
+                <div class="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" @click="downloadEquipmentCsv">
+                        <Download class="size-4" />
+                        {{ t.equipment.csv_export }}
+                    </Button>
+                    <Button type="button" variant="outline" @click="downloadEquipmentCsvTemplate">
+                        <Download class="size-4" />
+                        {{ t.equipment.csv_download_template }}
+                    </Button>
+                    <Button type="button" variant="outline" @click="openEquipmentCsvImport">
+                        <Upload class="size-4" />
+                        {{ t.equipment.csv_import }}
+                    </Button>
+                    <Button type="button" class="gap-2 self-start" @click="openCreateDialog">
+                        <Plus class="size-4" />
+                        <span>{{ t.equipment.create_item }}</span>
+                    </Button>
+                </div>
+            </div>
+
+            <div class="grid gap-2 rounded-2xl border border-dashed border-border p-4">
+                <p class="text-sm text-muted-foreground">
+                    {{ t.equipment.csv_description }}
+                </p>
+                <div class="flex flex-col gap-2 md:flex-row md:items-end">
+                    <div class="grid gap-2">
+                        <Label for="equipment-csv-delimiter">
+                            {{ t.equipment.csv_delimiter }}
+                        </Label>
+                        <Input
+                            id="equipment-csv-delimiter"
+                            v-model="csvImportForm.delimiter"
+                            :placeholder="t.equipment.csv_delimiter_placeholder"
+                            class="w-28"
+                        />
+                    </div>
+                    <Button
+                        type="button"
+                        :disabled="csvImportForm.processing || csvImportForm.file === null"
+                        @click="submitEquipmentCsvImport"
+                    >
+                        <Upload class="size-4" />
+                        {{ t.equipment.csv_import }}
+                    </Button>
+                </div>
+                <p class="text-xs text-muted-foreground">
+                    {{ t.equipment.csv_delimiter_hint }}
+                </p>
+                <InputError :message="csvImportForm.errors.delimiter" />
+                <InputError :message="csvImportForm.errors.file" />
+            </div>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">

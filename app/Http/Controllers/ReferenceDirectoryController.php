@@ -159,6 +159,7 @@ class ReferenceDirectoryController extends Controller
         ReferenceDirectoryCsvService $referenceDirectoryCsvService,
     ): StreamedResponse {
         abort_unless($request->user()?->canAccessDirectories() ?? false, 403);
+        $this->ensureCsvExchangeEnabled($referenceDirectory);
 
         return $referenceDirectoryCsvService->downloadRecords(
             $referenceDirectory,
@@ -173,6 +174,7 @@ class ReferenceDirectoryController extends Controller
         ReferenceDirectoryCsvService $referenceDirectoryCsvService,
     ): StreamedResponse {
         abort_unless($request->user()?->canAccessDirectories() ?? false, 403);
+        $this->ensureCsvExchangeEnabled($referenceDirectory);
 
         return $referenceDirectoryCsvService->downloadTemplate(
             $referenceDirectory,
@@ -186,6 +188,8 @@ class ReferenceDirectoryController extends Controller
         ReferenceDirectory $referenceDirectory,
         ReferenceDirectoryCsvService $referenceDirectoryCsvService,
     ): RedirectResponse {
+        $this->ensureCsvExchangeEnabled($referenceDirectory);
+
         $importedCount = $referenceDirectoryCsvService->import(
             $referenceDirectory,
             $request->uploadedFile(),
@@ -266,5 +270,10 @@ class ReferenceDirectoryController extends Controller
         }
 
         return $delimiter;
+    }
+
+    private function ensureCsvExchangeEnabled(ReferenceDirectory $referenceDirectory): void
+    {
+        abort_unless($referenceDirectory->csv_exchange_enabled, 403, __('ui.directories.csv_disabled'));
     }
 }

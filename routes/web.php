@@ -82,6 +82,12 @@ Route::get('portal-webhooks/{portalWebhook}/directories', [PortalWebhookReferenc
 Route::get('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}', [PortalWebhookReferenceDirectoryController::class, 'show'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.read', 'module.enabled:directories'])
     ->name('portal-webhooks.directories.show');
+Route::get('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}/export', [PortalWebhookReferenceDirectoryController::class, 'exportCsv'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.read', 'module.enabled:directories'])
+    ->name('portal-webhooks.directories.export');
+Route::get('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}/template', [PortalWebhookReferenceDirectoryController::class, 'downloadCsvTemplate'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.read', 'module.enabled:directories'])
+    ->name('portal-webhooks.directories.template');
 Route::post('portal-webhooks/{portalWebhook}/directories', [PortalWebhookReferenceDirectoryController::class, 'store'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.write', 'module.enabled:directories'])
     ->name('portal-webhooks.directories.store');
@@ -94,6 +100,9 @@ Route::delete('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}'
 Route::post('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}/records', [PortalWebhookReferenceDirectoryController::class, 'storeRecord'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.write', 'module.enabled:directories'])
     ->name('portal-webhooks.directories.records.store');
+Route::post('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}/import', [PortalWebhookReferenceDirectoryController::class, 'importCsv'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.write', 'module.enabled:directories'])
+    ->name('portal-webhooks.directories.import');
 Route::patch('portal-webhooks/{portalWebhook}/directories/{referenceDirectory}/records/{referenceDirectoryRecord}', [PortalWebhookReferenceDirectoryController::class, 'updateRecord'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:directories.write', 'module.enabled:directories'])
     ->name('portal-webhooks.directories.records.update');
@@ -194,9 +203,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('contacts', [ContactController::class, 'index'])
             ->middleware('can:access-contacts')
             ->name('contacts.index');
+        Route::get('contacts/export', [ContactController::class, 'exportCsv'])
+            ->middleware('can:access-contacts')
+            ->name('contacts.export');
+        Route::get('contacts/template', [ContactController::class, 'downloadCsvTemplate'])
+            ->middleware('can:access-contacts')
+            ->name('contacts.template');
         Route::post('contacts', [ContactController::class, 'store'])
             ->middleware('can:access-contacts')
             ->name('contacts.store');
+        Route::post('contacts/import', [ContactController::class, 'importCsv'])
+            ->middleware('can:access-contacts')
+            ->name('contacts.import');
         Route::post('contacts/{contact}/comments', [ContactCommentController::class, 'store'])
             ->middleware('can:access-contacts')
             ->name('contacts.comments.store');
@@ -290,6 +308,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['module.enabled:projects', 'can:access-projects'])->group(function () {
         Route::get('tasks', [ProjectController::class, 'tasksIndex'])->name('tasks.index');
         Route::get('tasks/export', [ProjectController::class, 'exportStandaloneTasks'])->name('tasks.export');
+        Route::get('tasks/template', [ProjectController::class, 'downloadStandaloneTasksTemplate'])->name('tasks.template');
         Route::post('tasks/import', [ProjectController::class, 'importStandaloneTasks'])->name('tasks.import');
         Route::get('tasks/{projectTask}', [ProjectController::class, 'showStandaloneTask'])->name('tasks.show');
         Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
@@ -304,6 +323,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('projects/tasks/{projectTask}', [ProjectController::class, 'destroyWorkspaceTask'])->name('projects.workspace.tasks.destroy');
         Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
         Route::get('projects/{project}/tasks/export', [ProjectController::class, 'exportProjectTasks'])->name('projects.tasks.export');
+        Route::get('projects/{project}/tasks/template', [ProjectController::class, 'downloadProjectTasksTemplate'])->name('projects.tasks.template');
         Route::post('projects/{project}/tasks/import', [ProjectController::class, 'importProjectTasks'])->name('projects.tasks.import');
         Route::get('projects/{project}/tasks/{projectTask}', [ProjectController::class, 'task'])->name('projects.tasks.show');
         Route::post('projects', [ProjectController::class, 'store'])->name('projects.store');
@@ -328,6 +348,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware(['module.enabled:equipment', 'can:access-equipment'])->group(function () {
         Route::get('equipment', [EquipmentController::class, 'index'])->name('equipment.index');
+        Route::get('equipment/export', [EquipmentController::class, 'exportCsv'])->name('equipment.export');
+        Route::get('equipment/template', [EquipmentController::class, 'downloadCsvTemplate'])->name('equipment.template');
+        Route::post('equipment/import', [EquipmentController::class, 'importCsv'])->name('equipment.import');
         Route::post('equipment', [EquipmentController::class, 'store'])->name('equipment.store');
         Route::patch('equipment/{equipmentItem}', [EquipmentController::class, 'update'])->name('equipment.update');
     });

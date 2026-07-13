@@ -53,22 +53,35 @@ Route::middleware(['auth', 'verified', 'module.enabled:api', 'can:manage-api-tok
 
 Route::middleware(['auth', 'verified', 'can:view-users'])->group(function () {
     Route::get('settings/users', [UserController::class, 'index'])->name('settings.users.index');
-    Route::get('settings/users/{user}', [UserController::class, 'show'])->name('settings.users.show');
+    Route::get('settings/users/export', [UserController::class, 'exportCsv'])->name('settings.users.export');
+    Route::get('settings/users/{user}', [UserController::class, 'show'])
+        ->whereNumber('user')
+        ->name('settings.users.show');
     Route::patch('settings/users/table-columns', [UserController::class, 'updateTableColumns'])->name('settings.users.table-columns.update');
 });
 
 Route::middleware(['auth', 'verified', 'can:manage-user-accounts'])->group(function () {
     Route::post('settings/users', [UserController::class, 'store'])->name('settings.users.store');
-    Route::patch('settings/users/{user}/profile', [UserController::class, 'updateProfile'])->name('settings.users.profile.update');
-    Route::patch('settings/users/{user}/password', [UserController::class, 'resetPassword'])->name('settings.users.password.reset');
+    Route::get('settings/users/template', [UserController::class, 'downloadCsvTemplate'])->name('settings.users.template');
+    Route::post('settings/users/import', [UserController::class, 'importCsv'])->name('settings.users.import');
+    Route::patch('settings/users/{user}/profile', [UserController::class, 'updateProfile'])
+        ->whereNumber('user')
+        ->name('settings.users.profile.update');
+    Route::patch('settings/users/{user}/password', [UserController::class, 'resetPassword'])
+        ->whereNumber('user')
+        ->name('settings.users.password.reset');
 });
 
 Route::middleware(['auth', 'verified', 'can:impersonate-users'])->group(function () {
-    Route::post('settings/users/{user}/impersonation', [UserImpersonationController::class, 'store'])->name('settings.users.impersonation.store');
+    Route::post('settings/users/{user}/impersonation', [UserImpersonationController::class, 'store'])
+        ->whereNumber('user')
+        ->name('settings.users.impersonation.store');
 });
 
 Route::middleware(['auth', 'verified', 'can:manage-user-activation'])->group(function () {
-    Route::patch('settings/users/{user}/activation', [UserController::class, 'updateActivation'])->name('settings.users.activation.update');
+    Route::patch('settings/users/{user}/activation', [UserController::class, 'updateActivation'])
+        ->whereNumber('user')
+        ->name('settings.users.activation.update');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -82,7 +95,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified', 'can:manage-users'])->group(function () {
-    Route::patch('settings/users/{user}/group', [UserController::class, 'updateGroup'])->name('settings.users.group.update');
+    Route::patch('settings/users/{user}/group', [UserController::class, 'updateGroup'])
+        ->whereNumber('user')
+        ->name('settings.users.group.update');
 
     Route::get('settings/groups', [UserGroupController::class, 'index'])->name('settings.groups.index');
     Route::post('settings/groups', [UserGroupController::class, 'store'])->name('settings.groups.store');

@@ -21,9 +21,12 @@ type WebhookDocumentation = {
     contacts_destroy_url: string;
     directories_index_url: string;
     directories_show_url: string;
+    directories_export_url: string;
+    directories_template_url: string;
     directories_store_url: string;
     directories_update_url: string;
     directories_destroy_url: string;
+    directories_import_url: string;
     directory_records_store_url: string;
     directory_records_update_url: string;
     directory_records_destroy_url: string;
@@ -198,6 +201,20 @@ const endpointExamples = computed<EndpointExample[]>(() => [
         permission: PortalWebhookDirectoriesReadPermission,
     },
     {
+        method: 'GET',
+        path: `${props.documentation.directories_export_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_directories_export_title,
+        description: t.value.webhooks.documentation_endpoint_directories_export_description,
+        permission: PortalWebhookDirectoriesReadPermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.directories_template_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_directories_template_title,
+        description: t.value.webhooks.documentation_endpoint_directories_template_description,
+        permission: PortalWebhookDirectoriesReadPermission,
+    },
+    {
         method: 'POST',
         path: `${props.documentation.directories_store_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_directories_store_title,
@@ -216,6 +233,13 @@ const endpointExamples = computed<EndpointExample[]>(() => [
         path: `${props.documentation.directories_destroy_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_directories_destroy_title,
         description: t.value.webhooks.documentation_endpoint_directories_destroy_description,
+        permission: PortalWebhookDirectoriesWritePermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.directories_import_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_directories_import_title,
+        description: t.value.webhooks.documentation_endpoint_directories_import_description,
         permission: PortalWebhookDirectoriesWritePermission,
     },
     {

@@ -2,17 +2,20 @@
 
 namespace App\Http\Requests\Settings;
 
+use App\Http\Requests\Concerns\InteractsWithCsvImport;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ImportUsersRequest extends FormRequest
 {
+    use InteractsWithCsvImport;
+
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return false;
+        return $this->user()?->can('manage-user-accounts') ?? false;
     }
 
     /**
@@ -22,8 +25,16 @@ class ImportUsersRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            //
-        ];
+        return $this->csvImportRules();
+    }
+
+    public function after(): array
+    {
+        return $this->csvImportAfter();
+    }
+
+    protected function csvDelimiterValidationKey(): string
+    {
+        return 'ui.admin.csv_delimiter_invalid';
     }
 }
