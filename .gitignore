@@ -15,6 +15,7 @@
 .env
 .env.backup
 .env.production
+.gradle-local
 .phpactor.json
 .phpunit.result.cache
 /.agents

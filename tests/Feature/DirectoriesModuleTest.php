@@ -98,6 +98,17 @@ test('directories module is available in the menu and opens for users with acces
         ->toContain('directories');
 });
 
+test('directories page renders records in a table layout', function () {
+    $page = file_get_contents(resource_path('js/pages/directories/Index.vue'));
+
+    expect($page)->toContain('class="overflow-x-auto rounded-2xl border border-border bg-background/70"')
+        ->toContain('<table class="min-w-full text-sm">')
+        ->toContain('t.directories.record_short')
+        ->toContain('t.directories.updated_at')
+        ->toContain('t.directories.actions')
+        ->not->toContain('class="mt-4 grid gap-4 lg:grid-cols-2"');
+});
+
 test('super admin can manage directories and their records from the web module', function () {
     $user = directoriesWebSuperAdmin();
 
@@ -138,6 +149,22 @@ test('super admin can manage directories and their records from the web module',
             'is_active' => true,
             'start_date' => '2026-07-09',
         ]);
+
+    $this->actingAs($user)
+        ->get(route('directories.show', $directory))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('directories/Index')
+            ->has('activeDirectory.records', 1, fn (Assert $recordPage) => $recordPage
+                ->where('id', $record->id)
+                ->where('values.full_name', 'Aruzhan Sarsenova')
+                ->where('values.age', 29)
+                ->where('values.is_active', true)
+                ->where('creator.name', $user->name)
+                ->where('updater.name', $user->name)
+                ->etc()
+            )
+        );
 
     $this->actingAs($user)
         ->patch(route('directories.records.update', [$directory, $record]), directoriesWebRecordPayload(

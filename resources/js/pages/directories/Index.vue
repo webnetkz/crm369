@@ -77,6 +77,8 @@ type DirectorySummary = {
 
 type ActiveDirectory = DirectorySummary & {
     records: DirectoryRecord[];
+    created_at: string | null;
+    updated_at: string | null;
     creator: DirectoryPerson;
     updater: DirectoryPerson;
 };
@@ -102,7 +104,7 @@ const props = defineProps<{
     };
 }>();
 
-const { t } = useLanguage();
+const { language, t } = useLanguage();
 
 const textareaClass =
     'min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
@@ -222,10 +224,7 @@ const removeColumn = (index: number): void => {
 };
 
 const submitDirectory = (): void => {
-    if (
-        directoryMode.value === 'edit'
-        && props.activeDirectory
-    ) {
+    if (directoryMode.value === 'edit' && props.activeDirectory) {
         directoryForm.patch(updateDirectory.url(props.activeDirectory.id), {
             preserveScroll: true,
             preserveState: 'errors',
@@ -251,7 +250,17 @@ const formatDateTime = (value: string | null): string => {
         return t.value.directories.never_updated;
     }
 
-    return new Date(value).toLocaleString();
+    return new Intl.DateTimeFormat(
+        language.value === 'ru' ? 'ru-RU' : 'en-US',
+        {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        },
+    ).format(new Date(value));
+};
+
+const formatPersonName = (person: DirectoryPerson): string => {
+    return person?.name ?? t.value.directories.unknown_author;
 };
 
 const formatRecordValue = (
@@ -263,7 +272,9 @@ const formatRecordValue = (
     }
 
     if (column.type === 'boolean') {
-        return value ? t.value.directories.boolean_true : t.value.directories.boolean_false;
+        return value
+            ? t.value.directories.boolean_true
+            : t.value.directories.boolean_false;
     }
 
     return String(value);
@@ -276,7 +287,10 @@ const normalizeRecordDefaults = (
     return Object.fromEntries(
         directory.columns.map((column) => [
             column.key,
-            normalizeRecordFieldValue(column, record?.values?.[column.key] ?? null),
+            normalizeRecordFieldValue(
+                column,
+                record?.values?.[column.key] ?? null,
+            ),
         ]),
     );
 };
@@ -360,7 +374,10 @@ const submitRecord = (): void => {
 
     if (recordMode.value === 'edit' && editingRecordId.value) {
         recordForm.patch(
-            updateRecord.url(props.activeDirectory.id, editingRecordId.value),
+            updateRecord.url({
+                referenceDirectory: props.activeDirectory.id,
+                referenceDirectoryRecord: editingRecordId.value,
+            }),
             {
                 preserveScroll: true,
                 preserveState: 'errors',
@@ -405,9 +422,15 @@ const deleteDirectoryRecord = (recordId: number): void => {
         return;
     }
 
-    router.delete(destroyRecord.url(props.activeDirectory.id, recordId), {
-        preserveScroll: true,
-    });
+    router.delete(
+        destroyRecord.url({
+            referenceDirectory: props.activeDirectory.id,
+            referenceDirectoryRecord: recordId,
+        }),
+        {
+            preserveScroll: true,
+        },
+    );
 };
 
 const downloadDirectoryExport = (): void => {
@@ -417,7 +440,9 @@ const downloadDirectoryExport = (): void => {
 
     window.location.assign(
         exportCsv.url(props.activeDirectory.id, {
-            delimiter: csvImportForm.delimiter,
+            query: {
+                delimiter: csvImportForm.delimiter,
+            },
         }),
     );
 };
@@ -429,7 +454,9 @@ const downloadDirectoryTemplate = (): void => {
 
     window.location.assign(
         downloadCsvTemplate.url(props.activeDirectory.id, {
-            delimiter: csvImportForm.delimiter,
+            query: {
+                delimiter: csvImportForm.delimiter,
+            },
         }),
     );
 };
@@ -480,7 +507,9 @@ const submitCsvImport = (): void => {
         </div>
 
         <div class="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
-            <aside class="space-y-4 rounded-3xl border border-border bg-card/60 p-5 shadow-xs">
+            <aside
+                class="space-y-4 rounded-3xl border border-border bg-card/60 p-5 shadow-xs"
+            >
                 <div class="flex items-center gap-2 text-base font-semibold">
                     <BookOpenText class="size-5 text-muted-foreground" />
                     {{ t.directories.list_title }}
@@ -514,7 +543,9 @@ const submitCsvImport = (): void => {
                                 <div class="truncate font-medium">
                                     {{ directory.name }}
                                 </div>
-                                <div class="truncate text-xs text-muted-foreground">
+                                <div
+                                    class="truncate text-xs text-muted-foreground"
+                                >
                                     {{ directory.slug }}
                                 </div>
                             </div>
@@ -581,18 +612,48 @@ const submitCsvImport = (): void => {
                             {{ props.activeDirectory.description }}
                         </p>
 
-                        <div class="grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
+                        <div
+                            class="grid gap-2 text-sm text-muted-foreground md:grid-cols-2"
+                        >
                             <div>
-                                {{ t.directories.columns_count.replace(':count', String(props.activeDirectory.columns.length)) }}
+                                {{
+                                    t.directories.columns_count.replace(
+                                        ':count',
+                                        String(
+                                            props.activeDirectory.columns
+                                                .length,
+                                        ),
+                                    )
+                                }}
                             </div>
                             <div>
-                                {{ t.directories.records_count.replace(':count', String(props.activeDirectory.records_count)) }}
+                                {{
+                                    t.directories.records_count.replace(
+                                        ':count',
+                                        String(
+                                            props.activeDirectory.records_count,
+                                        ),
+                                    )
+                                }}
                             </div>
                             <div>
-                                {{ t.directories.created_by_label.replace(':name', props.activeDirectory.creator?.name ?? t.directories.unknown_author) }}
+                                {{
+                                    t.directories.created_by_label.replace(
+                                        ':name',
+                                        props.activeDirectory.creator?.name ??
+                                            t.directories.unknown_author,
+                                    )
+                                }}
                             </div>
                             <div>
-                                {{ t.directories.updated_at_label.replace(':date', formatDateTime(props.activeDirectory.updated_at)) }}
+                                {{
+                                    t.directories.updated_at_label.replace(
+                                        ':date',
+                                        formatDateTime(
+                                            props.activeDirectory.updated_at,
+                                        ),
+                                    )
+                                }}
                             </div>
                         </div>
                     </div>
@@ -623,7 +684,9 @@ const submitCsvImport = (): void => {
                 </div>
 
                 <div class="space-y-4">
-                    <div class="flex items-center gap-2 text-base font-semibold">
+                    <div
+                        class="flex items-center gap-2 text-base font-semibold"
+                    >
                         <Rows3 class="size-5 text-muted-foreground" />
                         {{ t.directories.columns_title }}
                     </div>
@@ -634,8 +697,12 @@ const submitCsvImport = (): void => {
                             :key="column.key"
                             class="rounded-2xl border border-border bg-background/70 p-4"
                         >
-                            <div class="flex items-center justify-between gap-3">
-                                <div class="font-medium">{{ column.label }}</div>
+                            <div
+                                class="flex items-center justify-between gap-3"
+                            >
+                                <div class="font-medium">
+                                    {{ column.label }}
+                                </div>
                                 <Badge variant="outline">
                                     {{ column.key }}
                                 </Badge>
@@ -643,7 +710,16 @@ const submitCsvImport = (): void => {
 
                             <div class="mt-3 flex flex-wrap gap-2">
                                 <Badge variant="secondary">
-                                    {{ t.directories.type_label.replace(':type', props.columnTypes.find((option) => option.value === column.type)?.label ?? column.type) }}
+                                    {{
+                                        t.directories.type_label.replace(
+                                            ':type',
+                                            props.columnTypes.find(
+                                                (option) =>
+                                                    option.value ===
+                                                    column.type,
+                                            )?.label ?? column.type,
+                                        )
+                                    }}
                                 </Badge>
                                 <Badge
                                     :variant="
@@ -663,8 +739,12 @@ const submitCsvImport = (): void => {
                     </div>
                 </div>
 
-                <div class="rounded-2xl border border-border bg-background/70 p-5">
-                    <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div
+                    class="rounded-2xl border border-border bg-background/70 p-5"
+                >
+                    <div
+                        class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"
+                    >
                         <div class="space-y-2">
                             <div class="text-base font-semibold">
                                 {{ t.directories.csv_title }}
@@ -685,13 +765,17 @@ const submitCsvImport = (): void => {
                                 <Input
                                     id="directory-csv-delimiter"
                                     v-model="csvImportForm.delimiter"
-                                    :placeholder="t.directories.csv_delimiter_placeholder"
+                                    :placeholder="
+                                        t.directories.csv_delimiter_placeholder
+                                    "
                                     maxlength="10"
                                 />
                                 <p class="text-xs text-muted-foreground">
                                     {{ t.directories.csv_delimiter_hint }}
                                 </p>
-                                <InputError :message="csvImportForm.errors.delimiter" />
+                                <InputError
+                                    :message="csvImportForm.errors.delimiter"
+                                />
                             </div>
 
                             <div class="flex flex-wrap gap-3">
@@ -732,14 +816,19 @@ const submitCsvImport = (): void => {
                                         accept=".csv,text/csv,.txt"
                                         @change="handleCsvFileChange"
                                     />
-                                    <InputError :message="csvImportForm.errors.file" />
+                                    <InputError
+                                        :message="csvImportForm.errors.file"
+                                    />
                                 </div>
 
                                 <div class="flex justify-end">
                                     <Button
                                         type="submit"
                                         class="gap-2"
-                                        :disabled="csvImportForm.processing || csvImportForm.file === null"
+                                        :disabled="
+                                            csvImportForm.processing ||
+                                            csvImportForm.file === null
+                                        "
                                     >
                                         <Upload class="size-4" />
                                         {{ t.directories.csv_import }}
@@ -763,7 +852,9 @@ const submitCsvImport = (): void => {
                 </div>
 
                 <div class="space-y-4">
-                    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div
+                        class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+                    >
                         <div>
                             <div class="text-base font-semibold">
                                 {{ t.directories.records_title }}
@@ -791,62 +882,147 @@ const submitCsvImport = (): void => {
                         {{ t.directories.records_empty }}
                     </div>
 
-                    <div v-else class="grid gap-4">
-                        <div
-                            v-for="record in props.activeDirectory.records"
-                            :key="record.id"
-                            class="rounded-2xl border border-border bg-background/70 p-5"
-                        >
-                            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                                <div class="space-y-1">
-                                    <div class="font-medium">
-                                        {{ t.directories.record_label.replace(':id', String(record.id)) }}
-                                    </div>
-                                    <div class="text-xs text-muted-foreground">
-                                        {{ t.directories.updated_at_label.replace(':date', formatDateTime(record.updated_at)) }}
-                                    </div>
-                                </div>
-
-                                <div
-                                    v-if="canManageDirectories"
-                                    class="flex flex-wrap gap-2"
-                                >
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        class="gap-2"
-                                        @click="openEditRecord(record)"
+                    <div
+                        v-else
+                        class="overflow-x-auto rounded-2xl border border-border bg-background/70"
+                    >
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-muted/40 text-left">
+                                <tr class="divide-x divide-border">
+                                    <th
+                                        class="w-32 px-4 py-3 font-medium text-muted-foreground"
                                     >
-                                        <PencilLine class="size-4" />
-                                        {{ t.directories.edit_record }}
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="destructive"
-                                        class="gap-2"
-                                        @click="deleteDirectoryRecord(record.id)"
+                                        {{ t.directories.record }}
+                                    </th>
+                                    <th
+                                        v-for="column in props.activeDirectory
+                                            .columns"
+                                        :key="`head-${column.key}`"
+                                        class="min-w-[12rem] px-4 py-3 font-medium text-muted-foreground"
                                     >
-                                        <Trash2 class="size-4" />
-                                        {{ t.directories.delete }}
-                                    </Button>
-                                </div>
-                            </div>
+                                        <div class="flex flex-col gap-1">
+                                            <span>{{ column.label }}</span>
+                                            <span
+                                                class="text-xs font-normal text-muted-foreground/80"
+                                            >
+                                                {{ column.key }}
+                                            </span>
+                                        </div>
+                                    </th>
+                                    <th
+                                        class="w-48 px-4 py-3 font-medium text-muted-foreground"
+                                    >
+                                        {{ t.directories.updated_at }}
+                                    </th>
+                                    <th
+                                        v-if="canManageDirectories"
+                                        class="w-44 px-4 py-3 text-right font-medium text-muted-foreground"
+                                    >
+                                        {{ t.directories.actions }}
+                                    </th>
+                                </tr>
+                            </thead>
 
-                            <div class="mt-4 grid gap-4 lg:grid-cols-2">
-                                <div
-                                    v-for="column in props.activeDirectory.columns"
-                                    :key="`${record.id}-${column.key}`"
-                                    class="rounded-xl border border-border/80 bg-card/50 px-4 py-3"
+                            <tbody class="divide-y divide-border">
+                                <tr
+                                    v-for="record in props.activeDirectory
+                                        .records"
+                                    :key="record.id"
+                                    class="divide-x divide-border align-top"
                                 >
-                                    <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                        {{ column.label }}
-                                    </div>
-                                    <div class="mt-1 text-sm text-foreground">
-                                        {{ formatRecordValue(column, record.values[column.key]) }}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                                    <td class="px-4 py-3">
+                                        <div
+                                            class="font-medium text-foreground"
+                                        >
+                                            {{
+                                                t.directories.record_short.replace(
+                                                    ':id',
+                                                    String(record.id),
+                                                )
+                                            }}
+                                        </div>
+                                        <div
+                                            class="mt-1 text-xs text-muted-foreground"
+                                        >
+                                            {{
+                                                t.directories.created_by_label.replace(
+                                                    ':name',
+                                                    formatPersonName(
+                                                        record.creator,
+                                                    ),
+                                                )
+                                            }}
+                                        </div>
+                                    </td>
+                                    <td
+                                        v-for="column in props.activeDirectory
+                                            .columns"
+                                        :key="`${record.id}-${column.key}`"
+                                        class="px-4 py-3 text-foreground"
+                                    >
+                                        <div
+                                            class="max-w-[18rem] break-words whitespace-pre-wrap"
+                                        >
+                                            {{
+                                                formatRecordValue(
+                                                    column,
+                                                    record.values[column.key],
+                                                )
+                                            }}
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-muted-foreground">
+                                        <div>
+                                            {{
+                                                formatDateTime(
+                                                    record.updated_at,
+                                                )
+                                            }}
+                                        </div>
+                                        <div class="mt-1 text-xs">
+                                            {{
+                                                formatPersonName(record.updater)
+                                            }}
+                                        </div>
+                                    </td>
+                                    <td
+                                        v-if="canManageDirectories"
+                                        class="px-4 py-3"
+                                    >
+                                        <div class="flex justify-end gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                class="gap-2"
+                                                @click="openEditRecord(record)"
+                                            >
+                                                <PencilLine class="size-4" />
+                                                <span>{{
+                                                    t.directories.edit_record
+                                                }}</span>
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="destructive"
+                                                size="sm"
+                                                class="gap-2"
+                                                @click="
+                                                    deleteDirectoryRecord(
+                                                        record.id,
+                                                    )
+                                                "
+                                            >
+                                                <Trash2 class="size-4" />
+                                                <span>{{
+                                                    t.directories.delete
+                                                }}</span>
+                                            </Button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>
@@ -927,14 +1103,20 @@ const submitCsvImport = (): void => {
                             :placeholder="t.directories.description_placeholder"
                             :class="textareaClass"
                         />
-                        <InputError :message="directoryForm.errors.description" />
+                        <InputError
+                            :message="directoryForm.errors.description"
+                        />
                     </div>
 
-                    <div class="rounded-2xl border border-border bg-background/70 p-4">
+                    <div
+                        class="rounded-2xl border border-border bg-background/70 p-4"
+                    >
                         <div class="flex items-start gap-3">
                             <Checkbox
                                 id="directory-csv-exchange-enabled"
-                                :model-value="directoryForm.csv_exchange_enabled"
+                                :model-value="
+                                    directoryForm.csv_exchange_enabled
+                                "
                                 @update:model-value="
                                     (value) =>
                                         (directoryForm.csv_exchange_enabled =
@@ -946,7 +1128,9 @@ const submitCsvImport = (): void => {
                                     {{ t.directories.csv_exchange_enabled }}
                                 </Label>
                                 <p class="text-sm text-muted-foreground">
-                                    {{ t.directories.csv_exchange_enabled_hint }}
+                                    {{
+                                        t.directories.csv_exchange_enabled_hint
+                                    }}
                                 </p>
                             </div>
                         </div>
@@ -956,13 +1140,17 @@ const submitCsvImport = (): void => {
                     </div>
 
                     <div class="space-y-4">
-                        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div
+                            class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+                        >
                             <div>
                                 <div class="text-base font-semibold">
                                     {{ t.directories.columns_editor_title }}
                                 </div>
                                 <p class="text-sm text-muted-foreground">
-                                    {{ t.directories.columns_editor_description }}
+                                    {{
+                                        t.directories.columns_editor_description
+                                    }}
                                 </p>
                             </div>
 
@@ -983,14 +1171,19 @@ const submitCsvImport = (): void => {
                                 :key="`directory-column-${index}`"
                                 class="rounded-2xl border border-border bg-background/70 p-4"
                             >
-                                <div class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_12rem_auto] lg:items-end">
+                                <div
+                                    class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_12rem_auto] lg:items-end"
+                                >
                                     <div class="grid gap-2">
                                         <Label>
                                             {{ t.directories.column_label }}
                                         </Label>
                                         <Input
                                             v-model="column.label"
-                                            :placeholder="t.directories.column_label_placeholder"
+                                            :placeholder="
+                                                t.directories
+                                                    .column_label_placeholder
+                                            "
                                         />
                                         <InputError
                                             :message="
@@ -1007,7 +1200,10 @@ const submitCsvImport = (): void => {
                                         </Label>
                                         <Input
                                             v-model="column.key"
-                                            :placeholder="t.directories.column_key_placeholder"
+                                            :placeholder="
+                                                t.directories
+                                                    .column_key_placeholder
+                                            "
                                         />
                                         <InputError
                                             :message="
@@ -1044,7 +1240,9 @@ const submitCsvImport = (): void => {
                                     </div>
 
                                     <div class="flex flex-col gap-3">
-                                        <div class="flex items-center gap-3 rounded-xl border border-border px-3 py-2">
+                                        <div
+                                            class="flex items-center gap-3 rounded-xl border border-border px-3 py-2"
+                                        >
                                             <Checkbox
                                                 :model-value="
                                                     column.is_required
@@ -1148,7 +1346,10 @@ const submitCsvImport = (): void => {
                         <Input
                             v-else
                             :id="`record-${column.key}`"
-                            v-model="recordForm.values[column.key] as string | number | null"
+                            :model-value="
+                                (recordForm.values[column.key] as
+                                    string | number | null) ?? ''
+                            "
                             :type="
                                 column.type === 'number'
                                     ? 'number'
@@ -1157,12 +1358,17 @@ const submitCsvImport = (): void => {
                                       : 'text'
                             "
                             :placeholder="column.label"
+                            @update:model-value="
+                                (value) =>
+                                    (recordForm.values[column.key] =
+                                        value === ''
+                                            ? null
+                                            : (value as string | number))
+                            "
                         />
 
                         <InputError
-                            :message="
-                                recordForm.errors[`values.${column.key}`]
-                            "
+                            :message="recordForm.errors[`values.${column.key}`]"
                         />
                     </div>
 
