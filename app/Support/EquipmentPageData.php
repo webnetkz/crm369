@@ -10,7 +10,7 @@ class EquipmentPageData
     /**
      * @return array<string, mixed>
      */
-    public function build(User $viewer): array
+    public function build(User $viewer, ?int $activeEquipmentItemId = null): array
     {
         $equipmentItems = EquipmentItem::query()
             ->with([
@@ -19,39 +19,18 @@ class EquipmentPageData
             ])
             ->ordered()
             ->get();
+        $activeEquipmentItem = $activeEquipmentItemId !== null
+            ? $equipmentItems->firstWhere('id', $activeEquipmentItemId)
+            : null;
 
         return [
             'equipmentItems' => $equipmentItems
-                ->map(fn (EquipmentItem $equipmentItem): array => [
-                    'id' => $equipmentItem->id,
-                    'name' => $equipmentItem->name,
-                    'qr_code' => $equipmentItem->qr_code,
-                    'qr_code_svg_data_uri' => $equipmentItem->qrCodeSvgDataUri(),
-                    'status' => $equipmentItem->status,
-                    'status_label' => __(
-                        EquipmentItem::statusDefinitions()[$equipmentItem->status]['label_key']
-                            ?? 'ui.equipment.statuses.on_balance'
-                    ),
-                    'issued_to_user' => $equipmentItem->issuedToUser
-                        ? [
-                            'id' => $equipmentItem->issuedToUser->id,
-                            'name' => $equipmentItem->issuedToUser->name,
-                            'last_name' => $equipmentItem->issuedToUser->last_name,
-                            'email' => $equipmentItem->issuedToUser->email,
-                        ]
-                        : null,
-                    'responsible_user' => $equipmentItem->responsibleUser
-                        ? [
-                            'id' => $equipmentItem->responsibleUser->id,
-                            'name' => $equipmentItem->responsibleUser->name,
-                            'last_name' => $equipmentItem->responsibleUser->last_name,
-                            'email' => $equipmentItem->responsibleUser->email,
-                        ]
-                        : null,
-                    'updated_at' => $equipmentItem->updated_at?->toISOString(),
-                ])
+                ->map(fn (EquipmentItem $equipmentItem): array => $this->serializeEquipmentItem($equipmentItem))
                 ->values()
                 ->all(),
+            'activeEquipmentItem' => $activeEquipmentItem instanceof EquipmentItem
+                ? $this->serializeEquipmentItem($activeEquipmentItem)
+                : null,
             'availableUsers' => User::query()
                 ->select(['id', 'name', 'last_name', 'email'])
                 ->where('is_active', true)
@@ -90,6 +69,41 @@ class EquipmentPageData
             'viewer' => [
                 'id' => $viewer->id,
             ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeEquipmentItem(EquipmentItem $equipmentItem): array
+    {
+        return [
+            'id' => $equipmentItem->id,
+            'name' => $equipmentItem->name,
+            'qr_code' => $equipmentItem->qr_code,
+            'qr_code_svg_data_uri' => $equipmentItem->qrCodeSvgDataUri(),
+            'status' => $equipmentItem->status,
+            'status_label' => __(
+                EquipmentItem::statusDefinitions()[$equipmentItem->status]['label_key']
+                    ?? 'ui.equipment.statuses.on_balance'
+            ),
+            'issued_to_user' => $equipmentItem->issuedToUser
+                ? [
+                    'id' => $equipmentItem->issuedToUser->id,
+                    'name' => $equipmentItem->issuedToUser->name,
+                    'last_name' => $equipmentItem->issuedToUser->last_name,
+                    'email' => $equipmentItem->issuedToUser->email,
+                ]
+                : null,
+            'responsible_user' => $equipmentItem->responsibleUser
+                ? [
+                    'id' => $equipmentItem->responsibleUser->id,
+                    'name' => $equipmentItem->responsibleUser->name,
+                    'last_name' => $equipmentItem->responsibleUser->last_name,
+                    'email' => $equipmentItem->responsibleUser->email,
+                ]
+                : null,
+            'updated_at' => $equipmentItem->updated_at?->toISOString(),
         ];
     }
 }

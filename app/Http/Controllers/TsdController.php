@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreTsdQrScanRequest;
 use App\Http\Resources\ApiTsdQrScanResource;
+use App\Models\EquipmentItem;
 use App\Models\TsdQrScan;
 use App\Support\TsdQrScanManager;
 use Illuminate\Http\RedirectResponse;
@@ -14,6 +15,16 @@ class TsdController extends Controller
 {
     public function index(): Response
     {
+        return $this->renderPage();
+    }
+
+    public function scan(): Response
+    {
+        return $this->renderPage(autoStartScanner: true);
+    }
+
+    private function renderPage(bool $autoStartScanner = false): Response
+    {
         return Inertia::render('tsd/Index', [
             'stats' => [
                 'total' => TsdQrScan::query()->count(),
@@ -22,6 +33,7 @@ class TsdController extends Controller
                 'api' => TsdQrScan::query()->where('source', TsdQrScan::SOURCE_API)->count(),
                 'webhook' => TsdQrScan::query()->where('source', TsdQrScan::SOURCE_WEBHOOK)->count(),
             ],
+            'autoStartScanner' => $autoStartScanner,
             'recentScans' => ApiTsdQrScanResource::collection(
                 TsdQrScan::query()
                     ->with(['scannedBy:id,name,last_name,email', 'portalWebhook:id,name'])
@@ -38,7 +50,7 @@ class TsdController extends Controller
         $user = $request->user();
         abort_unless($user !== null, 403);
 
-        $scanManager->create(
+        $scan = $scanManager->create(
             payload: $request->scanPayload(),
             source: TsdQrScan::SOURCE_WEB,
             user: $user,
@@ -48,6 +60,16 @@ class TsdController extends Controller
             'type' => 'success',
             'message' => __('ui.tsd.created_success'),
         ]);
+
+        if ($user->canAccessEquipment()) {
+            $equipmentItem = EquipmentItem::query()
+                ->matchingQrCode($scan->qr_code, $scan->normalized_qr_code)
+                ->first();
+
+            if ($equipmentItem instanceof EquipmentItem) {
+                return to_route('equipment.index', ['equipment' => $equipmentItem->id]);
+            }
+        }
 
         return back();
     }

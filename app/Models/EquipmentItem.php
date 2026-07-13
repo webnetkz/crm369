@@ -182,6 +182,19 @@ class EquipmentItem extends Model
     }
 
     /**
+     * @param  Builder<EquipmentItem>  $query
+     * @return Builder<EquipmentItem>
+     */
+    public function scopeMatchingQrCode(Builder $query, string $qrCode, string $normalizedQrCode): Builder
+    {
+        return $query->where(function (Builder $builder) use ($qrCode, $normalizedQrCode): void {
+            $builder
+                ->where('qr_code', $qrCode)
+                ->orWhereRaw("REPLACE(UPPER(qr_code), ' ', '') = ?", [$normalizedQrCode]);
+        });
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function issuedToUser(): BelongsTo

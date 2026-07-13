@@ -356,6 +356,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware(['module.enabled:tsd', 'can:access-tsd'])->group(function () {
+        Route::get('qr', [TsdController::class, 'scan'])->name('qr.index');
         Route::get('tsd', [TsdController::class, 'index'])->name('tsd.index');
         Route::post('tsd/scans', [TsdController::class, 'store'])->name('tsd.store');
     });

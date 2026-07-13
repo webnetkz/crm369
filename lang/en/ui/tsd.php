@@ -2,6 +2,7 @@
 
 return [
     'title' => 'TSD',
+    'quick_scan_title' => 'QR',
     'description' => 'Scan QR codes from handheld terminals, keep a shared operations journal, and connect external devices through the API and webhooks.',
     'eyebrow' => 'QR operations',
     'hero_title' => 'A dedicated TSD workspace for QR scanning',
@@ -39,4 +40,14 @@ return [
     'integration_description' => 'External handheld terminals can use the REST API with a Bearer token or an incoming webhook with its own secret.',
     'api_hint' => 'REST endpoint: `POST /api/v1/tsd/scans` with the `tsd.write` permission.',
     'webhook_hint' => 'Webhook: `POST /portal-webhooks/{webhook_id}/tsd/scans?token=...` with the `tsd.write` permission.',
+    'scanner_title' => 'Camera scanning',
+    'scanner_description' => 'Open the browser camera and point it at a QR code. The scan is saved automatically once it is recognized.',
+    'scanner_ready' => 'The camera is ready to start. It works best on a device with a rear camera.',
+    'scanner_start' => 'Start scanning',
+    'scanner_starting' => 'Starting camera...',
+    'scanner_stop' => 'Stop',
+    'scanner_active' => 'Camera is active. Place the QR code inside the frame.',
+    'scanner_unsupported' => 'This browser does not support built-in QR scanning yet. You can still paste the code manually below.',
+    'scanner_permission_denied' => 'Camera access was denied. Allow access in the browser and try again.',
+    'scanner_error' => 'The camera could not be started. Check device access and try again.',
 ];

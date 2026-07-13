@@ -175,11 +175,17 @@ class MenuItem extends Model
                 'url' => '/warehouses',
                 'sort_order' => 102,
             ],
+            'qr' => [
+                'title_key' => 'ui.tsd.quick_scan_title',
+                'fallback_title' => 'QR',
+                'url' => '/qr',
+                'sort_order' => 103,
+            ],
             'tsd' => [
                 'title_key' => 'ui.tsd.title',
                 'fallback_title' => 'TSD',
                 'url' => '/tsd',
-                'sort_order' => 103,
+                'sort_order' => 104,
             ],
             'equipment' => [
                 'title_key' => 'ui.equipment.title',
@@ -288,6 +294,7 @@ class MenuItem extends Model
             'edo',
             'production',
             'warehouses',
+            'qr',
             'tsd',
             'equipment',
             'documentation',

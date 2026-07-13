@@ -19,7 +19,10 @@ class EquipmentController extends Controller
 {
     public function index(Request $request, EquipmentPageData $pageData): Response
     {
-        return Inertia::render('equipment/Index', $pageData->build($request->user()));
+        return Inertia::render('equipment/Index', $pageData->build(
+            $request->user(),
+            $request->integer('equipment') > 0 ? $request->integer('equipment') : null,
+        ));
     }
 
     public function store(StoreEquipmentItemRequest $request): RedirectResponse

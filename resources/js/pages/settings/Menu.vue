@@ -106,6 +106,7 @@ const sidebarBuiltInKeys = [
     'edo',
     'production',
     'warehouses',
+    'qr',
     'tsd',
     'equipment',
 ] as const;

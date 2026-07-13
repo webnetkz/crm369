@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, setLayoutProps, useForm } from '@inertiajs/vue3';
 import { Download, Eye, Hash, Package, PencilLine, Plus, Printer, Upload, UserCog, Wrench } from '@lucide/vue';
-import { computed, ref, watchEffect } from 'vue';
+import { computed, ref, watch, watchEffect } from 'vue';
 import {
     downloadCsvTemplate,
     exportCsv,
@@ -71,6 +71,7 @@ const props = defineProps<{
         maintenance: number;
         written_off: number;
     };
+    activeEquipmentItem: EquipmentItem | null;
 }>();
 
 const { t } = useLanguage();
@@ -108,6 +109,19 @@ watchEffect(() => {
         ],
     });
 });
+
+watch(
+    () => props.activeEquipmentItem,
+    (equipmentItem) => {
+        if (! equipmentItem) {
+            return;
+        }
+
+        selectedEquipmentItem.value = equipmentItem;
+        detailsDialogOpen.value = true;
+    },
+    { immediate: true },
+);
 
 const resetForm = (): void => {
     editingEquipmentId.value = null;

@@ -135,6 +135,24 @@ test('equipment page includes a qr preview and print action in the details dialo
         ->not->toContain("window.open('', '_blank', 'noopener,noreferrer')");
 });
 
+test('equipment page can preselect an item from the query string', function () {
+    $user = User::factory()->create();
+    $equipmentItem = EquipmentItem::factory()->create([
+        'name' => 'Scanner Terminal',
+        'qr_code' => 'EQ-SCAN-001',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('equipment.index', ['equipment' => $equipmentItem->id]))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('equipment/Index')
+            ->where('activeEquipmentItem.id', $equipmentItem->id)
+            ->where('activeEquipmentItem.name', 'Scanner Terminal')
+            ->where('activeEquipmentItem.qr_code', 'EQ-SCAN-001')
+        );
+});
+
 test('authenticated users can export import equipment as csv and download a template', function () {
     $user = User::factory()->create();
     $responsibleUser = User::factory()->create([

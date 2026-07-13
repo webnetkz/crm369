@@ -15,6 +15,7 @@ import {
     Newspaper,
     Package,
     QrCode,
+    ScanLine,
     Settings,
     ListTodo,
     Users,
@@ -41,22 +42,23 @@ import { useLanguage } from '@/composables/useLanguage';
 import { useSettingsNavigation } from '@/composables/useSettingsNavigation';
 import { resolveMenuIcon } from '@/lib/menuIcons';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
-import { index as companyStructureIndex } from '@/routes/company-structure';
-import { index as documentationIndex } from '@/routes/documentation';
 import { dashboard } from '@/routes';
 import { index as chatsIndex } from '@/routes/chats';
+import { index as companyStructureIndex } from '@/routes/company-structure';
 import { index as contactsIndex } from '@/routes/contacts';
 import { index as directoriesIndex } from '@/routes/directories';
+import { index as documentationIndex } from '@/routes/documentation';
 import { index as edoIndex } from '@/routes/edo';
+import { index as equipmentIndex } from '@/routes/equipment';
 import { index as formsIndex } from '@/routes/forms';
 import { index as newsIndex } from '@/routes/news';
 import { index as notificationsIndex } from '@/routes/notifications';
-import { index as equipmentIndex } from '@/routes/equipment';
 import {
     index as productionIndex,
     show as showProductionSection,
 } from '@/routes/production';
 import { index as projectsIndex } from '@/routes/projects';
+import { index as qrIndex } from '@/routes/qr';
 import { edit as editMenu } from '@/routes/settings/menu';
 import { update as updateMenuOrder } from '@/routes/settings/menu/order';
 import { index as tasksIndex } from '@/routes/tasks';
@@ -317,6 +319,16 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                       title: t.value.warehouses.title,
                       href: warehousesIndex(),
                       icon: Boxes,
+                  },
+              ]
+            : []),
+        ...(page.props.auth.canAccessTsd && isMenuItemVisible('qr')
+            ? [
+                  {
+                      key: 'qr',
+                      title: t.value.tsd.quick_scan_title,
+                      href: qrIndex(),
+                      icon: ScanLine,
                   },
               ]
             : []),

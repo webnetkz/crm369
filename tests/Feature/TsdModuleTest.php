@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\ApiAccessToken;
+use App\Models\EquipmentItem;
 use App\Models\PortalWebhook;
 use App\Models\TsdQrScan;
 use App\Models\User;
@@ -33,6 +34,7 @@ test('authenticated users can open tsd module and save a qr scan', function () {
         ->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page
             ->component('tsd/Index')
+            ->where('autoStartScanner', false)
             ->where('stats.total', 0)
             ->where('recentScans', [])
         );
@@ -56,6 +58,40 @@ test('authenticated users can open tsd module and save a qr scan', function () {
         ->and($scan->scanned_by_user_id)->toBe($user->id);
 });
 
+test('authenticated users can open the qr menu entry with scanner autostart enabled', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('qr.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('tsd/Index')
+            ->where('autoStartScanner', true)
+        );
+});
+
+test('authenticated users are redirected to equipment after scanning an equipment qr code', function () {
+    $user = User::factory()->create();
+    $equipmentItem = EquipmentItem::factory()->create([
+        'name' => 'Handheld Scanner',
+        'qr_code' => 'EQ-HANDHELD-001',
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('tsd.store'), [
+            'qr_code' => ' EQ-HANDHELD-001 ',
+            'device_name' => 'TSD-01',
+        ])
+        ->assertRedirect(route('equipment.index', ['equipment' => $equipmentItem->id]));
+
+    $scan = TsdQrScan::query()->latest('id')->first();
+
+    $this->assertModelExists($scan);
+
+    expect($scan->qr_code)->toBe('EQ-HANDHELD-001')
+        ->and($scan->normalized_qr_code)->toBe('EQ-HANDHELD-001');
+});
+
 test('tsd is wired into the sidebar and built in menu items', function () {
     $user = User::factory()->create();
 
@@ -66,10 +102,27 @@ test('tsd is wired into the sidebar and built in menu items', function () {
 
     $builtInKeys = collect($response->inertiaProps('builtInItems'))->pluck('key');
 
-    expect($sidebar)->toContain("isMenuItemVisible('tsd')")
+    expect($sidebar)->toContain("key: 'qr'")
+        ->and($sidebar)->toContain('title: t.value.tsd.quick_scan_title')
+        ->and($sidebar)->toContain('href: qrIndex()')
+        ->and($sidebar)->toContain("isMenuItemVisible('tsd')")
         ->and($sidebar)->toContain('title: t.value.tsd.title')
         ->and($sidebar)->toContain('href: tsdIndex()')
+        ->and($builtInKeys->all())->toContain('qr')
         ->and($builtInKeys->all())->toContain('tsd');
+});
+
+test('tsd page includes browser camera qr scanning controls', function () {
+    $page = file_get_contents(resource_path('js/pages/tsd/Index.vue'));
+
+    expect($page)->toContain('startScanner')
+        ->and($page)->toContain('stopScanner')
+        ->and($page)->toContain('BarcodeDetector')
+        ->and($page)->toContain('ref="videoElement"')
+        ->and($page)->toContain('scanner_title')
+        ->and($page)->toContain('autoStartScanner')
+        ->and($page)->toContain('shouldRenderScannerOnly')
+        ->and($page)->toContain('v-if="shouldRenderScannerOnly"');
 });
 
 test('api settings include tsd documentation and permissions', function () {

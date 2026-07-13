@@ -4,13 +4,14 @@ import {
     Activity,
     BadgeCheck,
     Box,
+    Camera,
     Clock3,
     QrCode,
     RadioTower,
     ScanLine,
     Webhook,
 } from '@lucide/vue';
-import { computed, watchEffect } from 'vue';
+import { computed, onBeforeUnmount, ref, watchEffect } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/composables/useLanguage';
+import { index as qrIndex } from '@/routes/qr';
 import { index as tsdIndex, store as storeTsdScan } from '@/routes/tsd';
 
 type ScanActor = {
@@ -48,7 +50,24 @@ type ScanItem = {
     webhook: ScanWebhook;
 };
 
+type DetectedBarcode = {
+    rawValue?: string;
+};
+
+type BarcodeDetectorLike = {
+    detect: (source: HTMLVideoElement) => Promise<DetectedBarcode[]>;
+};
+
+type BarcodeDetectorConstructor = new (options?: {
+    formats?: string[];
+}) => BarcodeDetectorLike;
+
+type BarcodeDetectorWindow = Window & {
+    BarcodeDetector?: BarcodeDetectorConstructor;
+};
+
 const props = defineProps<{
+    autoStartScanner: boolean;
     stats: {
         total: number;
         today: number;
@@ -60,6 +79,16 @@ const props = defineProps<{
 }>();
 
 const { language, t } = useLanguage();
+const videoElement = ref<HTMLVideoElement | null>(null);
+const scannerActive = ref(false);
+const scannerStarting = ref(false);
+const scannerBusy = ref(false);
+const scannerError = ref<string | null>(null);
+const autoStartDismissed = ref(false);
+const autoStartAttempted = ref(false);
+let scannerStream: MediaStream | null = null;
+let scannerIntervalId: number | null = null;
+let barcodeDetector: BarcodeDetectorLike | null = null;
 
 const form = useForm({
     qr_code: '',
@@ -68,12 +97,22 @@ const form = useForm({
     context: '',
 });
 
+const pageTitle = computed((): string => {
+    return props.autoStartScanner
+        ? t.value.tsd.quick_scan_title
+        : t.value.tsd.title;
+});
+
+const shouldRenderScannerOnly = computed((): boolean => {
+    return props.autoStartScanner;
+});
+
 watchEffect(() => {
     setLayoutProps({
         breadcrumbs: [
             {
-                title: t.value.tsd.title,
-                href: tsdIndex(),
+                title: pageTitle.value,
+                href: props.autoStartScanner ? qrIndex() : tsdIndex(),
             },
         ],
     });
@@ -117,7 +156,169 @@ const statsCards = computed(() => [
     },
 ]);
 
+const scannerSupported = computed((): boolean => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+        return false;
+    }
+
+    return (
+        typeof (window as BarcodeDetectorWindow).BarcodeDetector !==
+            'undefined' &&
+        typeof navigator.mediaDevices?.getUserMedia === 'function'
+    );
+});
+
+const scannerStatusMessage = computed((): string => {
+    if (scannerError.value) {
+        return scannerError.value;
+    }
+
+    if (scannerStarting.value) {
+        return t.value.tsd.scanner_starting;
+    }
+
+    if (scannerActive.value) {
+        return t.value.tsd.scanner_active;
+    }
+
+    return scannerSupported.value
+        ? t.value.tsd.scanner_ready
+        : t.value.tsd.scanner_unsupported;
+});
+
+const stopScanner = (disableAutoStart: boolean = false): void => {
+    if (disableAutoStart) {
+        autoStartDismissed.value = true;
+    }
+
+    if (scannerIntervalId !== null && typeof window !== 'undefined') {
+        window.clearInterval(scannerIntervalId);
+        scannerIntervalId = null;
+    }
+
+    scannerStream?.getTracks().forEach((track) => track.stop());
+    scannerStream = null;
+    barcodeDetector = null;
+    scannerBusy.value = false;
+    scannerActive.value = false;
+
+    if (videoElement.value) {
+        videoElement.value.pause();
+        videoElement.value.srcObject = null;
+    }
+};
+
+const detectQrCode = async (): Promise<void> => {
+    if (scannerBusy.value || !scannerActive.value) {
+        return;
+    }
+
+    const video = videoElement.value;
+
+    if (
+        !video ||
+        !barcodeDetector ||
+        video.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA
+    ) {
+        return;
+    }
+
+    scannerBusy.value = true;
+
+    try {
+        const qrCode = (await barcodeDetector.detect(video))
+            .map((barcode) => barcode.rawValue?.trim() ?? '')
+            .find((value) => value !== '');
+
+        if (!qrCode) {
+            return;
+        }
+
+        form.qr_code = qrCode;
+        submitScan();
+    } catch {
+        // Ignore transient detection errors while the camera is warming up.
+    } finally {
+        scannerBusy.value = false;
+    }
+};
+
+const startScanner = async (): Promise<void> => {
+    if (scannerStarting.value || scannerActive.value) {
+        return;
+    }
+
+    scannerError.value = null;
+
+    const detectorConstructor =
+        typeof window !== 'undefined'
+            ? (window as BarcodeDetectorWindow).BarcodeDetector
+            : undefined;
+
+    if (!detectorConstructor || !scannerSupported.value) {
+        scannerError.value = t.value.tsd.scanner_unsupported;
+
+        return;
+    }
+
+    scannerStarting.value = true;
+
+    try {
+        barcodeDetector = new detectorConstructor({
+            formats: ['qr_code'],
+        });
+
+        scannerStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+                facingMode: {
+                    ideal: 'environment',
+                },
+            },
+        });
+
+        if (!videoElement.value) {
+            throw new Error('Scanner video element is unavailable.');
+        }
+
+        videoElement.value.srcObject = scannerStream;
+        await videoElement.value.play();
+
+        scannerActive.value = true;
+        scannerIntervalId = window.setInterval(() => {
+            void detectQrCode();
+        }, 250);
+    } catch (error) {
+        stopScanner();
+
+        scannerError.value =
+            error instanceof DOMException && error.name === 'NotAllowedError'
+                ? t.value.tsd.scanner_permission_denied
+                : t.value.tsd.scanner_error;
+    } finally {
+        scannerStarting.value = false;
+    }
+};
+
+watchEffect(() => {
+    if (
+        !props.autoStartScanner ||
+        autoStartDismissed.value ||
+        autoStartAttempted.value ||
+        !scannerSupported.value ||
+        scannerActive.value ||
+        scannerStarting.value
+    ) {
+        return;
+    }
+
+    autoStartAttempted.value = true;
+    void startScanner();
+});
+
 const submitScan = (): void => {
+    stopScanner();
+
     form.post(storeTsdScan.url(), {
         preserveScroll: true,
         onSuccess: () => {
@@ -174,14 +375,101 @@ const payloadPreview = (payload: Record<string, unknown> | null): string => {
 
     return JSON.stringify(payload, null, 2);
 };
+
+onBeforeUnmount(() => {
+    stopScanner();
+});
 </script>
 
 <template>
-    <Head :title="t.tsd.title" />
+    <Head :title="pageTitle" />
 
-    <h1 class="sr-only">{{ t.tsd.title }}</h1>
+    <h1 class="sr-only">{{ pageTitle }}</h1>
 
-    <div class="space-y-8">
+    <div
+        v-if="shouldRenderScannerOnly"
+        class="mx-auto flex min-h-[calc(100vh-10rem)] max-w-3xl items-center"
+    >
+        <section class="w-full overflow-hidden rounded-3xl border border-border bg-card shadow-xs">
+            <div class="space-y-5 p-6 sm:p-8">
+                <div
+                    class="relative overflow-hidden rounded-3xl border border-border bg-black"
+                >
+                    <video
+                        ref="videoElement"
+                        autoplay
+                        muted
+                        playsinline
+                        class="aspect-[4/5] h-full w-full object-cover transition-opacity duration-200 sm:aspect-video"
+                        :class="scannerActive ? 'opacity-100' : 'opacity-0'"
+                    />
+
+                    <div
+                        v-if="!scannerActive"
+                        class="absolute inset-0 flex items-center justify-center px-6 text-center"
+                    >
+                        <div class="space-y-3">
+                            <div
+                                class="mx-auto flex size-14 items-center justify-center rounded-full bg-white/10 text-white"
+                            >
+                                <Camera class="size-6" />
+                            </div>
+                            <p
+                                class="max-w-sm text-sm leading-6 text-white/80"
+                            >
+                                {{ scannerStatusMessage }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        v-else
+                        class="pointer-events-none absolute inset-0 p-5 sm:p-8"
+                    >
+                        <div
+                            class="h-full w-full rounded-[2rem] border-2 border-dashed border-white/70"
+                        />
+                    </div>
+                </div>
+
+                <div
+                    class="rounded-2xl border border-border bg-muted/20 px-4 py-3 text-center text-sm leading-6 text-muted-foreground"
+                >
+                    {{ scannerStatusMessage }}
+                </div>
+
+                <div class="flex justify-center">
+                    <Button
+                        v-if="scannerActive"
+                        type="button"
+                        variant="outline"
+                        class="gap-2"
+                        @click="stopScanner(true)"
+                    >
+                        <QrCode class="size-4" />
+                        <span>{{ t.tsd.scanner_stop }}</span>
+                    </Button>
+
+                    <Button
+                        v-else-if="scannerError"
+                        type="button"
+                        class="gap-2"
+                        :disabled="scannerStarting || form.processing"
+                        @click="startScanner"
+                    >
+                        <ScanLine class="size-4" />
+                        <span>{{
+                            scannerStarting
+                                ? t.tsd.scanner_starting
+                                : t.tsd.scanner_start
+                        }}</span>
+                    </Button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div v-else class="space-y-8">
         <section
             class="overflow-hidden rounded-3xl border border-border bg-card shadow-xs"
         >
@@ -370,6 +658,89 @@ const payloadPreview = (payload: Record<string, unknown> | null): string => {
             </div>
 
             <aside class="space-y-6">
+                <div class="rounded-3xl border border-border bg-card p-6">
+                    <Heading
+                        variant="small"
+                        :title="t.tsd.scanner_title"
+                        :description="t.tsd.scanner_description"
+                    />
+
+                    <div class="mt-5 space-y-4">
+                        <div
+                            class="relative overflow-hidden rounded-2xl border border-border bg-black"
+                        >
+                            <video
+                                ref="videoElement"
+                                autoplay
+                                muted
+                                playsinline
+                                class="aspect-video h-full w-full object-cover transition-opacity duration-200"
+                                :class="scannerActive ? 'opacity-100' : 'opacity-0'"
+                            />
+
+                            <div
+                                v-if="!scannerActive"
+                                class="absolute inset-0 flex items-center justify-center px-6 text-center"
+                            >
+                                <div class="space-y-3">
+                                    <div
+                                        class="mx-auto flex size-12 items-center justify-center rounded-full bg-white/10 text-white"
+                                    >
+                                        <Camera class="size-5" />
+                                    </div>
+                                    <p
+                                        class="max-w-xs text-sm leading-6 text-white/80"
+                                    >
+                                        {{ scannerStatusMessage }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div
+                                v-else
+                                class="pointer-events-none absolute inset-0 p-5"
+                            >
+                                <div
+                                    class="h-full w-full rounded-[2rem] border-2 border-dashed border-white/70"
+                                />
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-2xl border border-border bg-muted/20 px-4 py-3 text-sm leading-6 text-muted-foreground"
+                        >
+                            {{ scannerStatusMessage }}
+                        </div>
+
+                        <div class="flex flex-col gap-3 sm:flex-row">
+                            <Button
+                                type="button"
+                                class="gap-2 sm:flex-1"
+                                :disabled="scannerStarting || form.processing || scannerActive"
+                                @click="startScanner"
+                            >
+                                <ScanLine class="size-4" />
+                                <span>{{
+                                    scannerStarting
+                                        ? t.tsd.scanner_starting
+                                        : t.tsd.scanner_start
+                                }}</span>
+                            </Button>
+
+                            <Button
+                                v-if="scannerActive"
+                                type="button"
+                                variant="outline"
+                                class="gap-2 sm:flex-1"
+                                @click="stopScanner(true)"
+                            >
+                                <QrCode class="size-4" />
+                                <span>{{ t.tsd.scanner_stop }}</span>
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="rounded-3xl border border-border bg-card p-6">
                     <Heading
                         variant="small"
