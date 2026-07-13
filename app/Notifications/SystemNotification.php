@@ -3,9 +3,10 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
-class SystemNotification extends Notification
+class SystemNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -17,7 +18,10 @@ class SystemNotification extends Notification
         private readonly string $message,
         private readonly ?string $actionUrl = null,
         private readonly ?string $actionLabel = null,
-    ) {}
+    ) {
+        $this->afterCommit();
+        $this->onQueue('notifications');
+    }
 
     /**
      * Get the notification's delivery channels.

@@ -21,20 +21,28 @@ const resolveAppUrl = (configuredAppUrl?: string): URL | null => {
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '');
     const appUrl = resolveAppUrl(env.APP_URL);
+    const devServerPort = Number(env.VITE_PORT || 5173);
+    const detectTls = appUrl?.protocol === 'https:' ? appUrl.hostname : false;
+    const devServerOrigin = appUrl
+        ? `${appUrl.protocol}//${appUrl.hostname}:${devServerPort}`
+        : undefined;
 
     return {
         server: {
             host: '0.0.0.0',
+            port: devServerPort,
+            origin: devServerOrigin,
             hmr: appUrl
                 ? {
                       host: appUrl.hostname,
+                      port: devServerPort,
                       protocol: appUrl.protocol === 'https:' ? 'wss' : 'ws',
                   }
                 : undefined,
         },
         plugins: [
             laravel({
-                detectTls: false,
+                detectTls,
                 input: ['resources/css/app.css', 'resources/js/app.ts'],
                 refresh: true,
                 fonts: [

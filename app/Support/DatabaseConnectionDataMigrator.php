@@ -2,13 +2,217 @@
 
 namespace App\Support;
 
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
+use RuntimeException;
+
 class DatabaseConnectionDataMigrator
 {
     /**
-     * Create a new class instance.
+     * @param  array<int, string>  $excludedTables
+     * @return array<string, int>
      */
-    public function __construct()
+    public function migrate(
+        string $sourceConnection,
+        string $targetConnection,
+        bool $truncateTarget = true,
+        array $excludedTables = [],
+    ): array {
+        if ($sourceConnection === $targetConnection) {
+            throw new InvalidArgumentException('The source and target database connections must be different.');
+        }
+
+        $tables = $this->tablesFor($sourceConnection)
+            ->reject(fn (string $table): bool => in_array($table, $excludedTables, true))
+            ->values();
+
+        if ($tables->isEmpty()) {
+            return [];
+        }
+
+        $targetTables = $this->tablesFor($targetConnection);
+        $missingTargetTables = $tables->diff($targetTables)->values();
+
+        if ($missingTargetTables->isNotEmpty()) {
+            throw new RuntimeException(sprintf(
+                'The target connection [%s] is missing table(s): %s.',
+                $targetConnection,
+                $missingTargetTables->implode(', '),
+            ));
+        }
+
+        $orderedTables = $this->sortTablesByDependencies($sourceConnection, $tables);
+
+        return DB::connection($targetConnection)->transaction(function () use (
+            $sourceConnection,
+            $targetConnection,
+            $truncateTarget,
+            $orderedTables,
+        ): array {
+            if ($truncateTarget) {
+                $this->clearTargetTables($targetConnection, $orderedTables->reverse()->values());
+            }
+
+            $copiedRowsByTable = [];
+
+            foreach ($orderedTables as $table) {
+                $copiedRowsByTable[$table] = $this->copyTable($sourceConnection, $targetConnection, $table);
+            }
+
+            $this->resetSequences($targetConnection, $orderedTables);
+
+            return $copiedRowsByTable;
+        });
+    }
+
+    /**
+     * @return Collection<int, string>
+     */
+    private function tablesFor(string $connection): Collection
     {
-        //
+        return collect(Schema::connection($connection)->getTableListing(schemaQualified: false))
+            ->filter(fn (mixed $table): bool => is_string($table) && $table !== '')
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, string>  $tables
+     * @return Collection<int, string>
+     */
+    private function sortTablesByDependencies(string $connection, Collection $tables): Collection
+    {
+        $dependencies = $tables->mapWithKeys(function (string $table) use ($connection, $tables): array {
+            $foreignTables = collect(Schema::connection($connection)->getForeignKeys($table))
+                ->pluck('foreign_table')
+                ->filter(fn (mixed $foreignTable): bool => is_string($foreignTable))
+                ->filter(fn (string $foreignTable): bool => $foreignTable !== $table)
+                ->filter(fn (string $foreignTable): bool => $tables->contains($foreignTable))
+                ->unique()
+                ->values()
+                ->all();
+
+            return [$table => $foreignTables];
+        });
+
+        $orderedTables = collect();
+        $visited = [];
+        $visiting = [];
+
+        $visit = function (string $table) use (&$visit, &$visited, &$visiting, $dependencies, $orderedTables): void {
+            if (($visited[$table] ?? false) === true) {
+                return;
+            }
+
+            if (($visiting[$table] ?? false) === true) {
+                return;
+            }
+
+            $visiting[$table] = true;
+
+            foreach ($dependencies->get($table, []) as $dependency) {
+                $visit($dependency);
+            }
+
+            $visiting[$table] = false;
+            $visited[$table] = true;
+            $orderedTables->push($table);
+        };
+
+        foreach ($tables as $table) {
+            $visit($table);
+        }
+
+        return $orderedTables->values();
+    }
+
+    /**
+     * @param  Collection<int, string>  $tables
+     */
+    private function clearTargetTables(string $connection, Collection $tables): void
+    {
+        $schema = Schema::connection($connection);
+        $driver = DB::connection($connection)->getDriverName();
+
+        if ($driver === 'pgsql') {
+            foreach ($tables as $table) {
+                $wrappedTable = DB::connection($connection)->getQueryGrammar()->wrapTable($table);
+
+                DB::connection($connection)->statement("TRUNCATE TABLE {$wrappedTable} RESTART IDENTITY CASCADE");
+            }
+
+            return;
+        }
+
+        $schema->disableForeignKeyConstraints();
+
+        try {
+            foreach ($tables as $table) {
+                DB::connection($connection)->table($table)->delete();
+            }
+        } finally {
+            $schema->enableForeignKeyConstraints();
+        }
+    }
+
+    private function copyTable(string $sourceConnection, string $targetConnection, string $table): int
+    {
+        $query = DB::connection($sourceConnection)->table($table);
+
+        if (Schema::connection($sourceConnection)->hasColumn($table, 'id')) {
+            $query->orderBy('id');
+        }
+
+        $rows = $query->get()
+            ->map(fn (object $row): array => (array) $row)
+            ->values();
+
+        if ($rows->isEmpty()) {
+            return 0;
+        }
+
+        foreach ($rows->chunk(500) as $chunk) {
+            DB::connection($targetConnection)->table($table)->insert($chunk->all());
+        }
+
+        return $rows->count();
+    }
+
+    /**
+     * @param  Collection<int, string>  $tables
+     */
+    private function resetSequences(string $connection, Collection $tables): void
+    {
+        if (DB::connection($connection)->getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        foreach ($tables as $table) {
+            if (! Schema::connection($connection)->hasColumn($table, 'id')) {
+                continue;
+            }
+
+            try {
+                $maxId = DB::connection($connection)->table($table)->max('id');
+            } catch (QueryException) {
+                continue;
+            }
+
+            if (! is_numeric($maxId)) {
+                DB::connection($connection)->select(
+                    "select setval(pg_get_serial_sequence(?, 'id'), 1, false)",
+                    [$table],
+                );
+
+                continue;
+            }
+
+            DB::connection($connection)->select(
+                "select setval(pg_get_serial_sequence(?, 'id'), ?, true)",
+                [$table, (int) $maxId],
+            );
+        }
     }
 }

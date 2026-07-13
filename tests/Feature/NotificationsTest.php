@@ -2,7 +2,15 @@
 
 use App\Models\User;
 use App\Notifications\SystemNotification;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Inertia\Testing\AssertableInertia as Assert;
+
+test('system notifications are queued for asynchronous delivery', function () {
+    expect(new SystemNotification(
+        title: 'Queued',
+        message: 'Notification payload.',
+    ))->toBeInstanceOf(ShouldQueue::class);
+});
 
 test('authenticated users receive notifications and unread count in shared props', function () {
     $user = User::factory()->create();
