@@ -14,6 +14,7 @@ class ChatSidebarData
     public function __construct(
         private readonly ChatMessageData $chatMessageData,
         private readonly ChatRuntimeCache $chatRuntimeCache,
+        private readonly GeneralChatManager $generalChatManager,
     ) {}
 
     /**
@@ -21,6 +22,8 @@ class ChatSidebarData
      */
     public function build(User $user, string $search = '', ?ChatConversation $activeConversation = null): array
     {
+        $this->generalChatManager->ensureForUser($user);
+
         if ($search === '' && $activeConversation === null) {
             return $this->chatRuntimeCache->sidebar(
                 $user,
@@ -36,6 +39,8 @@ class ChatSidebarData
      */
     public function shared(User $user): array
     {
+        $this->generalChatManager->ensureForUser($user);
+
         return $this->chatRuntimeCache->shared($user, fn (): array => [
             'unreadCount' => (int) array_sum($this->unreadCounts($user)),
         ]);
@@ -46,6 +51,8 @@ class ChatSidebarData
      */
     public function unreadConversations(User $user, int $limit = 10): array
     {
+        $this->generalChatManager->ensureForUser($user);
+
         return $this->chatRuntimeCache->unreadConversations($user, $limit, function () use ($limit, $user): array {
             $unreadCounts = $this->unreadCounts($user);
 
@@ -57,7 +64,11 @@ class ChatSidebarData
                         'id' => $conversation->id,
                         'title' => $conversation->type === ChatConversation::TYPE_DIRECT
                             ? $this->displayName($otherParticipant)
-                            : ($conversation->title ?? __('ui.chat.untitled_chat')),
+                            : (
+                                $conversation->isGeneralConversation()
+                                    ? ChatConversation::GENERAL_CHAT_TITLE
+                                    : ($conversation->title ?? __('ui.chat.untitled_chat'))
+                            ),
                         'excerpt' => $this->chatMessageData->excerpt($conversation->latestMessage),
                         'unreadCount' => Arr::get($unreadCounts, $conversation->id, 0),
                         'latestMessageId' => $conversation->latestMessage?->id,
@@ -71,8 +82,30 @@ class ChatSidebarData
         });
     }
 
+    public function resolveConversation(User $user, int $conversationId): ChatConversation
+    {
+        $conversation = ChatConversation::query()
+            ->whereKey($conversationId)
+            ->firstOrFail();
+
+        if ($conversation->isGeneralConversation()) {
+            $this->generalChatManager->ensureParticipant($conversation, $user);
+        }
+
+        abort_unless($conversation->isAccessibleBy($user), 404);
+
+        return $conversation->fresh([
+            'participants.user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
+            'task',
+        ]) ?? $conversation;
+    }
+
     public function markConversationAsRead(ChatConversation $conversation, User $user): void
     {
+        if ($conversation->isGeneralConversation()) {
+            $this->generalChatManager->ensureParticipant($conversation, $user);
+        }
+
         ChatConversationParticipant::query()
             ->where('chat_conversation_id', $conversation->id)
             ->where('user_id', $user->id)
@@ -111,7 +144,15 @@ class ChatSidebarData
      */
     private function conversationCollection(User $user, string $search): Collection
     {
-        return ChatConversation::query()
+        $generalConversation = $this->generalChatManager
+            ->ensureForUser($user)
+            ->load([
+                'participants.user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
+                'latestMessage.user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
+                'latestMessage.attachments',
+            ]);
+
+        $conversations = ChatConversation::query()
             ->where('type', ChatConversation::TYPE_DIRECT)
             ->whereHas('participants', fn ($query) => $query->where('user_id', $user->id))
             ->with([
@@ -137,8 +178,10 @@ class ChatSidebarData
             })
             ->orderByDesc('last_message_at')
             ->orderByDesc('id')
-            ->limit(25)
+            ->limit(24)
             ->get();
+
+        return new Collection([$generalConversation, ...$conversations->all()]);
     }
 
     /**
@@ -154,7 +197,10 @@ class ChatSidebarData
             })
             ->join('chat_conversations', function ($join): void {
                 $join->on('chat_conversations.id', '=', 'chat_messages.chat_conversation_id')
-                    ->where('chat_conversations.type', '=', ChatConversation::TYPE_DIRECT);
+                    ->whereIn('chat_conversations.type', [
+                        ChatConversation::TYPE_DIRECT,
+                        ChatConversation::TYPE_GENERAL,
+                    ]);
             })
             ->where('chat_messages.user_id', '!=', $user->id)
             ->where(function ($query): void {
@@ -182,7 +228,11 @@ class ChatSidebarData
             'type' => $conversation->type,
             'title' => $conversation->type === ChatConversation::TYPE_DIRECT
                 ? $this->displayName($otherParticipant)
-                : ($conversation->title ?? __('ui.chat.untitled_chat')),
+                : (
+                    $conversation->isGeneralConversation()
+                        ? ChatConversation::GENERAL_CHAT_TITLE
+                        : ($conversation->title ?? __('ui.chat.untitled_chat'))
+                ),
             'subtitle' => $conversation->type === ChatConversation::TYPE_DIRECT
                 ? $otherParticipant?->email
                 : null,
@@ -245,7 +295,11 @@ class ChatSidebarData
             'type' => $conversation->type,
             'title' => $conversation->type === ChatConversation::TYPE_DIRECT
                 ? $this->displayName($otherParticipant)
-                : ($conversation->title ?? __('ui.chat.untitled_chat')),
+                : (
+                    $conversation->isGeneralConversation()
+                        ? ChatConversation::GENERAL_CHAT_TITLE
+                        : ($conversation->title ?? __('ui.chat.untitled_chat'))
+                ),
             'subtitle' => $conversation->type === ChatConversation::TYPE_DIRECT
                 ? $otherParticipant?->email
                 : null,

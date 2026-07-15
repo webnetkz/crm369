@@ -71,6 +71,9 @@ class HandleInertiaRequests extends Middleware
                 'canAccessChats' => $this->moduleEnabled('chats')
                     ? ($request->user()?->canAccessChats() ?? false)
                     : false,
+                'canAccessConferences' => $this->moduleEnabled('conferences')
+                    ? ($request->user()?->canAccessConferences() ?? false)
+                    : false,
                 'canAccessKnowledgeBases' => $this->moduleEnabled('knowledge-bases')
                     ? ($request->user()?->canAccessKnowledgeBases() ?? false)
                     : false,

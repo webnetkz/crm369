@@ -211,8 +211,40 @@ test('impersonated users can return to the original account', function () {
     $this->assertAuthenticatedAs($targetUser);
     expect(session('impersonator_id'))->toBe($superAdmin->id);
 
-    $this->delete(route('settings.impersonation.destroy'))
-        ->assertRedirect(route('settings.users.index'));
+    $this->withHeader('X-Inertia', 'true')
+        ->delete(route('settings.impersonation.destroy'))
+        ->assertStatus(409)
+        ->assertHeader('X-Inertia-Location', route('settings.users.index'));
+
+    $this->assertAuthenticatedAs($superAdmin);
+    expect(session('impersonator_id'))->toBeNull();
+});
+
+test('repeated impersonation exit requests do not fail with forbidden', function () {
+    config(['admin.super_admin_email' => 'super@example.com']);
+
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+    ]);
+
+    $targetUser = User::factory()->create();
+
+    $this->actingAs($superAdmin)
+        ->post(route('settings.users.impersonation.store', $targetUser))
+        ->assertRedirect(route('dashboard'));
+
+    $this->withHeader('X-Inertia', 'true')
+        ->delete(route('settings.impersonation.destroy'))
+        ->assertStatus(409)
+        ->assertHeader('X-Inertia-Location', route('settings.users.index'));
+
+    $this->assertAuthenticatedAs($superAdmin);
+    expect(session('impersonator_id'))->toBeNull();
+
+    $this->withHeader('X-Inertia', 'true')
+        ->delete(route('settings.impersonation.destroy'))
+        ->assertStatus(409)
+        ->assertHeader('X-Inertia-Location', route('settings.users.index'));
 
     $this->assertAuthenticatedAs($superAdmin);
     expect(session('impersonator_id'))->toBeNull();

@@ -415,7 +415,9 @@ const cancelEditingMessage = (): void => {
     selectedAttachments.value = [];
 };
 
-const startEditingMessage = (message: ChatActiveConversation['messages'][number]): void => {
+const startEditingMessage = (
+    message: ChatActiveConversation['messages'][number],
+): void => {
     if (sending.value || message.isDeleted) {
         return;
     }
@@ -428,11 +430,7 @@ const startEditingMessage = (message: ChatActiveConversation['messages'][number]
 const removeMessage = async (
     message: ChatActiveConversation['messages'][number],
 ): Promise<void> => {
-    if (
-        sending.value ||
-        !activeConversationId.value ||
-        message.isDeleted
-    ) {
+    if (sending.value || !activeConversationId.value || message.isDeleted) {
         return;
     }
 
@@ -465,11 +463,7 @@ const removeMessage = async (
 const togglePinnedMessage = async (
     message: ChatActiveConversation['messages'][number],
 ): Promise<void> => {
-    if (
-        sending.value ||
-        !activeConversationId.value ||
-        message.isDeleted
-    ) {
+    if (sending.value || !activeConversationId.value || message.isDeleted) {
         return;
     }
 
@@ -478,9 +472,10 @@ const togglePinnedMessage = async (
 
     try {
         await fetchSameOriginJson(
-            (
-                message.isPinned ? unpinMessage : pinMessage
-            ).url([activeConversationId.value, message.id]),
+            (message.isPinned ? unpinMessage : pinMessage).url([
+                activeConversationId.value,
+                message.id,
+            ]),
             {
                 method: message.isPinned ? 'DELETE' : 'PATCH',
             },
@@ -516,11 +511,9 @@ const submitMessage = async (): Promise<void> => {
 
     if (
         !activeConversationId.value ||
-        (
-            draft.value.trim() === '' &&
+        (draft.value.trim() === '' &&
             selectedAttachments.value.length === 0 &&
-            !canSubmitEmptyEdit
-        ) ||
+            !canSubmitEmptyEdit) ||
         sending.value
     ) {
         return;
@@ -618,6 +611,42 @@ const avatarStyle = (
         objectPosition: 'center',
         transform: `scale(${user?.avatarScale ?? 1})`,
     };
+};
+
+const isGeneralConversation = (
+    conversation:
+        ChatConversationListItem | ChatActiveConversation | null | undefined,
+): boolean => {
+    return conversation?.type === 'general';
+};
+
+const conversationAvatarSrc = (
+    conversation:
+        ChatConversationListItem | ChatActiveConversation | null | undefined,
+): string | null => {
+    if (isGeneralConversation(conversation)) {
+        return page.props.portal.logoUrl;
+    }
+
+    return conversation?.participant?.avatar ?? null;
+};
+
+const conversationAvatarStyle = (
+    conversation:
+        ChatConversationListItem | ChatActiveConversation | null | undefined,
+): Record<string, string> | undefined => {
+    if (isGeneralConversation(conversation)) {
+        return undefined;
+    }
+
+    return avatarStyle(conversation?.participant);
+};
+
+const canOpenConversationProfile = (
+    conversation:
+        ChatConversationListItem | ChatActiveConversation | null | undefined,
+): boolean => {
+    return !isGeneralConversation(conversation) && !!conversation?.participant;
 };
 
 const managedProfilePayload = (): ManagedProfilePayload => ({
@@ -981,10 +1010,14 @@ onBeforeUnmount(() => {
                                 <button
                                     type="button"
                                     class="mt-0.5 shrink-0"
-                                    :disabled="!conversation.participant"
+                                    :disabled="
+                                        !canOpenConversationProfile(
+                                            conversation,
+                                        )
+                                    "
                                     @click="
                                         $event.stopPropagation();
-                                        openProfile(conversation.participant)
+                                        openProfile(conversation.participant);
                                     "
                                 >
                                     <Avatar
@@ -992,16 +1025,27 @@ onBeforeUnmount(() => {
                                     >
                                         <AvatarImage
                                             v-if="
-                                                conversation.participant?.avatar
+                                                conversationAvatarSrc(
+                                                    conversation,
+                                                )
                                             "
                                             :src="
-                                                conversation.participant.avatar
+                                                conversationAvatarSrc(
+                                                    conversation,
+                                                ) ?? undefined
                                             "
                                             :alt="conversation.title"
                                             :style="
-                                                avatarStyle(
-                                                    conversation.participant,
+                                                conversationAvatarStyle(
+                                                    conversation,
                                                 )
+                                            "
+                                            :class="
+                                                isGeneralConversation(
+                                                    conversation,
+                                                )
+                                                    ? 'bg-white object-contain p-1'
+                                                    : undefined
                                             "
                                         />
                                         <AvatarFallback
@@ -1165,7 +1209,9 @@ onBeforeUnmount(() => {
                         <button
                             type="button"
                             class="shrink-0"
-                            :disabled="!activeConversation.participant"
+                            :disabled="
+                                !canOpenConversationProfile(activeConversation)
+                            "
                             @click="openProfile(activeConversation.participant)"
                         >
                             <Avatar
@@ -1173,14 +1219,27 @@ onBeforeUnmount(() => {
                             >
                                 <AvatarImage
                                     v-if="
-                                        activeConversation.participant?.avatar
+                                        conversationAvatarSrc(
+                                            activeConversation,
+                                        )
                                     "
-                                    :src="activeConversation.participant.avatar"
+                                    :src="
+                                        conversationAvatarSrc(
+                                            activeConversation,
+                                        ) ?? undefined
+                                    "
                                     :alt="activeConversation.title"
                                     :style="
-                                        avatarStyle(
-                                            activeConversation.participant,
+                                        conversationAvatarStyle(
+                                            activeConversation,
                                         )
+                                    "
+                                    :class="
+                                        isGeneralConversation(
+                                            activeConversation,
+                                        )
+                                            ? 'bg-white object-contain p-1'
+                                            : undefined
                                     "
                                 />
                                 <AvatarFallback
@@ -1257,15 +1316,15 @@ onBeforeUnmount(() => {
                                     : 'justify-start'
                             "
                         >
-                            <div class="min-w-0 max-w-[80%] space-y-2">
+                            <div class="max-w-[80%] min-w-0 space-y-2">
                                 <div
                                     class="min-w-0 rounded-3xl px-4 py-3 text-sm wrap-anywhere whitespace-pre-wrap shadow-sm"
                                     :class="
                                         entry.message.isDeleted
-                                            ? 'border border-dashed border-border bg-muted/20 italic text-muted-foreground'
+                                            ? 'border border-dashed border-border bg-muted/20 text-muted-foreground italic'
                                             : entry.message.isOwn
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'border border-border bg-muted/35 text-foreground'
+                                              ? 'bg-primary text-primary-foreground'
+                                              : 'border border-border bg-muted/35 text-foreground'
                                     "
                                 >
                                     <div

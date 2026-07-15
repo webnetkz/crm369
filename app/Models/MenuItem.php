@@ -127,6 +127,12 @@ class MenuItem extends Model
                 'url' => '/chats',
                 'sort_order' => 50,
             ],
+            'conferences' => [
+                'title_key' => 'ui.conferences.title',
+                'fallback_title' => 'Conferences',
+                'url' => '/conferences',
+                'sort_order' => 55,
+            ],
             'knowledge-bases' => [
                 'title_key' => 'ui.knowledge.title',
                 'fallback_title' => 'Knowledge base',

@@ -19,6 +19,7 @@ import {
     Settings,
     ListTodo,
     Users,
+    Video,
 } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import { index as funnelsIndex } from '@/actions/App/Http/Controllers/CrmFunnelController';
@@ -45,6 +46,7 @@ import { fetchSameOriginJson } from '@/lib/sameOriginJson';
 import { dashboard } from '@/routes';
 import { index as chatsIndex } from '@/routes/chats';
 import { index as companyStructureIndex } from '@/routes/company-structure';
+import { index as conferencesIndex } from '@/routes/conferences';
 import { index as contactsIndex } from '@/routes/contacts';
 import { index as directoriesIndex } from '@/routes/directories';
 import { index as documentationIndex } from '@/routes/documentation';
@@ -185,6 +187,17 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                       title: t.value.chat.title,
                       href: chatsIndex(),
                       icon: MessageSquareMore,
+                  },
+              ]
+            : []),
+        ...(page.props.auth.canAccessConferences &&
+        isMenuItemVisible('conferences')
+            ? [
+                  {
+                      key: 'conferences',
+                      title: t.value.conferences.title,
+                      href: conferencesIndex(),
+                      icon: Video,
                   },
               ]
             : []),

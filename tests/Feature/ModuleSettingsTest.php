@@ -103,6 +103,7 @@ test('disabled module routes return not found', function (string $module, string
     ['news', 'news.index'],
     ['projects', 'projects.index'],
     ['chats', 'chats.index'],
+    ['conferences', 'conferences.index'],
     ['knowledge-bases', 'knowledge-bases.index'],
     ['funnels', 'funnels.index'],
     ['forms', 'forms.index'],

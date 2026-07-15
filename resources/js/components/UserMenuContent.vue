@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { LogOut, RotateCcw, Settings } from '@lucide/vue';
+import { ref } from 'vue';
 import {
     DropdownMenuGroup,
     DropdownMenuItem,
@@ -23,10 +24,20 @@ const handleLogout = () => {
 };
 
 const page = usePage();
+const stoppingImpersonation = ref(false);
 
 const stopImpersonation = (): void => {
+    if (stoppingImpersonation.value) {
+        return;
+    }
+
+    stoppingImpersonation.value = true;
+
     router.delete(destroyImpersonation.url(), {
         preserveScroll: true,
+        onFinish: () => {
+            stoppingImpersonation.value = false;
+        },
     });
 };
 
@@ -51,6 +62,7 @@ const { t } = useLanguage();
         </DropdownMenuItem>
         <DropdownMenuItem
             v-if="page.props.auth.isImpersonating"
+            :disabled="stoppingImpersonation"
             @select.prevent="stopImpersonation"
         >
             <RotateCcw class="mr-2 h-4 w-4" />

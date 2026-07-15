@@ -3,12 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StartDirectChatRequest;
-use App\Models\ChatConversation;
 use App\Models\User;
 use App\Support\ChatSidebarData;
 use App\Support\DirectConversationManager;
 use App\Support\ManagedUserProfileData;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -28,12 +26,7 @@ class ChatSidebarController extends Controller
         $conversationId = $validated['conversation'] ?? null;
 
         if (is_numeric($conversationId)) {
-            $activeConversation = ChatConversation::query()
-                ->with('participants.user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id')
-                ->whereKey((int) $conversationId)
-                ->whereHas('participants', fn (Builder $query) => $query->where('user_id', $user->id))
-                ->firstOrFail();
-
+            $activeConversation = $chatSidebarData->resolveConversation($user, (int) $conversationId);
             $chatSidebarData->markConversationAsRead($activeConversation, $user);
         }
 

@@ -51,6 +51,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('access-news', fn (User $user): bool => $user->canAccessNews());
         Gate::define('access-projects', fn (User $user): bool => $user->canAccessProjects());
         Gate::define('access-chats', fn (User $user): bool => $user->canAccessChats());
+        Gate::define('access-conferences', fn (User $user): bool => $user->canAccessConferences());
         Gate::define('access-knowledge-bases', fn (User $user): bool => $user->canAccessKnowledgeBases());
         Gate::define('access-forms', fn (User $user): bool => $user->canAccessForms());
         Gate::define('access-edo', fn (User $user): bool => $user->canAccessEdo());

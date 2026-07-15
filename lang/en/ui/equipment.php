@@ -25,6 +25,7 @@ return [
     'search_placeholder' => 'Name, QR code, employee, or email',
     'search_submit' => 'Search',
     'search_reset' => 'Reset',
+    'all_stages' => 'All stages',
     'search_empty_title' => 'No equipment matches the search',
     'search_empty_description' => 'Try a different query and search again.',
     'details_title' => 'Equipment details',

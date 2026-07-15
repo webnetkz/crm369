@@ -49,6 +49,8 @@ return [
     'permission_access_projects_description' => 'Разрешить открывать проекты, задачи и работать с проектными рабочими пространствами.',
     'permission_access_chats' => 'Доступ к чатам',
     'permission_access_chats_description' => 'Разрешить открывать центр чатов, диалоги и историю сообщений.',
+    'permission_access_conferences' => 'Доступ к конференциям',
+    'permission_access_conferences_description' => 'Разрешить создавать конференции, открывать комнаты встреч и приглашать участников.',
     'permission_access_knowledge_bases' => 'Доступ к базам знаний',
     'permission_access_knowledge_bases_description' => 'Разрешить открывать раздел баз знаний и читать доступные материалы.',
     'permission_manage_knowledge_bases' => 'Управление базами знаний',

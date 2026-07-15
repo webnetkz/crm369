@@ -124,10 +124,15 @@ class ChatMessageSender
             'last_message_at' => $message->created_at,
         ])->save();
 
-        ChatConversationParticipant::query()
-            ->where('chat_conversation_id', $chatConversation->id)
-            ->where('user_id', $message->user_id)
-            ->update(['last_read_at' => $message->created_at]);
+        ChatConversationParticipant::query()->updateOrCreate(
+            [
+                'chat_conversation_id' => $chatConversation->id,
+                'user_id' => $message->user_id,
+            ],
+            [
+                'last_read_at' => $message->created_at,
+            ],
+        );
 
         $this->chatRuntimeCache->forgetConversation($chatConversation);
     }

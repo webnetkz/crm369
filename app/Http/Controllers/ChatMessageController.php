@@ -12,6 +12,7 @@ use App\Support\ChatMessageEditor;
 use App\Support\ChatMessagePinner;
 use App\Support\ChatMessageRemover;
 use App\Support\ChatMessageSender;
+use App\Support\GeneralChatManager;
 use App\Support\TaskConversationManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
@@ -26,6 +27,7 @@ class ChatMessageController extends Controller
         ChatConversation $chatConversation,
         ChatMessageData $chatMessageData,
         ChatMessageSender $chatMessageSender,
+        GeneralChatManager $generalChatManager,
         TaskConversationManager $taskConversationManager,
     ): JsonResponse {
         $user = $request->user();
@@ -40,7 +42,8 @@ class ChatMessageController extends Controller
 
             $chatConversation = $taskConversationManager->ensureForTask($task, $user)->fresh() ?? $chatConversation;
         } else {
-            abort_unless($chatConversation->hasParticipant($user), 403);
+            $generalChatManager->ensureParticipant($chatConversation, $user);
+            abort_unless($chatConversation->isAccessibleBy($user), 403);
         }
 
         $message = $chatMessageSender->send($chatConversation, $user, $request);
@@ -56,6 +59,7 @@ class ChatMessageController extends Controller
         ChatMessage $chatMessage,
         ChatMessageData $chatMessageData,
         ChatMessageEditor $chatMessageEditor,
+        GeneralChatManager $generalChatManager,
     ): JsonResponse {
         $user = $request->user();
         abort_unless($user !== null, 401);
@@ -68,7 +72,8 @@ class ChatMessageController extends Controller
             $chatConversation->loadMissing('task');
             abort_unless($chatConversation->isAccessibleBy($user), 403);
         } else {
-            abort_unless($chatConversation->hasParticipant($user), 403);
+            $generalChatManager->ensureParticipant($chatConversation, $user);
+            abort_unless($chatConversation->isAccessibleBy($user), 403);
         }
 
         $message = $chatMessageEditor->edit($chatMessage, $request->body());
@@ -83,6 +88,7 @@ class ChatMessageController extends Controller
         ChatMessage $chatMessage,
         ChatMessageData $chatMessageData,
         ChatMessageRemover $chatMessageRemover,
+        GeneralChatManager $generalChatManager,
     ): JsonResponse {
         $user = request()->user();
         abort_unless($user !== null, 401);
@@ -94,7 +100,8 @@ class ChatMessageController extends Controller
             $chatConversation->loadMissing('task');
             abort_unless($chatConversation->isAccessibleBy($user), 403);
         } else {
-            abort_unless($chatConversation->hasParticipant($user), 403);
+            $generalChatManager->ensureParticipant($chatConversation, $user);
+            abort_unless($chatConversation->isAccessibleBy($user), 403);
         }
 
         $message = $chatMessageRemover->remove($chatMessage);
@@ -109,6 +116,7 @@ class ChatMessageController extends Controller
         ChatMessage $chatMessage,
         ChatMessageData $chatMessageData,
         ChatMessagePinner $chatMessagePinner,
+        GeneralChatManager $generalChatManager,
     ): JsonResponse {
         $user = request()->user();
         abort_unless($user !== null, 401);
@@ -120,7 +128,8 @@ class ChatMessageController extends Controller
             $chatConversation->loadMissing('task');
             abort_unless($chatConversation->isAccessibleBy($user), 403);
         } else {
-            abort_unless($chatConversation->hasParticipant($user), 403);
+            $generalChatManager->ensureParticipant($chatConversation, $user);
+            abort_unless($chatConversation->isAccessibleBy($user), 403);
         }
 
         $message = $chatMessagePinner->pin($chatMessage, $user);
@@ -135,6 +144,7 @@ class ChatMessageController extends Controller
         ChatMessage $chatMessage,
         ChatMessageData $chatMessageData,
         ChatMessagePinner $chatMessagePinner,
+        GeneralChatManager $generalChatManager,
     ): JsonResponse {
         $user = request()->user();
         abort_unless($user !== null, 401);
@@ -146,7 +156,8 @@ class ChatMessageController extends Controller
             $chatConversation->loadMissing('task');
             abort_unless($chatConversation->isAccessibleBy($user), 403);
         } else {
-            abort_unless($chatConversation->hasParticipant($user), 403);
+            $generalChatManager->ensureParticipant($chatConversation, $user);
+            abort_unless($chatConversation->isAccessibleBy($user), 403);
         }
 
         $message = $chatMessagePinner->unpin($chatMessage);

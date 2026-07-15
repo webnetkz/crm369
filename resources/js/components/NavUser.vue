@@ -39,6 +39,7 @@ const user = computed(() => auth.value.user);
 const { getInitials } = useInitials();
 const { language, t } = useLanguage();
 const profileSheetOpen = ref(false);
+const stoppingImpersonation = ref(false);
 
 const avatarImageStyle = computed(() => ({
     objectPosition: 'center',
@@ -83,8 +84,17 @@ const closeProfileSheet = (): void => {
 };
 
 const stopImpersonation = (): void => {
+    if (stoppingImpersonation.value) {
+        return;
+    }
+
+    stoppingImpersonation.value = true;
+
     router.delete(destroyImpersonation.url(), {
         preserveScroll: true,
+        onFinish: () => {
+            stoppingImpersonation.value = false;
+        },
     });
 };
 </script>
@@ -370,6 +380,7 @@ const stopImpersonation = (): void => {
                                 v-if="auth.isImpersonating"
                                 variant="outline"
                                 class="w-full justify-start"
+                                :disabled="stoppingImpersonation"
                                 @click="stopImpersonation"
                             >
                                 <RotateCcw class="size-4" />

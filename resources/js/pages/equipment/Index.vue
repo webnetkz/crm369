@@ -48,7 +48,7 @@ type EquipmentItem = {
     id: number;
     name: string;
     qr_code: string;
-    qr_code_svg_data_uri: string;
+    qr_code_svg_data_uri: string | null;
     status: string;
     status_label: string;
     issued_to_user: EquipmentUser | null;
@@ -85,12 +85,16 @@ type EquipmentHistoryEntry = {
     webhook_name: string | null;
 };
 
+type ActiveDialog = 'details' | 'edit' | 'history' | null;
+const allStatusesValue = 'all';
+
 const props = defineProps<{
     equipmentItems: PaginatedCollection<EquipmentItem>;
     availableUsers: EquipmentUser[];
     statusOptions: StatusOption[];
     filters: {
         search: string;
+        status: string;
     };
     perPageOptions: number[];
     stats: {
@@ -101,6 +105,7 @@ const props = defineProps<{
         written_off: number;
     };
     activeEquipmentItem: EquipmentItem | null;
+    activeDialog: ActiveDialog;
 }>();
 
 const { t } = useLanguage();
@@ -121,6 +126,7 @@ const csvImportForm = useForm({
 });
 const filtersForm = useForm('EquipmentFilters', {
     search: props.filters.search,
+    status: props.filters.status !== '' ? props.filters.status : allStatusesValue,
 });
 
 const dialogOpen = ref(false);
@@ -133,6 +139,32 @@ const csvImportInput = ref<HTMLInputElement | null>(null);
 
 const isEditing = computed(() => editingEquipmentId.value !== null);
 const equipmentRows = computed(() => props.equipmentItems.data);
+const statusFilterOptions = computed(() => {
+    return [
+        {
+            value: allStatusesValue,
+            label: t.value.equipment.all_stages,
+        },
+        ...props.statusOptions,
+    ];
+});
+const hasActiveFilters = computed(() => {
+    return filtersForm.search.trim() !== '' || filtersForm.status !== allStatusesValue;
+});
+
+function populateEditForm(equipmentItem: EquipmentItem): void {
+    editingEquipmentId.value = equipmentItem.id;
+    form.name = equipmentItem.name;
+    form.qr_code = equipmentItem.qr_code;
+    form.status = equipmentItem.status;
+    form.responsible_user_id = equipmentItem.responsible_user
+        ? String(equipmentItem.responsible_user.id)
+        : emptyUserValue;
+    form.issued_to_user_id = equipmentItem.issued_to_user
+        ? String(equipmentItem.issued_to_user.id)
+        : emptyUserValue;
+    form.clearErrors();
+}
 
 watchEffect(() => {
     setLayoutProps({
@@ -146,14 +178,28 @@ watchEffect(() => {
 });
 
 watch(
-    () => props.activeEquipmentItem,
-    (equipmentItem) => {
-        if (! equipmentItem) {
+    [() => props.activeEquipmentItem, () => props.activeDialog],
+    ([equipmentItem, activeDialog]) => {
+        if (! equipmentItem || ! activeDialog) {
             return;
         }
 
-        selectedEquipmentItem.value = equipmentItem;
-        detailsDialogOpen.value = true;
+        if (activeDialog === 'details') {
+            selectedEquipmentItem.value = equipmentItem;
+            detailsDialogOpen.value = true;
+
+            return;
+        }
+
+        if (activeDialog === 'history') {
+            historyEquipmentItem.value = equipmentItem;
+            historyDialogOpen.value = true;
+
+            return;
+        }
+
+        populateEditForm(equipmentItem);
+        dialogOpen.value = true;
     },
     { immediate: true },
 );
@@ -168,48 +214,72 @@ const resetForm = (): void => {
     form.clearErrors();
 };
 
+const baseListQuery = (): Record<string, number | string> => {
+    const query: Record<string, number | string> = {};
+
+    if (props.filters.search.trim() !== '') {
+        query.search = props.filters.search.trim();
+    }
+
+    if (props.filters.status !== '') {
+        query.status = props.filters.status;
+    }
+
+    if (props.equipmentItems.meta.current_page > 1) {
+        query.page = props.equipmentItems.meta.current_page;
+    }
+
+    return query;
+};
+
+const equipmentDialogUrl = (equipmentItemId: number, dialog: Exclude<ActiveDialog, null>): string => {
+    return equipmentIndex.url({
+        query: {
+            ...baseListQuery(),
+            equipment: equipmentItemId,
+            dialog,
+        },
+    });
+};
+
+const clearActiveEquipmentDialog = (): void => {
+    if (! props.activeDialog && ! props.activeEquipmentItem) {
+        return;
+    }
+
+    router.get(
+        equipmentIndex.url({
+            query: baseListQuery(),
+        }),
+        {},
+        {
+            preserveScroll: true,
+            preserveState: false,
+            replace: true,
+        },
+    );
+};
+
 const closeDialog = (): void => {
     dialogOpen.value = false;
     resetForm();
+    clearActiveEquipmentDialog();
 };
 
 const closeDetailsDialog = (): void => {
     detailsDialogOpen.value = false;
     selectedEquipmentItem.value = null;
+    clearActiveEquipmentDialog();
 };
 
 const closeHistoryDialog = (): void => {
     historyDialogOpen.value = false;
     historyEquipmentItem.value = null;
+    clearActiveEquipmentDialog();
 };
 
 const openCreateDialog = (): void => {
     resetForm();
-    dialogOpen.value = true;
-};
-
-const openDetailsDialog = (equipmentItem: EquipmentItem): void => {
-    selectedEquipmentItem.value = equipmentItem;
-    detailsDialogOpen.value = true;
-};
-
-const openHistoryDialog = (equipmentItem: EquipmentItem): void => {
-    historyEquipmentItem.value = equipmentItem;
-    historyDialogOpen.value = true;
-};
-
-const openEditDialog = (equipmentItem: EquipmentItem): void => {
-    editingEquipmentId.value = equipmentItem.id;
-    form.name = equipmentItem.name;
-    form.qr_code = equipmentItem.qr_code;
-    form.status = equipmentItem.status;
-    form.responsible_user_id = equipmentItem.responsible_user
-        ? String(equipmentItem.responsible_user.id)
-        : emptyUserValue;
-    form.issued_to_user_id = equipmentItem.issued_to_user
-        ? String(equipmentItem.issued_to_user.id)
-        : emptyUserValue;
-    form.clearErrors();
     dialogOpen.value = true;
 };
 
@@ -235,6 +305,7 @@ const submitFilters = (): void => {
         equipmentIndex(),
         {
             search: filtersForm.search.trim() !== '' ? filtersForm.search.trim() : null,
+            status: filtersForm.status !== allStatusesValue ? filtersForm.status : null,
         },
         {
             preserveScroll: true,
@@ -246,6 +317,7 @@ const submitFilters = (): void => {
 
 const clearFilters = (): void => {
     filtersForm.search = '';
+    filtersForm.status = allStatusesValue;
     submitFilters();
 };
 
@@ -320,8 +392,13 @@ const printEquipmentQr = (): void => {
     }
 
     const equipmentItem = selectedEquipmentItem.value;
-    const title = escapeHtml(equipmentItem.name);
     const qrCode = equipmentItem.qr_code_svg_data_uri;
+
+    if (! qrCode) {
+        return;
+    }
+
+    const title = escapeHtml(equipmentItem.name);
     const qrCodeValue = escapeHtml(equipmentItem.qr_code);
     const statusLabel = printableStatusLabel(equipmentItem);
     const locale = document.documentElement.lang || 'en';
@@ -641,7 +718,7 @@ const selectedStatusLabel = computed(() => {
 
         <div class="rounded-3xl border border-border bg-card">
             <div class="border-b border-border p-6">
-                <form class="flex flex-col gap-3 md:flex-row md:items-end" @submit.prevent="submitFilters">
+                <form class="flex flex-col gap-3 lg:flex-row lg:items-end" @submit.prevent="submitFilters">
                     <div class="grid flex-1 gap-2">
                         <Label for="equipment-search">{{ t.equipment.search }}</Label>
                         <div class="relative">
@@ -656,13 +733,31 @@ const selectedStatusLabel = computed(() => {
                         </div>
                     </div>
 
+                    <div class="grid gap-2 lg:w-72">
+                        <Label for="equipment-filter-status">{{ t.equipment.status }}</Label>
+                        <Select v-model="filtersForm.status">
+                            <SelectTrigger id="equipment-filter-status" class="w-full">
+                                <SelectValue :placeholder="t.equipment.status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="statusOption in statusFilterOptions"
+                                    :key="statusOption.value"
+                                    :value="statusOption.value"
+                                >
+                                    {{ statusOption.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     <div class="flex flex-wrap gap-2">
                         <Button type="submit" class="gap-2">
                             <Search class="size-4" />
                             {{ t.equipment.search_submit }}
                         </Button>
                         <Button
-                            v-if="filtersForm.search.trim() !== ''"
+                            v-if="hasActiveFilters"
                             type="button"
                             variant="outline"
                             class="gap-2"
@@ -680,10 +775,10 @@ const selectedStatusLabel = computed(() => {
                 class="space-y-2 px-6 py-12 text-center"
             >
                 <h2 class="text-lg font-semibold">
-                    {{ props.filters.search !== '' ? t.equipment.search_empty_title : t.equipment.empty_title }}
+                    {{ hasActiveFilters ? t.equipment.search_empty_title : t.equipment.empty_title }}
                 </h2>
                 <p class="mx-auto max-w-2xl text-sm leading-6 text-muted-foreground">
-                    {{ props.filters.search !== '' ? t.equipment.search_empty_description : t.equipment.empty_description }}
+                    {{ hasActiveFilters ? t.equipment.search_empty_description : t.equipment.empty_description }}
                 </p>
             </div>
 
@@ -726,34 +821,37 @@ const selectedStatusLabel = computed(() => {
 
                                     <div class="relative z-10 mt-3 flex flex-wrap gap-2">
                                         <Button
-                                            type="button"
+                                            as-child
                                             variant="ghost"
                                             size="sm"
                                             class="gap-2"
-                                            @click="openDetailsDialog(equipmentItem)"
                                         >
-                                            <Eye class="size-4" />
-                                            <span>{{ t.equipment.view }}</span>
+                                            <a :href="equipmentDialogUrl(equipmentItem.id, 'details')">
+                                                <Eye class="size-4" />
+                                                <span>{{ t.equipment.view }}</span>
+                                            </a>
                                         </Button>
                                         <Button
-                                            type="button"
+                                            as-child
                                             variant="outline"
                                             size="sm"
                                             class="gap-2"
-                                            @click="openEditDialog(equipmentItem)"
                                         >
-                                            <PencilLine class="size-4" />
-                                            <span>{{ t.equipment.edit }}</span>
+                                            <a :href="equipmentDialogUrl(equipmentItem.id, 'edit')">
+                                                <PencilLine class="size-4" />
+                                                <span>{{ t.equipment.edit }}</span>
+                                            </a>
                                         </Button>
                                         <Button
-                                            type="button"
+                                            as-child
                                             variant="outline"
                                             size="sm"
                                             class="gap-2"
-                                            @click="openHistoryDialog(equipmentItem)"
                                         >
-                                            <History class="size-4" />
-                                            <span>{{ t.equipment.history }}</span>
+                                            <a :href="equipmentDialogUrl(equipmentItem.id, 'history')">
+                                                <History class="size-4" />
+                                                <span>{{ t.equipment.history }}</span>
+                                            </a>
                                         </Button>
                                     </div>
                                 </div>

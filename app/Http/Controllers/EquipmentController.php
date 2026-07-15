@@ -21,10 +21,18 @@ class EquipmentController extends Controller
 {
     public function index(Request $request, EquipmentPageData $pageData): Response
     {
+        $activeDialog = in_array($request->string('dialog')->toString(), ['details', 'edit', 'history'], true)
+            ? $request->string('dialog')->toString()
+            : null;
+        $status = $request->string('status')->toString();
+        $activeStatus = in_array($status, EquipmentItem::availableStatuses(), true) ? $status : '';
+
         return Inertia::render('equipment/Index', $pageData->build(
             $request->user(),
             $request->integer('equipment') > 0 ? $request->integer('equipment') : null,
             trim((string) $request->input('search', '')),
+            $activeDialog,
+            $activeStatus,
         ));
     }
 

@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
 
 class UserImpersonationController extends Controller
 {
@@ -35,11 +36,15 @@ class UserImpersonationController extends Controller
         return to_route('dashboard');
     }
 
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request): Response
     {
-        $impersonatorId = $request->session()->pull('impersonator_id');
+        $impersonatorId = $request->session()->get('impersonator_id');
 
-        abort_unless(is_numeric($impersonatorId), 403);
+        if (! is_numeric($impersonatorId)) {
+            return Inertia::location($this->redirectUrlAfterImpersonation($request->user()));
+        }
+
+        $request->session()->forget('impersonator_id');
 
         $impersonator = User::query()->find((int) $impersonatorId);
 
@@ -48,7 +53,7 @@ class UserImpersonationController extends Controller
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return to_route('login');
+            return Inertia::location(route('login'));
         }
 
         Auth::loginUsingId($impersonator->id);
@@ -56,8 +61,13 @@ class UserImpersonationController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.admin.impersonation_ended_success')]);
 
-        return $impersonator->canViewUsers()
-            ? to_route('settings.users.index')
-            : to_route('dashboard');
+        return Inertia::location($this->redirectUrlAfterImpersonation($impersonator));
+    }
+
+    private function redirectUrlAfterImpersonation(?User $user): string
+    {
+        return $user?->canViewUsers()
+            ? route('settings.users.index')
+            : route('dashboard');
     }
 }

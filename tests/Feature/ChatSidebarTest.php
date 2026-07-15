@@ -5,7 +5,9 @@ use App\Models\ChatConversationParticipant;
 use App\Models\ChatMessage;
 use App\Models\User;
 use App\Models\UserGroup;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -145,6 +147,117 @@ test('users can start a direct chat and load it in the sidebar payload', functio
         ->assertJsonPath('activeConversation.id', $conversationId)
         ->assertJsonPath('activeConversation.title', trim($recipient->name.' '.($recipient->last_name ?? '')))
         ->assertJsonPath('activeConversation.participant.phone', $recipient->phone);
+});
+
+test('general chat is created automatically and always stays first in the chats list', function () {
+    $user = User::factory()->create();
+    $recipient = User::factory()->create();
+
+    $directConversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $recipient->id,
+        'last_message_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $directConversation->id,
+        'user_id' => $user->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $directConversation->id,
+        'user_id' => $recipient->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatMessage::query()->create([
+        'chat_conversation_id' => $directConversation->id,
+        'user_id' => $recipient->id,
+        'body' => 'Direct message',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('chats.sidebar'))
+        ->assertSuccessful();
+
+    $generalConversationId = $response->json('conversations.0.id');
+
+    expect($response->json('conversations.0.type'))->toBe(ChatConversation::TYPE_GENERAL)
+        ->and($response->json('conversations.0.title'))->toBe(ChatConversation::GENERAL_CHAT_TITLE)
+        ->and($response->json('conversations.1.id'))->toBe($directConversation->id)
+        ->and(ChatConversation::query()->whereKey($generalConversationId)->value('system_key'))->toBe(ChatConversation::SYSTEM_KEY_GENERAL)
+        ->and(ChatConversationParticipant::query()
+            ->where('chat_conversation_id', $generalConversationId)
+            ->where('user_id', $user->id)
+            ->exists())->toBeTrue();
+});
+
+test('all users can exchange messages in the general chat', function () {
+    $author = User::factory()->create();
+    $viewer = User::factory()->create();
+
+    $this->actingAs($viewer)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 0));
+
+    $generalConversationId = $this->actingAs($author)
+        ->get(route('chats.sidebar'))
+        ->assertSuccessful()
+        ->json('conversations.0.id');
+
+    $this->actingAs($author)
+        ->post(route('chats.messages.store', $generalConversationId), [
+            'body' => 'Сообщение для всех',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('message.body', 'Сообщение для всех');
+
+    $this->actingAs($viewer)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 1));
+
+    $this->actingAs($viewer)
+        ->get(route('chats.sidebar', ['conversation' => $generalConversationId]))
+        ->assertSuccessful()
+        ->assertJsonPath('activeConversation.id', $generalConversationId)
+        ->assertJsonPath('activeConversation.type', ChatConversation::TYPE_GENERAL)
+        ->assertJsonPath('activeConversation.title', ChatConversation::GENERAL_CHAT_TITLE)
+        ->assertJsonPath('activeConversation.messages.0.body', 'Сообщение для всех')
+        ->assertJsonPath('unreadCount', 0);
+});
+
+test('general chat can be created before the system key migration is applied', function () {
+    ChatConversation::flushSystemKeySupportCache();
+
+    Schema::table('chat_conversations', function (Blueprint $table) {
+        $table->dropUnique(['system_key']);
+        $table->dropColumn('system_key');
+    });
+
+    ChatConversation::flushSystemKeySupportCache();
+
+    try {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('chats.sidebar'))
+            ->assertSuccessful()
+            ->assertJsonPath('conversations.0.type', ChatConversation::TYPE_GENERAL)
+            ->assertJsonPath('conversations.0.title', ChatConversation::GENERAL_CHAT_TITLE);
+
+        expect(ChatConversation::query()
+            ->where('type', ChatConversation::TYPE_GENERAL)
+            ->count())->toBe(1);
+    } finally {
+        Schema::table('chat_conversations', function (Blueprint $table) {
+            $table->string('system_key')->nullable()->unique()->after('type');
+        });
+
+        ChatConversation::flushSystemKeySupportCache();
+    }
 });
 
 test('chat profile endpoint returns the same managed profile fields used by the users sidebar', function () {
@@ -546,7 +659,7 @@ test('users can delete their messages while preserving the original record', fun
         ->assertJsonPath('activeConversation.messages.0.body', __('ui.chat.deleted_message'))
         ->assertJsonPath('activeConversation.messages.0.isDeleted', true)
         ->assertJsonPath('activeConversation.messages.0.attachments', [])
-        ->assertJsonPath('conversations.0.excerpt', __('ui.chat.deleted_message'));
+        ->assertJsonPath('conversations.1.excerpt', __('ui.chat.deleted_message'));
 });
 
 test('users cannot delete messages created by other participants', function () {
@@ -924,7 +1037,7 @@ test('chat ui renders header trigger, sidebar dock, and sheet targeting hooks', 
         ->and($panel)->toContain('class="min-w-0 flex-1 text-left"')
         ->and($panel)->toContain('@click="openConversation(conversation.id)"')
         ->and($panel)->toContain('$event.stopPropagation();')
-        ->and($panel)->toContain('class="min-w-0 max-w-[80%] space-y-2"')
+        ->and($panel)->toContain('class="max-w-[80%] min-w-0 space-y-2"')
         ->and($panel)->toContain('class="min-w-0 rounded-3xl px-4 py-3 text-sm wrap-anywhere whitespace-pre-wrap shadow-sm"')
         ->and($panel)->toContain('class="min-w-0 wrap-anywhere whitespace-pre-wrap"')
         ->and($panel)->toContain('whitespace-pre-wrap')

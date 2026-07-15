@@ -284,6 +284,13 @@ class User extends Authenticatable implements PasskeyUser
         ]);
     }
 
+    public function canAccessConferences(): bool
+    {
+        return $this->canAccessConfiguredModule('conferences', [
+            UserGroup::PERMISSION_ACCESS_CONFERENCES,
+        ]);
+    }
+
     public function canAccessKnowledgeBases(): bool
     {
         return $this->canAccessConfiguredModule('knowledge-bases', [

@@ -8,6 +8,8 @@ use App\Models\PortalFormSubmission;
 use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('guests are redirected to the login page', function () {
@@ -97,4 +99,30 @@ test('authenticated users can visit the dashboard', function () {
     expect($donuts['Статусы задач']['total'])->toBe(2)
         ->and($donuts['Состояние проектов']['total'])->toBe(1)
         ->and($donuts['Портальные формы']['total'])->toBe(1);
+});
+
+test('dashboard stays available before the system key migration is applied', function () {
+    ChatConversation::flushSystemKeySupportCache();
+
+    Schema::table('chat_conversations', function (Blueprint $table) {
+        $table->dropUnique(['system_key']);
+        $table->dropColumn('system_key');
+    });
+
+    ChatConversation::flushSystemKeySupportCache();
+
+    try {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertSuccessful()
+            ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 0));
+    } finally {
+        Schema::table('chat_conversations', function (Blueprint $table) {
+            $table->string('system_key')->nullable()->unique()->after('type');
+        });
+
+        ChatConversation::flushSystemKeySupportCache();
+    }
 });

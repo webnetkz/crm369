@@ -49,6 +49,8 @@ return [
     'permission_access_projects_description' => 'Allow opening projects, tasks, and working with project workspaces.',
     'permission_access_chats' => 'Access chats',
     'permission_access_chats_description' => 'Allow opening the chat center, conversations, and message history.',
+    'permission_access_conferences' => 'Access conferences',
+    'permission_access_conferences_description' => 'Allow creating conferences, opening meeting rooms, and inviting participants.',
     'permission_access_knowledge_bases' => 'Access knowledge bases',
     'permission_access_knowledge_bases_description' => 'Allow opening the knowledge base section and reading available materials.',
     'permission_manage_knowledge_bases' => 'Manage knowledge bases',

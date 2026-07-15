@@ -21,10 +21,12 @@ class EquipmentPageData
         User $viewer,
         ?int $activeEquipmentItemId = null,
         string $search = '',
+        ?string $activeDialog = null,
+        string $status = '',
     ): array {
         $search = trim($search);
         $historyTableExists = Schema::hasTable('equipment_item_histories');
-        $filteredEquipmentQuery = $this->filteredEquipmentQuery($search);
+        $filteredEquipmentQuery = $this->filteredEquipmentQuery($search, $status);
         $stats = (clone $filteredEquipmentQuery)
             ->selectRaw('count(*) as total')
             ->selectRaw('sum(case when status = ? then 1 else 0 end) as on_balance', [
@@ -46,48 +48,28 @@ class EquipmentPageData
             ->with(array_filter([
                 'issuedToUser:id,name,last_name,email',
                 'responsibleUser:id,name,last_name,email',
-                $historyTableExists ? 'historyEntries.actor:id,name,last_name,email' : null,
             ]))
             ->ordered()
             ->paginate(self::PER_PAGE)
             ->withQueryString();
-        $currentPageEquipmentItems = $equipmentItems->getCollection();
-        $normalizedQrCodes = $equipmentItems
+        $serializedEquipmentItems = $equipmentItems
             ->getCollection()
-            ->map(fn (EquipmentItem $equipmentItem): string => EquipmentItem::normalizeQrCode($equipmentItem->qr_code))
-            ->unique()
-            ->values();
-        $scansByNormalizedQrCode = $normalizedQrCodes->isEmpty()
-            ? collect()
-            : TsdQrScan::query()
-                ->with(['scannedBy:id,name,last_name,email', 'portalWebhook:id,name'])
-                ->whereIn('normalized_qr_code', $normalizedQrCodes->all())
-                ->orderByDesc('scanned_at')
-                ->orderByDesc('id')
-                ->get()
-                ->groupBy('normalized_qr_code');
-        $serializedEquipmentItems = $currentPageEquipmentItems
-            ->map(function (EquipmentItem $equipmentItem) use ($scansByNormalizedQrCode, $historyTableExists): array {
-                return $this->serializeEquipmentItem(
-                    $equipmentItem,
-                    $scansByNormalizedQrCode->get(
-                        EquipmentItem::normalizeQrCode($equipmentItem->qr_code),
-                        collect(),
-                    ),
-                    $historyTableExists,
-                );
+            ->map(function (EquipmentItem $equipmentItem): array {
+                return $this->serializeEquipmentItemSummary($equipmentItem);
             })
             ->values();
         $equipmentItems->setCollection($serializedEquipmentItems);
-        $activeEquipmentItem = $activeEquipmentItemId !== null
-            ? $serializedEquipmentItems->firstWhere('id', $activeEquipmentItemId)
-            : null;
+        $activeEquipmentItem = $this->activeEquipmentItem(
+            $activeEquipmentItemId,
+            $historyTableExists,
+        );
 
         return [
             'equipmentItems' => PaginationData::from($equipmentItems),
             'activeEquipmentItem' => is_array($activeEquipmentItem)
                 ? $activeEquipmentItem
                 : null,
+            'activeDialog' => $activeDialog,
             'availableUsers' => User::query()
                 ->select(['id', 'name', 'last_name', 'email'])
                 ->where('is_active', true)
@@ -112,6 +94,7 @@ class EquipmentPageData
                 ->all(),
             'filters' => [
                 'search' => $search,
+                'status' => $status,
             ],
             'perPageOptions' => [self::PER_PAGE],
             'stats' => [
@@ -128,11 +111,49 @@ class EquipmentPageData
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    private function activeEquipmentItem(?int $activeEquipmentItemId, bool $historyTableExists): ?array
+    {
+        if ($activeEquipmentItemId === null) {
+            return null;
+        }
+
+        $equipmentItem = EquipmentItem::query()
+            ->with(array_filter([
+                'issuedToUser:id,name,last_name,email',
+                'responsibleUser:id,name,last_name,email',
+                $historyTableExists ? 'historyEntries.actor:id,name,last_name,email' : null,
+            ]))
+            ->find($activeEquipmentItemId);
+
+        if (! $equipmentItem instanceof EquipmentItem) {
+            return null;
+        }
+
+        $scans = TsdQrScan::query()
+            ->with(['scannedBy:id,name,last_name,email', 'portalWebhook:id,name'])
+            ->where('normalized_qr_code', EquipmentItem::normalizeQrCode($equipmentItem->qr_code))
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id')
+            ->get();
+
+        return $this->serializeEquipmentItem(
+            $equipmentItem,
+            $scans,
+            $historyTableExists,
+        );
+    }
+
+    /**
      * @return Builder<EquipmentItem>
      */
-    private function filteredEquipmentQuery(string $search): Builder
+    private function filteredEquipmentQuery(string $search, string $status): Builder
     {
         return EquipmentItem::query()
+            ->when($status !== '', function (Builder $query) use ($status): void {
+                $query->where('status', $status);
+            })
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $equipmentQuery) use ($search): void {
                     $equipmentQuery
@@ -196,6 +217,42 @@ class EquipmentPageData
             'history_entries' => $historyTableExists
                 ? $this->serializeHistoryEntries($equipmentItem, $scans)
                 : [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeEquipmentItemSummary(EquipmentItem $equipmentItem): array
+    {
+        return [
+            'id' => $equipmentItem->id,
+            'name' => $equipmentItem->name,
+            'qr_code' => $equipmentItem->qr_code,
+            'qr_code_svg_data_uri' => null,
+            'status' => $equipmentItem->status,
+            'status_label' => __(
+                EquipmentItem::statusDefinitions()[$equipmentItem->status]['label_key']
+                    ?? 'ui.equipment.statuses.on_balance'
+            ),
+            'issued_to_user' => $equipmentItem->issuedToUser
+                ? [
+                    'id' => $equipmentItem->issuedToUser->id,
+                    'name' => $equipmentItem->issuedToUser->name,
+                    'last_name' => $equipmentItem->issuedToUser->last_name,
+                    'email' => $equipmentItem->issuedToUser->email,
+                ]
+                : null,
+            'responsible_user' => $equipmentItem->responsibleUser
+                ? [
+                    'id' => $equipmentItem->responsibleUser->id,
+                    'name' => $equipmentItem->responsibleUser->name,
+                    'last_name' => $equipmentItem->responsibleUser->last_name,
+                    'email' => $equipmentItem->responsibleUser->email,
+                ]
+                : null,
+            'updated_at' => $equipmentItem->updated_at?->toISOString(),
+            'history_entries' => [],
         ];
     }
 

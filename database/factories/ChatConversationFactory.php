@@ -18,6 +18,7 @@ class ChatConversationFactory extends Factory
     {
         return [
             'type' => ChatConversation::TYPE_DIRECT,
+            'system_key' => null,
             'title' => null,
             'created_by_user_id' => User::factory(),
             'last_message_at' => null,

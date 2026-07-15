@@ -14,12 +14,14 @@ type Props = {
     multiple?: boolean;
     disabled?: boolean;
     excludeUserIds?: number[];
+    emptyLabel?: string | null;
 };
 
 const props = withDefaults(defineProps<Props>(), {
     multiple: false,
     disabled: false,
     excludeUserIds: () => [],
+    emptyLabel: null,
 });
 
 const model = defineModel<PickerValue>({ required: true });
@@ -86,7 +88,7 @@ const filteredOptions = computed(() => {
 const triggerLabel = computed(() => {
     if (props.multiple) {
         if (selectedOptions.value.length === 0) {
-            return t.value.projects.no_co_assignees;
+            return props.emptyLabel ?? t.value.projects.no_co_assignees;
         }
 
         const labels = selectedOptions.value.map((option) => {

@@ -25,6 +25,7 @@ return [
     'search_placeholder' => 'Название, QR-код, сотрудник или email',
     'search_submit' => 'Найти',
     'search_reset' => 'Сбросить',
+    'all_stages' => 'Все стадии',
     'search_empty_title' => 'Поиск не дал результатов',
     'search_empty_description' => 'Попробуйте изменить запрос и повторить поиск по оборудованию.',
     'details_title' => 'Информация об оборудовании',

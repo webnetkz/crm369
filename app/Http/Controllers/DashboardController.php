@@ -652,6 +652,9 @@ class DashboardController extends Controller
                         $taskQuery
                             ->where('type', ChatConversation::TYPE_TASK)
                             ->whereHas('task', fn (Builder $projectTaskQuery): Builder => $projectTaskQuery->visibleTo($user));
+                    })
+                    ->orWhere(function (Builder $generalQuery): void {
+                        $generalQuery->general();
                     });
             });
     }
@@ -674,6 +677,9 @@ class DashboardController extends Controller
                             $taskQuery
                                 ->where('type', ChatConversation::TYPE_TASK)
                                 ->whereHas('task', fn (Builder $projectTaskQuery): Builder => $projectTaskQuery->visibleTo($user));
+                        })
+                        ->orWhere(function (Builder $generalQuery): void {
+                            $generalQuery->general();
                         });
                 }));
     }

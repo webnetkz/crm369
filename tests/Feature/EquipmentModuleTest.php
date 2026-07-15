@@ -28,6 +28,7 @@ test('authenticated users can open equipment page and manage equipment items', f
             ->where('stats.total', 0)
             ->has('availableUsers')
             ->has('statusOptions', 5)
+            ->where('filters.status', '')
             ->where('equipmentItems.meta.per_page', 50)
         );
 
@@ -83,7 +84,7 @@ test('authenticated users can open equipment page and manage equipment items', f
             ->has('equipmentItems.data', 1, fn (Assert $equipment) => $equipment
                 ->where('name', 'Lenovo ThinkPad X1 Carbon')
                 ->where('qr_code', 'EQ-LENOVO-001')
-                ->where('qr_code_svg_data_uri', fn (string $value): bool => str_starts_with($value, 'data:image/svg+xml;utf8,'))
+                ->where('qr_code_svg_data_uri', null)
                 ->etc()
             )
         );
@@ -196,19 +197,23 @@ test('equipment page renders history action near the equipment name and shows co
     ]);
 
     $this->actingAs($user)
-        ->get(route('equipment.index'))
+        ->get(route('equipment.index', [
+            'equipment' => $equipmentItem->id,
+            'dialog' => 'history',
+        ]))
         ->assertSuccessful()
         ->assertInertia(fn (Assert $page) => $page
             ->component('equipment/Index')
-            ->where('equipmentItems.data.0.name', 'History Laptop')
-            ->where('equipmentItems.data.0.history_entries.0.kind', 'scan')
-            ->where('equipmentItems.data.0.history_entries.1.kind', 'change')
-            ->where('equipmentItems.data.0.history_entries.1.event_label', __('ui.equipment.history_event_created'))
+            ->where('activeDialog', 'history')
+            ->where('activeEquipmentItem.name', 'History Laptop')
+            ->where('activeEquipmentItem.history_entries.0.kind', 'scan')
+            ->where('activeEquipmentItem.history_entries.1.kind', 'change')
+            ->where('activeEquipmentItem.history_entries.1.event_label', __('ui.equipment.history_event_created'))
         );
 
     $page = file_get_contents(resource_path('js/pages/equipment/Index.vue'));
 
-    expect($page)->toContain('openHistoryDialog(equipmentItem)')
+    expect($page)->toContain("equipmentDialogUrl(equipmentItem.id, 'history')")
         ->and($page)->toContain('t.equipment.history_title')
         ->and($page)->toContain('historyEquipmentItem.history_entries')
         ->and($page)->toContain('{{ t.equipment.history }}');
@@ -255,12 +260,40 @@ test('equipment page can search by name qr code and employee fields', function (
         ->and(collect($byName->inertiaProps('equipmentItems.data'))->pluck('name')->all())
         ->toBe(['Lenovo Search Laptop'])
         ->and($byName->inertiaProps('filters.search'))->toBe('Lenovo')
+        ->and($byName->inertiaProps('filters.status'))->toBe('')
         ->and(collect($byQr->inertiaProps('equipmentItems.data'))->pluck('name')->all())
         ->toBe(['Zebra Scanner'])
         ->and($byQr->inertiaProps('filters.search'))->toBe('EQ-ZEBRA-002')
+        ->and($byQr->inertiaProps('filters.status'))->toBe('')
         ->and(collect($byResponsibleEmail->inertiaProps('equipmentItems.data'))->pluck('name')->all())
         ->toBe(['Lenovo Search Laptop'])
-        ->and($byResponsibleEmail->inertiaProps('filters.search'))->toBe('alice.manager@example.com');
+        ->and($byResponsibleEmail->inertiaProps('filters.search'))->toBe('alice.manager@example.com')
+        ->and($byResponsibleEmail->inertiaProps('filters.status'))->toBe('');
+});
+
+test('equipment page can filter items by stage', function () {
+    $user = User::factory()->create();
+
+    EquipmentItem::factory()->create([
+        'name' => 'Maintenance Scanner',
+        'status' => EquipmentItem::STATUS_MAINTENANCE,
+    ]);
+
+    EquipmentItem::factory()->create([
+        'name' => 'Issued Laptop',
+        'status' => EquipmentItem::STATUS_ISSUED,
+    ]);
+
+    $response = $this->actingAs($user)->get(route('equipment.index', [
+        'status' => EquipmentItem::STATUS_MAINTENANCE,
+    ]));
+
+    expect($response->inertiaProps('equipmentItems.meta.total'))->toBe(1)
+        ->and(collect($response->inertiaProps('equipmentItems.data'))->pluck('name')->all())
+        ->toBe(['Maintenance Scanner'])
+        ->and($response->inertiaProps('filters.status'))->toBe(EquipmentItem::STATUS_MAINTENANCE)
+        ->and($response->inertiaProps('stats.total'))->toBe(1)
+        ->and($response->inertiaProps('stats.maintenance'))->toBe(1);
 });
 
 test('equipment page paginates equipment items by 50 per page', function () {
@@ -289,6 +322,18 @@ test('equipment page paginates equipment items by 50 per page', function () {
             ->where('equipmentItems.meta.current_page', 2)
             ->has('equipmentItems.data', 5)
         );
+});
+
+test('equipment page action links preserve filters and target dialog state', function () {
+    $page = file_get_contents(resource_path('js/pages/equipment/Index.vue'));
+
+    expect($page)->toContain('const equipmentDialogUrl = (equipmentItemId: number, dialog: Exclude<ActiveDialog, null>): string => {')
+        ->and($page)->toContain('query.status = props.filters.status;')
+        ->and($page)->toContain('equipment: equipmentItemId')
+        ->and($page)->toContain('dialog,')
+        ->and($page)->toContain("equipmentDialogUrl(equipmentItem.id, 'details')")
+        ->and($page)->toContain("equipmentDialogUrl(equipmentItem.id, 'edit')")
+        ->and($page)->toContain("equipmentDialogUrl(equipmentItem.id, 'history')");
 });
 
 test('equipment page still opens when history table is missing', function () {
@@ -333,6 +378,27 @@ test('equipment page can preselect an item from the query string', function () {
             ->where('activeEquipmentItem.id', $equipmentItem->id)
             ->where('activeEquipmentItem.name', 'Scanner Terminal')
             ->where('activeEquipmentItem.qr_code', 'EQ-SCAN-001')
+        );
+});
+
+test('equipment page can open edit dialog state from the query string', function () {
+    $user = User::factory()->create();
+    $equipmentItem = EquipmentItem::factory()->create([
+        'name' => 'Edit Terminal',
+        'qr_code' => 'EQ-EDIT-001',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('equipment.index', [
+            'equipment' => $equipmentItem->id,
+            'dialog' => 'edit',
+        ]))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('equipment/Index')
+            ->where('activeDialog', 'edit')
+            ->where('activeEquipmentItem.id', $equipmentItem->id)
+            ->where('activeEquipmentItem.name', 'Edit Terminal')
         );
 });
 

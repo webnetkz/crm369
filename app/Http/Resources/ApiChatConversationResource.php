@@ -31,7 +31,11 @@ class ApiChatConversationResource extends JsonResource
             'type' => $conversation->type,
             'title' => $conversation->type === ChatConversation::TYPE_DIRECT
                 ? $this->displayName($otherParticipant)
-                : ($conversation->title ?? __('ui.chat.untitled_chat')),
+                : (
+                    $conversation->isGeneralConversation()
+                        ? ChatConversation::GENERAL_CHAT_TITLE
+                        : ($conversation->title ?? __('ui.chat.untitled_chat'))
+                ),
             'subtitle' => $conversation->type === ChatConversation::TYPE_DIRECT
                 ? $otherParticipant?->email
                 : null,

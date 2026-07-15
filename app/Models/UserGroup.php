@@ -49,6 +49,8 @@ class UserGroup extends Model
 
     public const string PERMISSION_ACCESS_CHATS = 'access_chats';
 
+    public const string PERMISSION_ACCESS_CONFERENCES = 'access_conferences';
+
     public const string PERMISSION_ACCESS_KNOWLEDGE_BASES = 'access_knowledge_bases';
 
     public const string PERMISSION_MANAGE_KNOWLEDGE_BASES = 'manage_knowledge_bases';
@@ -186,6 +188,11 @@ class UserGroup extends Model
                 'description_key' => 'ui.admin.permission_access_chats_description',
                 'module_key' => 'chats',
             ],
+            self::PERMISSION_ACCESS_CONFERENCES => [
+                'label_key' => 'ui.admin.permission_access_conferences',
+                'description_key' => 'ui.admin.permission_access_conferences_description',
+                'module_key' => 'conferences',
+            ],
             self::PERMISSION_ACCESS_KNOWLEDGE_BASES => [
                 'label_key' => 'ui.admin.permission_access_knowledge_bases',
                 'description_key' => 'ui.admin.permission_access_knowledge_bases_description',
@@ -286,6 +293,7 @@ class UserGroup extends Model
             'news' => $portalModules['news'],
             'projects' => $portalModules['projects'],
             'chats' => $portalModules['chats'],
+            'conferences' => $portalModules['conferences'],
             'knowledge-bases' => $portalModules['knowledge-bases'],
             'funnels' => $portalModules['funnels'],
             'forms' => $portalModules['forms'],
@@ -313,6 +321,7 @@ class UserGroup extends Model
             'news',
             'projects',
             'chats',
+            'conferences',
             'knowledge-bases',
             'forms',
             'edo',

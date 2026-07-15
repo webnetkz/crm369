@@ -24,6 +24,7 @@ return [
     'news' => require __DIR__.'/ui/news.php',
     'projects' => require __DIR__.'/ui/projects.php',
     'chat' => require __DIR__.'/ui/chat.php',
+    'conferences' => require __DIR__.'/ui/conferences.php',
     'notifications' => require __DIR__.'/ui/notifications.php',
     'profile' => require __DIR__.'/ui/profile.php',
     'integrations' => require __DIR__.'/ui/integrations.php',

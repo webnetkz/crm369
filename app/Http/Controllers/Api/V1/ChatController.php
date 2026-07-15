@@ -14,7 +14,7 @@ use App\Support\ChatMessageRemover;
 use App\Support\ChatMessageSender;
 use App\Support\ChatSidebarData;
 use App\Support\DirectConversationManager;
-use Illuminate\Database\Eloquent\Builder;
+use App\Support\GeneralChatManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,12 +32,7 @@ class ChatController
         $conversationId = $validated['conversation'] ?? null;
 
         if (is_numeric($conversationId)) {
-            $activeConversation = ChatConversation::query()
-                ->with('participants.user:id,name,last_name,email,avatar_path,avatar_scale,user_group_id')
-                ->whereKey((int) $conversationId)
-                ->whereHas('participants', fn (Builder $query) => $query->where('user_id', $user->id))
-                ->firstOrFail();
-
+            $activeConversation = $chatSidebarData->resolveConversation($user, (int) $conversationId);
             $chatSidebarData->markConversationAsRead($activeConversation, $user);
         }
 
@@ -68,9 +63,11 @@ class ChatController
         StoreChatMessageRequest $request,
         ChatConversation $chatConversation,
         ChatMessageSender $chatMessageSender,
+        GeneralChatManager $generalChatManager,
     ): JsonResponse {
         $user = ApiRequestContext::subject($request);
-        abort_unless($chatConversation->hasParticipant($user), 403);
+        $generalChatManager->ensureParticipant($chatConversation, $user);
+        abort_unless($chatConversation->isAccessibleBy($user), 403);
 
         $message = $chatMessageSender->send($chatConversation, $user, $request);
 
@@ -85,11 +82,13 @@ class ChatController
         ChatConversation $chatConversation,
         ChatMessage $chatMessage,
         ChatMessageEditor $chatMessageEditor,
+        GeneralChatManager $generalChatManager,
     ): JsonResponse {
         $user = ApiRequestContext::subject($request);
 
         abort_unless($chatMessage->chat_conversation_id === $chatConversation->id, 404);
-        abort_unless($chatConversation->hasParticipant($user), 403);
+        $generalChatManager->ensureParticipant($chatConversation, $user);
+        abort_unless($chatConversation->isAccessibleBy($user), 403);
         abort_unless($chatMessage->user_id === $user->id, 403);
         abort_unless(! $chatMessage->wasDeleted(), 404);
 
@@ -106,11 +105,13 @@ class ChatController
         ChatConversation $chatConversation,
         ChatMessage $chatMessage,
         ChatMessageRemover $chatMessageRemover,
+        GeneralChatManager $generalChatManager,
     ): JsonResponse {
         $user = ApiRequestContext::subject($request);
 
         abort_unless($chatMessage->chat_conversation_id === $chatConversation->id, 404);
-        abort_unless($chatConversation->hasParticipant($user), 403);
+        $generalChatManager->ensureParticipant($chatConversation, $user);
+        abort_unless($chatConversation->isAccessibleBy($user), 403);
         abort_unless($chatMessage->user_id === $user->id, 403);
 
         $message = $chatMessageRemover->remove($chatMessage);

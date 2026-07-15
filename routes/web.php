@@ -4,6 +4,8 @@ use App\Http\Controllers\ChatMessageController;
 use App\Http\Controllers\ChatPageController;
 use App\Http\Controllers\ChatSidebarController;
 use App\Http\Controllers\CompanyStructureController;
+use App\Http\Controllers\ConferenceController;
+use App\Http\Controllers\ConferenceInvitationController;
 use App\Http\Controllers\ContactCommentController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CrmFunnelController;
@@ -31,6 +33,7 @@ use App\Http\Controllers\PortalWebhookWarehouseController;
 use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectTaskConversationController;
+use App\Http\Controllers\PublicConferenceController;
 use App\Http\Controllers\PublicEdoSigningController;
 use App\Http\Controllers\PublicPortalFormController;
 use App\Http\Controllers\ReferenceDirectoryController;
@@ -167,6 +170,9 @@ Route::get('forms/public/{portalForm:public_token}', [PublicPortalFormController
 Route::post('forms/public/{portalForm:public_token}', [PublicPortalFormController::class, 'submit'])
     ->middleware(['throttle:20,1', 'module.enabled:forms'])
     ->name('forms.public.submit');
+Route::get('conferences/public/{conference}', [PublicConferenceController::class, 'show'])
+    ->middleware('module.enabled:conferences')
+    ->name('conferences.public.show');
 Route::get('edo/public/{edoDocument:public_token}', [PublicEdoSigningController::class, 'show'])
     ->middleware('module.enabled:edo')
     ->name('edo.public.show');
@@ -284,6 +290,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('chats/attachments/{chatMessageAttachment}/download', [ChatMessageController::class, 'downloadAttachment'])
             ->whereNumber('chatMessageAttachment')
             ->name('chats.attachments.download');
+    });
+
+    Route::middleware(['module.enabled:conferences', 'can:access-conferences'])->group(function () {
+        Route::get('conferences', [ConferenceController::class, 'index'])->name('conferences.index');
+        Route::post('conferences', [ConferenceController::class, 'store'])->name('conferences.store');
+        Route::get('conferences/{conference}', [ConferenceController::class, 'show'])->name('conferences.show');
+        Route::post('conferences/{conference}/invitations', [ConferenceInvitationController::class, 'store'])->name('conferences.invitations.store');
+        Route::patch('conferences/{conference}/end', [ConferenceController::class, 'end'])->name('conferences.end');
     });
 
     Route::middleware(['module.enabled:knowledge-bases', 'can:access-knowledge-bases'])->group(function () {
