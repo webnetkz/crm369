@@ -3,13 +3,13 @@
 namespace App\Support;
 
 use App\Models\User;
-use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Schema;
 
 class MobileNotificationFeed
 {
     public function __construct(
         private readonly ChatSidebarData $chatSidebarData,
+        private readonly NotificationRuntimeCache $notificationRuntimeCache,
     ) {}
 
     /**
@@ -64,20 +64,7 @@ class MobileNotificationFeed
             return [];
         }
 
-        return $user->unreadNotifications()
-            ->latest()
-            ->limit(10)
-            ->get()
-            ->map(fn (DatabaseNotification $notification): array => [
-                'key' => 'notification:'.$notification->id,
-                'id' => $notification->id,
-                'title' => (string) data_get($notification->data, 'title', __('ui.notifications.default_title')),
-                'message' => (string) data_get($notification->data, 'message', ''),
-                'action_path' => $this->normalizeActionPath(data_get($notification->data, 'action_url')),
-                'created_at' => $notification->created_at?->toISOString(),
-            ])
-            ->values()
-            ->all();
+        return $this->notificationRuntimeCache->mobileUnread($user);
     }
 
     /**
@@ -115,34 +102,5 @@ class MobileNotificationFeed
             && Schema::hasTable('chat_conversations')
             && Schema::hasTable('chat_conversation_participants')
             && Schema::hasTable('chat_messages');
-    }
-
-    private function normalizeActionPath(mixed $actionUrl): ?string
-    {
-        if (! is_string($actionUrl)) {
-            return null;
-        }
-
-        $trimmedActionUrl = trim($actionUrl);
-
-        if ($trimmedActionUrl === '') {
-            return null;
-        }
-
-        if (str_starts_with($trimmedActionUrl, '/')) {
-            return $trimmedActionUrl;
-        }
-
-        $parts = parse_url($trimmedActionUrl);
-
-        if ($parts === false) {
-            return null;
-        }
-
-        $path = $parts['path'] ?? '/';
-        $query = isset($parts['query']) ? '?'.$parts['query'] : '';
-        $fragment = isset($parts['fragment']) ? '#'.$parts['fragment'] : '';
-
-        return $path.$query.$fragment;
     }
 }

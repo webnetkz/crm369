@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\EquipmentItem;
+use App\Models\EquipmentItemHistory;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -78,14 +79,20 @@ class EquipmentCsvService
         ]);
     }
 
-    public function import(UploadedFile $file, User $actor, string $delimiter = ';'): int
-    {
+    public function import(
+        UploadedFile $file,
+        User $actor,
+        string $delimiter,
+        EquipmentHistoryRecorder $historyRecorder,
+    ): int {
         $rows = $this->parseRows($file, $delimiter);
 
         foreach ($rows as $row) {
             $equipmentItem = $row['qr_code'] !== null
                 ? EquipmentItem::query()->firstOrNew(['qr_code' => $row['qr_code']])
                 : new EquipmentItem;
+            $exists = $equipmentItem->exists;
+            $before = $exists ? $historyRecorder->snapshot($equipmentItem) : null;
 
             $equipmentItem->forceFill([
                 'name' => $row['name'],
@@ -96,6 +103,18 @@ class EquipmentCsvService
                 'created_by_user_id' => $equipmentItem->exists ? $equipmentItem->created_by_user_id : $actor->id,
                 'updated_by_user_id' => $actor->id,
             ])->save();
+
+            $equipmentItem->refresh();
+
+            if (! $exists) {
+                $historyRecorder->recordCreated($equipmentItem, EquipmentItemHistory::SOURCE_CSV, $actor->id);
+
+                continue;
+            }
+
+            if ($before !== null) {
+                $historyRecorder->recordUpdated($equipmentItem, $before, EquipmentItemHistory::SOURCE_CSV, $actor->id);
+            }
         }
 
         return count($rows);

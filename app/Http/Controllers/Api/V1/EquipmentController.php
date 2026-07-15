@@ -7,6 +7,8 @@ use App\Http\Requests\StoreEquipmentItemRequest;
 use App\Http\Requests\UpdateEquipmentItemRequest;
 use App\Http\Resources\ApiEquipmentResource;
 use App\Models\EquipmentItem;
+use App\Models\EquipmentItemHistory;
+use App\Support\EquipmentHistoryRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -41,8 +43,10 @@ class EquipmentController extends Controller
         ]);
     }
 
-    public function store(StoreEquipmentItemRequest $request): JsonResponse
-    {
+    public function store(
+        StoreEquipmentItemRequest $request,
+        EquipmentHistoryRecorder $historyRecorder,
+    ): JsonResponse {
         $user = $request->user();
         abort_unless($user !== null, 403);
 
@@ -52,21 +56,32 @@ class EquipmentController extends Controller
             'updated_by_user_id' => $user->id,
         ]);
 
+        $historyRecorder->recordCreated($equipmentItem, EquipmentItemHistory::SOURCE_API, $user->id);
+
         return response()->json([
             'message' => __('ui.equipment.created_success'),
             'data' => (new ApiEquipmentResource($equipmentItem->load($this->equipmentRelations())))->resolve(),
         ], 201);
     }
 
-    public function update(UpdateEquipmentItemRequest $request, EquipmentItem $equipmentItem): JsonResponse
-    {
+    public function update(
+        UpdateEquipmentItemRequest $request,
+        EquipmentItem $equipmentItem,
+        EquipmentHistoryRecorder $historyRecorder,
+    ): JsonResponse {
         $user = $request->user();
         abort_unless($user !== null, 403);
+
+        $before = $historyRecorder->snapshot($equipmentItem);
 
         $equipmentItem->update([
             ...$request->payload(),
             'updated_by_user_id' => $user->id,
         ]);
+
+        $equipmentItem->refresh();
+
+        $historyRecorder->recordUpdated($equipmentItem, $before, EquipmentItemHistory::SOURCE_API, $user->id);
 
         return response()->json([
             'message' => __('ui.equipment.updated_success'),

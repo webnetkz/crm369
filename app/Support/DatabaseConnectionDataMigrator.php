@@ -20,6 +20,7 @@ class DatabaseConnectionDataMigrator
         string $targetConnection,
         bool $truncateTarget = true,
         array $excludedTables = [],
+        bool $verifyTableCounts = true,
     ): array {
         if ($sourceConnection === $targetConnection) {
             throw new InvalidArgumentException('The source and target database connections must be different.');
@@ -51,6 +52,7 @@ class DatabaseConnectionDataMigrator
             $targetConnection,
             $truncateTarget,
             $orderedTables,
+            $verifyTableCounts,
         ): array {
             if ($truncateTarget) {
                 $this->clearTargetTables($targetConnection, $orderedTables->reverse()->values());
@@ -63,6 +65,9 @@ class DatabaseConnectionDataMigrator
             }
 
             $this->resetSequences($targetConnection, $orderedTables);
+            if ($verifyTableCounts) {
+                $this->assertTableCountsMatch($sourceConnection, $targetConnection, $orderedTables, $copiedRowsByTable);
+            }
 
             return $copiedRowsByTable;
         });
@@ -165,19 +170,27 @@ class DatabaseConnectionDataMigrator
             $query->orderBy('id');
         }
 
-        $rows = $query->get()
-            ->map(fn (object $row): array => (array) $row)
-            ->values();
+        $buffer = [];
+        $copiedRows = 0;
 
-        if ($rows->isEmpty()) {
-            return 0;
+        foreach ($query->cursor() as $row) {
+            $buffer[] = (array) $row;
+
+            if (count($buffer) < 500) {
+                continue;
+            }
+
+            DB::connection($targetConnection)->table($table)->insert($buffer);
+            $copiedRows += count($buffer);
+            $buffer = [];
         }
 
-        foreach ($rows->chunk(500) as $chunk) {
-            DB::connection($targetConnection)->table($table)->insert($chunk->all());
+        if ($buffer !== []) {
+            DB::connection($targetConnection)->table($table)->insert($buffer);
+            $copiedRows += count($buffer);
         }
 
-        return $rows->count();
+        return $copiedRows;
     }
 
     /**
@@ -213,6 +226,33 @@ class DatabaseConnectionDataMigrator
                 "select setval(pg_get_serial_sequence(?, 'id'), ?, true)",
                 [$table, (int) $maxId],
             );
+        }
+    }
+
+    /**
+     * @param  Collection<int, string>  $tables
+     * @param  array<string, int>  $copiedRowsByTable
+     */
+    private function assertTableCountsMatch(
+        string $sourceConnection,
+        string $targetConnection,
+        Collection $tables,
+        array $copiedRowsByTable,
+    ): void {
+        foreach ($tables as $table) {
+            $sourceCount = DB::connection($sourceConnection)->table($table)->count();
+            $targetCount = DB::connection($targetConnection)->table($table)->count();
+            $copiedRows = $copiedRowsByTable[$table] ?? 0;
+
+            if ($sourceCount !== $targetCount || $sourceCount !== $copiedRows) {
+                throw new RuntimeException(sprintf(
+                    'Table [%s] verification failed. Source: %d row(s), target: %d row(s), copied: %d row(s).',
+                    $table,
+                    $sourceCount,
+                    $targetCount,
+                    $copiedRows,
+                ));
+            }
         }
     }
 }

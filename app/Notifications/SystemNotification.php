@@ -20,7 +20,8 @@ class SystemNotification extends Notification implements ShouldQueue
         private readonly ?string $actionLabel = null,
     ) {
         $this->afterCommit();
-        $this->onQueue('notifications');
+        $this->onConnection((string) config('realtime.notifications.queue_connection', config('queue.default')));
+        $this->onQueue((string) config('realtime.notifications.queue', 'notifications'));
     }
 
     /**

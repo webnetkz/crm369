@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\DB;
 
 class DirectConversationManager
 {
+    public function __construct(
+        private readonly ChatRuntimeCache $chatRuntimeCache,
+    ) {}
+
     public function ensure(User $initiator, User $recipient): ChatConversation
     {
         $conversation = ChatConversation::query()
@@ -20,6 +24,8 @@ class DirectConversationManager
             ->first();
 
         if ($conversation) {
+            $this->chatRuntimeCache->forgetUsers([$initiator->id, $recipient->id]);
+
             return $conversation;
         }
 
@@ -39,6 +45,8 @@ class DirectConversationManager
                 'chat_conversation_id' => $conversation->id,
                 'user_id' => $recipient->id,
             ]);
+
+            $this->chatRuntimeCache->forgetUsers([$initiator->id, $recipient->id]);
 
             return $conversation;
         });

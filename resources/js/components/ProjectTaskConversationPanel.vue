@@ -1,20 +1,26 @@
 <script setup lang="ts">
 import {
+    ArrowDown,
     MessageSquareMore,
     Pencil,
+    Pin,
     Trash2,
     Users,
 } from '@lucide/vue';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import {
     destroy as destroyMessage,
+    pin as pinMessage,
     store as storeMessage,
+    unpin as unpinMessage,
     update as updateMessage,
 } from '@/actions/App/Http/Controllers/ChatMessageController';
 import { show as showTaskConversation } from '@/actions/App/Http/Controllers/ProjectTaskConversationController';
 import ChatMessageAttachments from '@/components/ChatMessageAttachments.vue';
 import ChatMessageComposer from '@/components/ChatMessageComposer.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { useChatMessageTimeline } from '@/composables/useChatMessageTimeline';
 import { useInitials } from '@/composables/useInitials';
 import { useLanguage } from '@/composables/useLanguage';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
@@ -39,6 +45,8 @@ const draft = ref('');
 const selectedAttachments = ref<File[]>([]);
 const editingMessageId = ref<number | null>(null);
 const messagesContainer = ref<HTMLElement | null>(null);
+const isScrolledNearBottom = ref(true);
+const scrollThresholdPx = 96;
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
 const participants = computed<ChatUserSummary[]>(() => {
@@ -47,6 +55,12 @@ const participants = computed<ChatUserSummary[]>(() => {
 
 const conversationId = computed<number | null>(() => {
     return conversation.value?.id ?? null;
+});
+const conversationMessages = computed(() => {
+    return conversation.value?.messages ?? [];
+});
+const conversationPinnedMessages = computed(() => {
+    return conversation.value?.pinnedMessages ?? [];
 });
 
 const hasMessages = computed<boolean>(() => {
@@ -65,6 +79,14 @@ const editingMessage = computed(() => {
     );
 });
 
+const showScrollToLatest = computed<boolean>(() => {
+    return hasMessages.value && !isScrolledNearBottom.value;
+});
+const { timelineEntries, formatDateTime } = useChatMessageTimeline(
+    conversationMessages,
+    language,
+);
+
 const avatarStyle = (
     user: ChatUserSummary | null | undefined,
 ): Record<string, string> => {
@@ -74,40 +96,91 @@ const avatarStyle = (
     };
 };
 
-const formatDateTime = (value: string | null, short = false): string => {
-    if (!value) {
-        return '';
+const isMessagesScrolledNearBottom = (): boolean => {
+    const container = messagesContainer.value;
+
+    if (!container) {
+        return true;
     }
 
-    const locale = language.value === 'ru' ? 'ru-RU' : 'en-US';
-
-    return short
-        ? new Intl.DateTimeFormat(locale, {
-              hour: '2-digit',
-              minute: '2-digit',
-          }).format(new Date(value))
-        : new Intl.DateTimeFormat(locale, {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-          }).format(new Date(value));
+    return (
+        container.scrollHeight - container.scrollTop - container.clientHeight <=
+        scrollThresholdPx
+    );
 };
 
-const scrollMessagesToBottom = async (): Promise<void> => {
+const syncMessagesScrollState = (): void => {
+    isScrolledNearBottom.value = isMessagesScrolledNearBottom();
+};
+
+const scrollMessagesToBottom = async (
+    behavior: ScrollBehavior = 'auto',
+): Promise<void> => {
     await nextTick();
 
-    if (!messagesContainer.value) {
+    const container = messagesContainer.value;
+
+    if (!container) {
         return;
     }
 
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+    container.scrollTo({
+        top: container.scrollHeight,
+        behavior,
+    });
+    syncMessagesScrollState();
+};
+
+const syncMessagesViewport = async (
+    stickToBottom: boolean,
+    behavior: ScrollBehavior = 'auto',
+): Promise<void> => {
+    if (stickToBottom) {
+        await scrollMessagesToBottom(behavior);
+
+        return;
+    }
+
+    await nextTick();
+    syncMessagesScrollState();
+};
+
+const handleMessagesScroll = (): void => {
+    syncMessagesScrollState();
+};
+
+const scrollToLatest = async (): Promise<void> => {
+    await scrollMessagesToBottom('smooth');
+};
+
+const scrollToMessage = async (messageId: number): Promise<void> => {
+    await nextTick();
+
+    const messageElement = messagesContainer.value?.querySelector<HTMLElement>(
+        `[data-message-id="${messageId}"]`,
+    );
+
+    if (!messageElement) {
+        return;
+    }
+
+    messageElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+    });
 };
 
 const loadConversation = async (options?: {
     suppressErrors?: boolean;
+    forceScrollToBottom?: boolean;
+    scrollBehavior?: ScrollBehavior;
 }): Promise<void> => {
     if (!props.active) {
         return;
     }
+
+    const shouldStickToBottom =
+        options?.forceScrollToBottom ?? isMessagesScrolledNearBottom();
 
     loading.value = conversation.value === null;
     loadError.value = null;
@@ -120,7 +193,10 @@ const loadConversation = async (options?: {
         });
 
         conversation.value = response.conversation;
-        await scrollMessagesToBottom();
+        await syncMessagesViewport(
+            shouldStickToBottom,
+            options?.scrollBehavior,
+        );
     } catch (error) {
         console.error(error);
 
@@ -185,6 +261,53 @@ const removeMessage = async (
     }
 };
 
+const togglePinnedMessage = async (
+    message: ChatActiveConversation['messages'][number],
+): Promise<void> => {
+    if (
+        sending.value ||
+        !conversationId.value ||
+        message.isDeleted
+    ) {
+        return;
+    }
+
+    sending.value = true;
+    loadError.value = null;
+
+    try {
+        await fetchSameOriginJson(
+            (
+                message.isPinned ? unpinMessage : pinMessage
+            ).url([conversationId.value, message.id]),
+            {
+                method: message.isPinned ? 'DELETE' : 'PATCH',
+            },
+        );
+
+        await loadConversation({
+            suppressErrors: true,
+        });
+    } catch (error) {
+        console.error(error);
+        loadError.value = t.value.common.error;
+    } finally {
+        sending.value = false;
+    }
+};
+
+const pinnedMessagePreview = (
+    message: ChatActiveConversation['messages'][number],
+): string => {
+    const body = message.body.trim();
+
+    if (body !== '') {
+        return body;
+    }
+
+    return message.attachments[0]?.name ?? t.value.chat.attachment;
+};
+
 const submitMessage = async (): Promise<void> => {
     const canSubmitEmptyEdit =
         editingMessage.value !== null &&
@@ -242,6 +365,8 @@ const submitMessage = async (): Promise<void> => {
         selectedAttachments.value = [];
         await loadConversation({
             suppressErrors: true,
+            forceScrollToBottom: true,
+            scrollBehavior: 'smooth',
         });
     } catch (error) {
         console.error(error);
@@ -288,7 +413,10 @@ watch(
         if (taskId !== previousTaskId || !previousActive) {
             cancelEditingMessage();
             conversation.value = null;
-            await loadConversation();
+            isScrolledNearBottom.value = true;
+            await loadConversation({
+                forceScrollToBottom: true,
+            });
         }
 
         startPolling();
@@ -303,7 +431,7 @@ onBeforeUnmount(() => {
 
 <template>
     <div
-        class="flex h-full min-h-0 flex-col border-t border-border bg-muted/15 xl:border-t-0 xl:border-l"
+        class="relative flex h-full min-h-0 flex-col border-t border-border bg-muted/15 xl:border-t-0 xl:border-l"
     >
         <div class="border-b border-border px-5 py-5">
             <div class="flex items-center gap-2">
@@ -352,8 +480,34 @@ onBeforeUnmount(() => {
         </div>
 
         <div
+            v-if="conversationPinnedMessages.length > 0"
+            class="border-b border-border bg-muted/20 px-5 py-3"
+        >
+            <div
+                class="flex flex-wrap items-center gap-2"
+                :aria-label="t.chat.pinned_messages"
+            >
+                <span
+                    class="flex size-7 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground"
+                >
+                    <Pin class="size-3.5" />
+                </span>
+                <button
+                    v-for="message in conversationPinnedMessages"
+                    :key="message.id"
+                    type="button"
+                    class="h-5 w-9 shrink-0 rounded-md border border-border bg-background shadow-sm transition hover:border-primary/40 hover:bg-primary/8"
+                    :title="pinnedMessagePreview(message)"
+                    :aria-label="pinnedMessagePreview(message)"
+                    @click="scrollToMessage(message.id)"
+                />
+            </div>
+        </div>
+
+        <div
             ref="messagesContainer"
             class="min-h-0 flex-1 overflow-y-auto px-5 py-5"
+            @scroll.passive="handleMessagesScroll"
         >
             <div
                 v-if="loading && !conversation"
@@ -386,75 +540,155 @@ onBeforeUnmount(() => {
             </div>
 
             <div v-else class="space-y-4">
-                <div
-                    v-for="message in conversation?.messages ?? []"
-                    :key="message.id"
-                    class="flex"
-                    :class="message.isOwn ? 'justify-end' : 'justify-start'"
-                >
-                    <div class="max-w-[88%] space-y-2">
-                        <div
-                            class="rounded-3xl px-4 py-3 text-sm break-words whitespace-pre-wrap shadow-sm"
-                            :class="
-                                message.isDeleted
-                                    ? 'border border-dashed border-border bg-muted/20 italic text-muted-foreground'
-                                    : message.isOwn
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'border border-border bg-background text-foreground'
-                            "
+                <template v-for="entry in timelineEntries" :key="entry.key">
+                    <div
+                        v-if="entry.type === 'separator'"
+                        class="flex items-center gap-3 py-1"
+                    >
+                        <div class="h-px flex-1 bg-border/70" />
+                        <span
+                            class="rounded-full border border-border bg-background px-3 py-1 text-[11px] font-medium text-muted-foreground"
                         >
+                            {{ entry.label }}
+                        </span>
+                        <div class="h-px flex-1 bg-border/70" />
+                    </div>
+
+                    <div
+                        v-else
+                        class="flex"
+                        :data-message-id="entry.message.id"
+                        :class="
+                            entry.message.isOwn
+                                ? 'justify-end'
+                                : 'justify-start'
+                        "
+                    >
+                        <div class="max-w-[88%] space-y-2">
                             <div
-                                v-if="message.body !== ''"
-                                class="break-words whitespace-pre-wrap"
+                                class="rounded-3xl px-4 py-3 text-sm break-words whitespace-pre-wrap shadow-sm"
+                                :class="
+                                    entry.message.isDeleted
+                                        ? 'border border-dashed border-border bg-muted/20 italic text-muted-foreground'
+                                        : entry.message.isOwn
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'border border-border bg-background text-foreground'
+                                "
                             >
-                                {{ message.body }}
+                                <div
+                                    v-if="entry.message.body !== ''"
+                                    class="break-words whitespace-pre-wrap"
+                                >
+                                    {{ entry.message.body }}
+                                </div>
+                                <ChatMessageAttachments
+                                    :attachments="entry.message.attachments"
+                                    :own="entry.message.isOwn"
+                                />
                             </div>
-                            <ChatMessageAttachments
-                                :attachments="message.attachments"
-                                :own="message.isOwn"
-                            />
-                        </div>
-                        <div
-                            class="px-1 text-[11px] text-muted-foreground"
-                            :class="message.isOwn ? 'text-right' : 'text-left'"
-                        >
-                            {{
-                                message.isOwn ? t.chat.you : message.user.name
-                            }}
-                            ·
-                            {{ formatDateTime(message.createdAt, true) }}
-                            <template v-if="message.isDeleted">
-                                · {{ t.chat.deleted }}
-                            </template>
-                            <template v-else-if="message.isEdited">
-                                · {{ t.chat.edited }}
-                            </template>
-                            <button
-                                v-if="message.isOwn && !message.isDeleted"
-                                type="button"
-                                class="ml-2 inline-flex size-6 items-center justify-center rounded-full transition hover:bg-muted hover:text-foreground"
-                                :title="t.chat.edit_message"
-                                :aria-label="t.chat.edit_message"
-                                :disabled="sending"
-                                @click="startEditingMessage(message)"
+                            <div
+                                class="px-1 text-[11px] text-muted-foreground"
+                                :class="
+                                    entry.message.isOwn
+                                        ? 'text-right'
+                                        : 'text-left'
+                                "
                             >
-                                <Pencil class="size-3" />
-                            </button>
-                            <button
-                                v-if="message.isOwn && !message.isDeleted"
-                                type="button"
-                                class="ml-1 inline-flex size-6 items-center justify-center rounded-full transition hover:bg-muted hover:text-foreground"
-                                :title="t.chat.delete_message"
-                                :aria-label="t.chat.delete_message"
-                                :disabled="sending"
-                                @click="removeMessage(message)"
-                            >
+                                {{
+                                    entry.message.isOwn
+                                        ? t.chat.you
+                                        : entry.message.user.name
+                                }}
+                                ·
+                                {{
+                                    formatDateTime(
+                                        entry.message.createdAt,
+                                        true,
+                                    )
+                                }}
+                                <template v-if="entry.message.isDeleted">
+                                    · {{ t.chat.deleted }}
+                                </template>
+                                <template
+                                    v-else-if="entry.message.isEdited"
+                                >
+                                    · {{ t.chat.edited }}
+                                </template>
+                                <button
+                                    v-if="!entry.message.isDeleted"
+                                    type="button"
+                                    class="ml-2 inline-flex size-6 items-center justify-center rounded-full transition"
+                                    :class="
+                                        entry.message.isPinned
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                            : 'hover:bg-muted hover:text-foreground'
+                                    "
+                                    :title="
+                                        entry.message.isPinned
+                                            ? t.chat.unpin_message
+                                            : t.chat.pin_message
+                                    "
+                                    :aria-label="
+                                        entry.message.isPinned
+                                            ? t.chat.unpin_message
+                                            : t.chat.pin_message
+                                    "
+                                    :aria-pressed="entry.message.isPinned"
+                                    :disabled="sending"
+                                    @click="togglePinnedMessage(entry.message)"
+                                >
+                                    <Pin class="size-3" />
+                                </button>
+                                <button
+                                    v-if="
+                                        entry.message.isOwn &&
+                                        !entry.message.isDeleted
+                                    "
+                                    type="button"
+                                    class="ml-1 inline-flex size-6 items-center justify-center rounded-full transition hover:bg-muted hover:text-foreground"
+                                    :title="t.chat.edit_message"
+                                    :aria-label="t.chat.edit_message"
+                                    :disabled="sending"
+                                    @click="startEditingMessage(entry.message)"
+                                >
+                                    <Pencil class="size-3" />
+                                </button>
+                                <button
+                                    v-if="
+                                        entry.message.isOwn &&
+                                        !entry.message.isDeleted
+                                    "
+                                    type="button"
+                                    class="ml-1 inline-flex size-6 items-center justify-center rounded-full transition hover:bg-muted hover:text-foreground"
+                                    :title="t.chat.delete_message"
+                                    :aria-label="t.chat.delete_message"
+                                    :disabled="sending"
+                                    @click="removeMessage(entry.message)"
+                                >
                                     <Trash2 class="size-3" />
-                            </button>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </template>
             </div>
+        </div>
+
+        <div
+            v-if="showScrollToLatest"
+            class="pointer-events-none absolute right-5 bottom-24 z-10 flex"
+        >
+            <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                class="pointer-events-auto size-10 rounded-full border border-border bg-background text-foreground shadow-lg"
+                :title="t.chat.scroll_to_latest"
+                :aria-label="t.chat.scroll_to_latest"
+                @click="scrollToLatest"
+            >
+                <ArrowDown class="size-4" />
+            </Button>
         </div>
 
         <div class="border-t border-border px-5 py-5">

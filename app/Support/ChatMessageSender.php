@@ -15,6 +15,10 @@ use Throwable;
 
 class ChatMessageSender
 {
+    public function __construct(
+        private readonly ChatRuntimeCache $chatRuntimeCache,
+    ) {}
+
     public function sendPlainText(
         ChatConversation $chatConversation,
         User $user,
@@ -124,5 +128,7 @@ class ChatMessageSender
             ->where('chat_conversation_id', $chatConversation->id)
             ->where('user_id', $message->user_id)
             ->update(['last_read_at' => $message->created_at]);
+
+        $this->chatRuntimeCache->forgetConversation($chatConversation);
     }
 }

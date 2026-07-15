@@ -13,12 +13,78 @@ class ChatSidebarData
 {
     public function __construct(
         private readonly ChatMessageData $chatMessageData,
+        private readonly ChatRuntimeCache $chatRuntimeCache,
     ) {}
 
     /**
      * @return array{unreadCount: int, conversations: array<int, array<string, mixed>>, contacts: array<int, array<string, mixed>>, activeConversation: array<string, mixed>|null}
      */
     public function build(User $user, string $search = '', ?ChatConversation $activeConversation = null): array
+    {
+        if ($search === '' && $activeConversation === null) {
+            return $this->chatRuntimeCache->sidebar(
+                $user,
+                fn (): array => $this->buildPayload($user, $search, $activeConversation),
+            );
+        }
+
+        return $this->buildPayload($user, $search, $activeConversation);
+    }
+
+    /**
+     * @return array{unreadCount: int}
+     */
+    public function shared(User $user): array
+    {
+        return $this->chatRuntimeCache->shared($user, fn (): array => [
+            'unreadCount' => (int) array_sum($this->unreadCounts($user)),
+        ]);
+    }
+
+    /**
+     * @return array<int, array{id: int, title: string, excerpt: string|null, unreadCount: int, latestMessageId: int|null, lastMessageAt: string|null}>
+     */
+    public function unreadConversations(User $user, int $limit = 10): array
+    {
+        return $this->chatRuntimeCache->unreadConversations($user, $limit, function () use ($limit, $user): array {
+            $unreadCounts = $this->unreadCounts($user);
+
+            return $this->conversationCollection($user, '')
+                ->map(function (ChatConversation $conversation) use ($unreadCounts, $user): array {
+                    $otherParticipant = $this->otherParticipant($conversation, $user);
+
+                    return [
+                        'id' => $conversation->id,
+                        'title' => $conversation->type === ChatConversation::TYPE_DIRECT
+                            ? $this->displayName($otherParticipant)
+                            : ($conversation->title ?? __('ui.chat.untitled_chat')),
+                        'excerpt' => $this->chatMessageData->excerpt($conversation->latestMessage),
+                        'unreadCount' => Arr::get($unreadCounts, $conversation->id, 0),
+                        'latestMessageId' => $conversation->latestMessage?->id,
+                        'lastMessageAt' => $conversation->last_message_at?->toISOString(),
+                    ];
+                })
+                ->filter(fn (array $conversation): bool => $conversation['unreadCount'] > 0)
+                ->take($limit)
+                ->values()
+                ->all();
+        });
+    }
+
+    public function markConversationAsRead(ChatConversation $conversation, User $user): void
+    {
+        ChatConversationParticipant::query()
+            ->where('chat_conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->update(['last_read_at' => now()]);
+
+        $this->chatRuntimeCache->forgetUser($user);
+    }
+
+    /**
+     * @return array{unreadCount: int, conversations: array<int, array<string, mixed>>, contacts: array<int, array<string, mixed>>, activeConversation: array<string, mixed>|null}
+     */
+    private function buildPayload(User $user, string $search = '', ?ChatConversation $activeConversation = null): array
     {
         $conversations = $this->conversationCollection($user, $search);
         $unreadCounts = $this->unreadCounts($user);
@@ -38,52 +104,6 @@ class ChatSidebarData
                 ? $this->serializeActiveConversation($resolvedActiveConversation, $user)
                 : null,
         ];
-    }
-
-    /**
-     * @return array{unreadCount: int}
-     */
-    public function shared(User $user): array
-    {
-        return [
-            'unreadCount' => (int) array_sum($this->unreadCounts($user)),
-        ];
-    }
-
-    /**
-     * @return array<int, array{id: int, title: string, excerpt: string|null, unreadCount: int, latestMessageId: int|null, lastMessageAt: string|null}>
-     */
-    public function unreadConversations(User $user, int $limit = 10): array
-    {
-        $unreadCounts = $this->unreadCounts($user);
-
-        return $this->conversationCollection($user, '')
-            ->map(function (ChatConversation $conversation) use ($unreadCounts, $user): array {
-                $otherParticipant = $this->otherParticipant($conversation, $user);
-
-                return [
-                    'id' => $conversation->id,
-                    'title' => $conversation->type === ChatConversation::TYPE_DIRECT
-                        ? $this->displayName($otherParticipant)
-                        : ($conversation->title ?? __('ui.chat.untitled_chat')),
-                    'excerpt' => $this->chatMessageData->excerpt($conversation->latestMessage),
-                    'unreadCount' => Arr::get($unreadCounts, $conversation->id, 0),
-                    'latestMessageId' => $conversation->latestMessage?->id,
-                    'lastMessageAt' => $conversation->last_message_at?->toISOString(),
-                ];
-            })
-            ->filter(fn (array $conversation): bool => $conversation['unreadCount'] > 0)
-            ->take($limit)
-            ->values()
-            ->all();
-    }
-
-    public function markConversationAsRead(ChatConversation $conversation, User $user): void
-    {
-        ChatConversationParticipant::query()
-            ->where('chat_conversation_id', $conversation->id)
-            ->where('user_id', $user->id)
-            ->update(['last_read_at' => now()]);
     }
 
     /**
@@ -209,12 +229,15 @@ class ChatSidebarData
                 'user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
                 'attachments',
             ])
-            ->latest('id')
-            ->limit(50)
+            ->oldest('id')
             ->get()
-            ->reverse()
             ->values()
             ->map(fn (ChatMessage $message): array => $this->chatMessageData->serialize($message, $user))
+            ->all();
+        $pinnedMessages = collect($messages)
+            ->filter(fn (array $message): bool => $message['isPinned'] === true)
+            ->sortByDesc('pinnedAt')
+            ->values()
             ->all();
 
         return [
@@ -232,6 +255,7 @@ class ChatSidebarData
                 ->values()
                 ->all(),
             'messages' => $messages,
+            'pinnedMessages' => $pinnedMessages,
         ];
     }
 

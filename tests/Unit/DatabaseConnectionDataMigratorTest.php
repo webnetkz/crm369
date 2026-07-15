@@ -150,3 +150,25 @@ test('database connection data migration command copies rows between configured 
     expect(DB::connection('sqlite_target')->table('users')->where('id', 7)->value('name'))
         ->toBe('Command owner');
 });
+
+test('database connection data migrator copies large tables without loading all rows at once', function () {
+    $rows = collect(range(1, 1205))
+        ->map(fn (int $id): array => [
+            'id' => $id,
+            'name' => 'User '.$id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ])
+        ->all();
+
+    DB::connection('sqlite_source')->table('users')->insert($rows);
+
+    $result = app(DatabaseConnectionDataMigrator::class)->migrate(
+        sourceConnection: 'sqlite_source',
+        targetConnection: 'sqlite_target',
+    );
+
+    expect($result['users'])->toBe(1205)
+        ->and(DB::connection('sqlite_target')->table('users')->count())->toBe(1205)
+        ->and(DB::connection('sqlite_target')->table('users')->where('id', 1205)->value('name'))->toBe('User 1205');
+});

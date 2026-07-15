@@ -9,12 +9,14 @@ use App\Models\ChatMessage;
 use App\Models\ChatMessageAttachment;
 use App\Support\ChatMessageData;
 use App\Support\ChatMessageEditor;
+use App\Support\ChatMessagePinner;
 use App\Support\ChatMessageRemover;
 use App\Support\ChatMessageSender;
 use App\Support\TaskConversationManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ChatMessageController extends Controller
@@ -102,6 +104,58 @@ class ChatMessageController extends Controller
         ]);
     }
 
+    public function pin(
+        ChatConversation $chatConversation,
+        ChatMessage $chatMessage,
+        ChatMessageData $chatMessageData,
+        ChatMessagePinner $chatMessagePinner,
+    ): JsonResponse {
+        $user = request()->user();
+        abort_unless($user !== null, 401);
+
+        abort_unless($chatMessage->chat_conversation_id === $chatConversation->id, 404);
+        abort_unless(! $chatMessage->wasDeleted(), 404);
+
+        if ($chatConversation->type === ChatConversation::TYPE_TASK) {
+            $chatConversation->loadMissing('task');
+            abort_unless($chatConversation->isAccessibleBy($user), 403);
+        } else {
+            abort_unless($chatConversation->hasParticipant($user), 403);
+        }
+
+        $message = $chatMessagePinner->pin($chatMessage, $user);
+
+        return response()->json([
+            'message' => $chatMessageData->serialize($message, $user),
+        ]);
+    }
+
+    public function unpin(
+        ChatConversation $chatConversation,
+        ChatMessage $chatMessage,
+        ChatMessageData $chatMessageData,
+        ChatMessagePinner $chatMessagePinner,
+    ): JsonResponse {
+        $user = request()->user();
+        abort_unless($user !== null, 401);
+
+        abort_unless($chatMessage->chat_conversation_id === $chatConversation->id, 404);
+        abort_unless(! $chatMessage->wasDeleted(), 404);
+
+        if ($chatConversation->type === ChatConversation::TYPE_TASK) {
+            $chatConversation->loadMissing('task');
+            abort_unless($chatConversation->isAccessibleBy($user), 403);
+        } else {
+            abort_unless($chatConversation->hasParticipant($user), 403);
+        }
+
+        $message = $chatMessagePinner->unpin($chatMessage);
+
+        return response()->json([
+            'message' => $chatMessageData->serialize($message, $user),
+        ]);
+    }
+
     public function downloadAttachment(ChatMessageAttachment $chatMessageAttachment): StreamedResponse
     {
         $user = request()->user();
@@ -133,14 +187,21 @@ class ChatMessageController extends Controller
 
         abort_unless($conversation !== null && $conversation->isAccessibleBy($user), 403);
         abort_unless($message !== null && ! $message->wasDeleted(), 404);
-        abort_unless($chatMessageData->isPreviewableImage($chatMessageAttachment), 404);
+        abort_unless($chatMessageData->isInlinePreviewable($chatMessageAttachment), 404);
 
-        return response()->file(
+        $response = response()->file(
             Storage::disk($chatMessageAttachment->disk)->path($chatMessageAttachment->path),
             [
                 'Content-Type' => $chatMessageAttachment->mime_type ?? 'application/octet-stream',
                 'X-Content-Type-Options' => 'nosniff',
             ],
         );
+
+        $response->setContentDisposition(
+            ResponseHeaderBag::DISPOSITION_INLINE,
+            $chatMessageAttachment->original_name,
+        );
+
+        return $response;
     }
 }

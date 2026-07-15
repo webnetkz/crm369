@@ -49,7 +49,7 @@ const handlePerPageChange = (event: Event): void => {
         </div>
 
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-            <div class="flex items-center gap-2">
+            <div v-if="perPageOptions.length > 1" class="flex items-center gap-2">
                 <Label for="per_page" class="text-sm">{{ t.common.per_page }}</Label>
                 <select
                     id="per_page"

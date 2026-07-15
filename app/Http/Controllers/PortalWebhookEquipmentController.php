@@ -6,7 +6,9 @@ use App\Http\Requests\StoreEquipmentItemRequest;
 use App\Http\Requests\UpdateEquipmentItemRequest;
 use App\Http\Resources\ApiEquipmentResource;
 use App\Models\EquipmentItem;
+use App\Models\EquipmentItemHistory;
 use App\Models\PortalWebhook;
+use App\Support\EquipmentHistoryRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -37,8 +39,11 @@ class PortalWebhookEquipmentController extends Controller
         ]);
     }
 
-    public function store(StoreEquipmentItemRequest $request, PortalWebhook $portalWebhook): JsonResponse
-    {
+    public function store(
+        StoreEquipmentItemRequest $request,
+        PortalWebhook $portalWebhook,
+        EquipmentHistoryRecorder $historyRecorder,
+    ): JsonResponse {
         $actorId = $portalWebhook->created_by_user_id;
         abort_unless($actorId !== null, 422, 'Webhook creator is required.');
 
@@ -48,6 +53,8 @@ class PortalWebhookEquipmentController extends Controller
             'updated_by_user_id' => $actorId,
         ]);
 
+        $historyRecorder->recordCreated($equipmentItem, EquipmentItemHistory::SOURCE_WEBHOOK, $actorId);
+
         return response()->json([
             'webhook' => $this->webhookPayload($portalWebhook),
             'message' => __('ui.equipment.created_success'),
@@ -55,15 +62,30 @@ class PortalWebhookEquipmentController extends Controller
         ], 201);
     }
 
-    public function update(UpdateEquipmentItemRequest $request, PortalWebhook $portalWebhook, EquipmentItem $equipmentItem): JsonResponse
-    {
+    public function update(
+        UpdateEquipmentItemRequest $request,
+        PortalWebhook $portalWebhook,
+        EquipmentItem $equipmentItem,
+        EquipmentHistoryRecorder $historyRecorder,
+    ): JsonResponse {
         $actorId = $portalWebhook->created_by_user_id;
         abort_unless($actorId !== null, 422, 'Webhook creator is required.');
+
+        $before = $historyRecorder->snapshot($equipmentItem);
 
         $equipmentItem->update([
             ...$request->payload(),
             'updated_by_user_id' => $actorId,
         ]);
+
+        $equipmentItem->refresh();
+
+        $historyRecorder->recordUpdated(
+            $equipmentItem,
+            $before,
+            EquipmentItemHistory::SOURCE_WEBHOOK,
+            $actorId,
+        );
 
         return response()->json([
             'webhook' => $this->webhookPayload($portalWebhook),

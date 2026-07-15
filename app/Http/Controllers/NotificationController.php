@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\NotificationRuntimeCache;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class NotificationController extends Controller
 {
-    public function update(Request $request, string $notification): RedirectResponse
-    {
-        $databaseNotification = $request->user()?->notifications()
+    public function update(
+        Request $request,
+        string $notification,
+        NotificationRuntimeCache $notificationRuntimeCache,
+    ): RedirectResponse {
+        $user = $request->user();
+        $databaseNotification = $user?->notifications()
             ->whereKey($notification)
             ->firstOrFail();
 
@@ -18,14 +23,24 @@ class NotificationController extends Controller
             $databaseNotification->markAsRead();
         }
 
+        if ($user !== null) {
+            $notificationRuntimeCache->forget($user);
+        }
+
         return back();
     }
 
-    public function updateAll(Request $request): RedirectResponse
+    public function updateAll(Request $request, NotificationRuntimeCache $notificationRuntimeCache): RedirectResponse
     {
-        $request->user()?->unreadNotifications()->update([
+        $user = $request->user();
+
+        $user?->unreadNotifications()->update([
             'read_at' => now(),
         ]);
+
+        if ($user !== null) {
+            $notificationRuntimeCache->forget($user);
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.notifications.all_marked_as_read')]);
 

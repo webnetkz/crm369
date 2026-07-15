@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Paperclip } from '@lucide/vue';
+import { Download, Paperclip, Volume2 } from '@lucide/vue';
 import { computed } from 'vue';
 import type { ChatAttachmentItem } from '@/types/ui';
 
@@ -24,6 +24,16 @@ const imageClassName = computed(() => {
         ? 'border-primary-foreground/20'
         : 'border-border/70';
 });
+
+const audioClassName = computed(() => {
+    return props.own
+        ? 'border-primary-foreground/20 bg-primary-foreground/10'
+        : 'border-border/70 bg-background/80';
+});
+
+const isAudioAttachment = (attachment: ChatAttachmentItem): boolean => {
+    return attachment.audioUrl !== null;
+};
 
 const formatFileSize = (sizeBytes: number): string => {
     if (sizeBytes < 1024) {
@@ -67,6 +77,40 @@ const formatFileSize = (sizeBytes: number): string => {
                     </span>
                 </span>
             </a>
+
+            <div
+                v-else-if="isAudioAttachment(attachment)"
+                class="overflow-hidden rounded-2xl border"
+                :class="audioClassName"
+            >
+                <div class="px-3 pt-3">
+                    <audio controls preload="metadata" class="block w-full max-w-full">
+                        <source :src="attachment.audioUrl ?? undefined" :type="attachment.mimeType ?? undefined" />
+                    </audio>
+                </div>
+
+                <div class="flex items-center gap-3 px-3 py-3" :class="attachmentClassName">
+                    <span class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-black/10">
+                        <Volume2 class="size-4" />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block truncate text-sm font-medium">
+                            {{ attachment.name }}
+                        </span>
+                        <span class="block text-xs opacity-80">
+                            {{ formatFileSize(attachment.sizeBytes) }}
+                        </span>
+                    </span>
+                    <a
+                        :href="attachment.downloadUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex size-8 shrink-0 items-center justify-center rounded-full transition hover:bg-black/10"
+                    >
+                        <Download class="size-4" />
+                    </a>
+                </div>
+            </div>
 
             <a
                 v-else

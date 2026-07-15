@@ -20,10 +20,12 @@ use Illuminate\Support\Carbon;
  * @property Collection<int, ChatMessageAttachment> $attachments
  * @property Carbon|null $edited_at
  * @property Carbon|null $deleted_at
+ * @property Carbon|null $pinned_at
+ * @property int|null $pinned_by_user_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['chat_conversation_id', 'user_id', 'body', 'original_body', 'edited_at', 'deleted_at'])]
+#[Fillable(['chat_conversation_id', 'user_id', 'body', 'original_body', 'edited_at', 'deleted_at', 'pinned_at', 'pinned_by_user_id'])]
 class ChatMessage extends Model
 {
     /** @use HasFactory<ChatMessageFactory> */
@@ -37,6 +39,7 @@ class ChatMessage extends Model
         return [
             'edited_at' => 'datetime',
             'deleted_at' => 'datetime',
+            'pinned_at' => 'datetime',
         ];
     }
 
@@ -57,6 +60,14 @@ class ChatMessage extends Model
     }
 
     /**
+     * @return BelongsTo<User, $this>
+     */
+    public function pinnedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pinned_by_user_id');
+    }
+
+    /**
      * @return HasMany<ChatMessageAttachment, $this>
      */
     public function attachments(): HasMany
@@ -72,5 +83,10 @@ class ChatMessage extends Model
     public function wasDeleted(): bool
     {
         return $this->deleted_at !== null;
+    }
+
+    public function isPinned(): bool
+    {
+        return $this->pinned_at !== null;
     }
 }

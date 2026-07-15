@@ -670,6 +670,7 @@ export type ChatAttachmentItem = {
     sizeBytes: number;
     downloadUrl: string;
     previewUrl: string | null;
+    audioUrl: string | null;
 };
 
 export type ChatMessageItem = {
@@ -678,8 +679,10 @@ export type ChatMessageItem = {
     createdAt: string | null;
     editedAt: string | null;
     deletedAt: string | null;
+    pinnedAt: string | null;
     isEdited: boolean;
     isDeleted: boolean;
+    isPinned: boolean;
     isOwn: boolean;
     user: ChatUserSummary;
     attachments: ChatAttachmentItem[];
@@ -693,6 +696,7 @@ export type ChatActiveConversation = {
     participant: ChatUserSummary | null;
     participants: ChatUserSummary[];
     messages: ChatMessageItem[];
+    pinnedMessages: ChatMessageItem[];
 };
 
 export type ChatCenter = {

@@ -15,6 +15,7 @@ use Throwable;
     {--to=pgsql : Target database connection}
     {--skip-tables= : Comma-separated list of tables to skip}
     {--without-truncate : Keep existing rows in the target database}
+    {--without-verify : Skip post-copy source / target row count verification}
     {--skip-migrate-target : Do not run migrations on the target connection before copying data}')]
 #[Description('Copy application data from one configured database connection to another')]
 class MigrateConnectionDataCommand extends Command
@@ -76,6 +77,7 @@ class MigrateConnectionDataCommand extends Command
                 targetConnection: $targetConnection,
                 truncateTarget: ! $this->option('without-truncate'),
                 excludedTables: $skipTables,
+                verifyTableCounts: ! $this->option('without-verify'),
             );
         } catch (Throwable $exception) {
             $this->error($exception->getMessage());

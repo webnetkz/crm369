@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Requests\FilterApiNotificationsIndexRequest;
 use App\Support\ApiRequestContext;
+use App\Support\NotificationRuntimeCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
@@ -44,8 +45,11 @@ class NotificationController
         ]);
     }
 
-    public function update(Request $request, string $notification): JsonResponse
-    {
+    public function update(
+        Request $request,
+        string $notification,
+        NotificationRuntimeCache $notificationRuntimeCache,
+    ): JsonResponse {
         $user = ApiRequestContext::subject($request);
         $databaseNotification = $user->notifications()
             ->whereKey($notification)
@@ -54,6 +58,8 @@ class NotificationController
         if ($databaseNotification->read_at === null) {
             $databaseNotification->markAsRead();
         }
+
+        $notificationRuntimeCache->forget($user);
 
         return response()->json([
             'message' => __('ui.notifications.marked_as_read'),
@@ -65,13 +71,15 @@ class NotificationController
         ]);
     }
 
-    public function updateAll(Request $request): JsonResponse
+    public function updateAll(Request $request, NotificationRuntimeCache $notificationRuntimeCache): JsonResponse
     {
         $user = ApiRequestContext::subject($request);
 
         $user->unreadNotifications()->update([
             'read_at' => now(),
         ]);
+
+        $notificationRuntimeCache->forget($user);
 
         return response()->json([
             'message' => __('ui.notifications.all_marked_as_read'),

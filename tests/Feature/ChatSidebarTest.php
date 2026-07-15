@@ -42,6 +42,87 @@ test('authenticated users receive chat unread count in shared props', function (
         ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 1));
 });
 
+test('chat shared props are invalidated after a conversation is opened and marked as read', function () {
+    $user = User::factory()->create();
+    $sender = User::factory()->create();
+
+    $conversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $sender->id,
+        'last_message_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $sender->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatMessage::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $sender->id,
+        'body' => 'Unread message',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 1));
+
+    $this->actingAs($user)
+        ->get(route('chats.sidebar', ['conversation' => $conversation->id]))
+        ->assertSuccessful()
+        ->assertJsonPath('unreadCount', 0);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 0));
+});
+
+test('chat shared props are invalidated after a new message arrives', function () {
+    $user = User::factory()->create();
+    $sender = User::factory()->create();
+
+    $conversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $sender->id,
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+        'last_read_at' => now()->subMinute(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $sender->id,
+        'last_read_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 0));
+
+    $this->actingAs($sender)
+        ->post(route('chats.messages.store', $conversation), [
+            'body' => 'New unread message',
+        ])
+        ->assertSuccessful();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 1));
+});
+
 test('users can start a direct chat and load it in the sidebar payload', function () {
     $user = User::factory()->create();
     $recipient = User::factory()->create([
@@ -212,6 +293,56 @@ test('chat messages preserve line breaks when stored and returned', function () 
         ->assertJsonPath('activeConversation.messages.0.body', $body);
 });
 
+test('chat sidebar returns full message history across multiple days', function () {
+    $user = User::factory()->create();
+    $recipient = User::factory()->create();
+
+    $conversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $recipient->id,
+        'last_message_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+        'last_read_at' => now(),
+    ]);
+
+    $firstSentAt = now()->subDays(4)->startOfDay()->addHours(9);
+
+    foreach (range(1, 55) as $index) {
+        $sentAt = $firstSentAt->copy()->addHours($index - 1);
+
+        ChatMessage::query()->create([
+            'chat_conversation_id' => $conversation->id,
+            'user_id' => $index % 2 === 0 ? $user->id : $recipient->id,
+            'body' => "History message {$index}",
+            'created_at' => $sentAt,
+            'updated_at' => $sentAt,
+        ]);
+    }
+
+    $conversation->update([
+        'last_message_at' => $firstSentAt->copy()->addHours(54),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('chats.sidebar', ['conversation' => $conversation->id]))
+        ->assertSuccessful()
+        ->assertJsonCount(55, 'activeConversation.messages')
+        ->assertJsonPath('activeConversation.messages.0.body', 'History message 1')
+        ->assertJsonPath('activeConversation.messages.54.body', 'History message 55')
+        ->assertJsonPath('activeConversation.messages.0.createdAt', fn (mixed $value): bool => is_string($value) && $value !== '')
+        ->assertJsonPath('activeConversation.messages.54.createdAt', fn (mixed $value): bool => is_string($value) && $value !== '');
+});
+
 test('users can edit their messages while preserving the original body', function () {
     $user = User::factory()->create();
     $recipient = User::factory()->create();
@@ -268,6 +399,65 @@ test('users can edit their messages while preserving the original body', functio
         ->assertJsonPath('activeConversation.messages.0.body', 'Третий текст')
         ->assertJsonPath('activeConversation.messages.0.isEdited', true)
         ->assertJsonPath('activeConversation.messages.0.editedAt', fn (mixed $value): bool => is_string($value) && $value !== '');
+});
+
+test('users can pin and unpin chat messages', function () {
+    $user = User::factory()->create();
+    $recipient = User::factory()->create();
+
+    $conversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $recipient->id,
+        'last_message_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+        'last_read_at' => now(),
+    ]);
+
+    $message = ChatMessage::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+        'body' => 'Important update',
+    ]);
+
+    $this->actingAs($user)
+        ->patch(route('chats.messages.pin', [$conversation, $message]))
+        ->assertSuccessful()
+        ->assertJsonPath('message.isPinned', true)
+        ->assertJsonPath('message.pinnedAt', fn (mixed $value): bool => is_string($value) && $value !== '');
+
+    expect($message->refresh()->isPinned())->toBeTrue()
+        ->and($message->pinned_by_user_id)->toBe($user->id);
+
+    $this->actingAs($user)
+        ->get(route('chats.sidebar', ['conversation' => $conversation->id]))
+        ->assertSuccessful()
+        ->assertJsonCount(1, 'activeConversation.pinnedMessages')
+        ->assertJsonPath('activeConversation.pinnedMessages.0.id', $message->id)
+        ->assertJsonPath('activeConversation.pinnedMessages.0.isPinned', true);
+
+    $this->actingAs($user)
+        ->delete(route('chats.messages.unpin', [$conversation, $message]))
+        ->assertSuccessful()
+        ->assertJsonPath('message.isPinned', false)
+        ->assertJsonPath('message.pinnedAt', null);
+
+    expect($message->refresh()->isPinned())->toBeFalse()
+        ->and($message->pinned_by_user_id)->toBeNull();
+
+    $this->actingAs($user)
+        ->get(route('chats.sidebar', ['conversation' => $conversation->id]))
+        ->assertSuccessful()
+        ->assertJsonCount(0, 'activeConversation.pinnedMessages');
 });
 
 test('users cannot edit messages created by other participants', function () {
@@ -498,6 +688,61 @@ test('image chat attachments expose preview links and can be rendered inline', f
     expect($previewResponse->headers->get('content-type'))->toContain('image/png');
 });
 
+test('audio chat attachments expose inline audio links and can be streamed in chat', function () {
+    Storage::fake('local');
+
+    $user = User::factory()->create();
+    $recipient = User::factory()->create();
+
+    $conversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $recipient->id,
+        'last_message_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $user->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+        'last_read_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('chats.messages.store', $conversation), [
+            'body' => 'Attached audio',
+            'attachments' => [
+                UploadedFile::fake()->create('voice-note.mp3', 256, 'audio/mpeg'),
+            ],
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('message.attachments.0.name', 'voice-note.mp3');
+
+    $attachment = ChatMessage::query()->with('attachments')->latest('id')->firstOrFail()
+        ->attachments
+        ->firstOrFail();
+
+    $audioUrl = route('chats.attachments.preview', $attachment);
+
+    $this->actingAs($user)
+        ->get(route('chats.sidebar', ['conversation' => $conversation->id]))
+        ->assertSuccessful()
+        ->assertJsonPath('activeConversation.messages.0.attachments.0.previewUrl', null)
+        ->assertJsonPath('activeConversation.messages.0.attachments.0.audioUrl', $audioUrl);
+
+    $previewResponse = $this->actingAs($user)->get($audioUrl);
+
+    $previewResponse->assertSuccessful()
+        ->assertHeader('x-content-type-options', 'nosniff');
+
+    expect($previewResponse->headers->get('content-disposition'))->toStartWith('inline;')
+        ->and($previewResponse->headers->get('content-type'))->toContain('audio/mpeg');
+});
+
 test('attachments of deleted chat messages are no longer accessible', function () {
     Storage::fake('local');
 
@@ -605,6 +850,7 @@ test('chat ui renders header trigger, sidebar dock, and sheet targeting hooks', 
     $attachments = file_get_contents(resource_path('js/components/ChatMessageAttachments.vue'));
     $emojiPicker = file_get_contents(resource_path('js/components/ChatEmojiPicker.vue'));
     $presence = file_get_contents(resource_path('js/composables/useChatCenterPresence.ts'));
+    $timeline = file_get_contents(resource_path('js/composables/useChatMessageTimeline.ts'));
 
     expect($header)->toContain('ChatCenterSheet')
         ->and($header)->toContain('MessageSquareMore')
@@ -636,6 +882,24 @@ test('chat ui renders header trigger, sidebar dock, and sheet targeting hooks', 
         ->and($panel)->toContain('setChatCenterVisible(isActive)')
         ->and($panel)->toContain('showUserProfile.url')
         ->and($panel)->toContain('UserProfileSheet')
+        ->and($panel)->toContain('useChatMessageTimeline')
+        ->and($panel)->toContain('activeConversationMessages')
+        ->and($panel)->toContain('activeConversationPinnedMessages')
+        ->and($panel)->toContain('v-for="entry in timelineEntries"')
+        ->and($panel)->toContain("entry.type === 'separator'")
+        ->and($panel)->toContain('pin as pinMessage')
+        ->and($panel)->toContain('unpin as unpinMessage')
+        ->and($panel)->toContain('message.isPinned ? unpinMessage : pinMessage')
+        ->and($panel)->toContain('togglePinnedMessage')
+        ->and($panel)->toContain(':aria-pressed="entry.message.isPinned"')
+        ->and($panel)->toContain("'bg-primary text-primary-foreground hover:bg-primary/90'")
+        ->and($panel)->toContain('pinnedMessagePreview')
+        ->and($panel)->toContain('scrollToMessage(message.id)')
+        ->and($panel)->toContain('t.chat.pinned_messages')
+        ->and($panel)->toContain('class="h-5 w-9 shrink-0 rounded-md border border-border bg-background shadow-sm transition hover:border-primary/40 hover:bg-primary/8"')
+        ->and($panel)->toContain(':title="pinnedMessagePreview(message)"')
+        ->and($panel)->toContain(':aria-label="pinnedMessagePreview(message)"')
+        ->and($panel)->toContain(':data-message-id="entry.message.id"')
         ->and($panel)->toContain(':manager-options="managerOptions"')
         ->and($panel)->toContain('@open-user="openProfileById"')
         ->and($panel)->toContain('ChatMessageComposer')
@@ -651,14 +915,20 @@ test('chat ui renders header trigger, sidebar dock, and sheet targeting hooks', 
         ->and($panel)->toContain('sidebarRequestSequence')
         ->and($panel)->toContain('sidebarAbortController')
         ->and($panel)->toContain("error instanceof DOMException && error.name === 'AbortError'")
+        ->and($panel)->toContain('showScrollToLatest')
+        ->and($panel)->toContain('forceScrollToBottom')
+        ->and($panel)->toContain('isMessagesScrolledNearBottom')
+        ->and($panel)->toContain('@scroll.passive="handleMessagesScroll"')
+        ->and($panel)->toContain('t.chat.scroll_to_latest')
+        ->and($panel)->toContain('<ArrowDown class="size-4" />')
         ->and($panel)->toContain('class="min-w-0 flex-1 text-left"')
         ->and($panel)->toContain('@click="openConversation(conversation.id)"')
         ->and($panel)->toContain('$event.stopPropagation();')
+        ->and($panel)->toContain('class="min-w-0 max-w-[80%] space-y-2"')
+        ->and($panel)->toContain('class="min-w-0 rounded-3xl px-4 py-3 text-sm wrap-anywhere whitespace-pre-wrap shadow-sm"')
+        ->and($panel)->toContain('class="min-w-0 wrap-anywhere whitespace-pre-wrap"')
         ->and($panel)->toContain('whitespace-pre-wrap')
         ->and($panel)->toContain('loadRequestedConversation')
-        ->and($panel)->toContain("hour: '2-digit'")
-        ->and($panel)->toContain("minute: '2-digit'")
-        ->and($panel)->toContain("dateStyle: 'medium'")
         ->and($composer)->toContain('ChatEmojiPicker')
         ->and($composer)->toContain('attachments.length > 0')
         ->and($composer)->toContain('type="file"')
@@ -666,10 +936,32 @@ test('chat ui renders header trigger, sidebar dock, and sheet targeting hooks', 
         ->and($composer)->toContain('t.chat.drop_files_here')
         ->and($attachments)->toContain('attachment.downloadUrl')
         ->and($attachments)->toContain('attachment.previewUrl')
+        ->and($attachments)->toContain('attachment.audioUrl')
         ->and($attachments)->toContain('<img')
+        ->and($attachments)->toContain('<audio controls preload="metadata"')
+        ->and($attachments)->toContain('<Volume2 class="size-4" />')
         ->and($attachments)->toContain('formatFileSize')
         ->and($emojiPicker)->toContain('DropdownMenuTrigger')
         ->and($emojiPicker)->toContain("emit('select', emoji)")
         ->and($emojiPicker)->toContain('t.chat.emoji_picker_title')
+        ->and($timeline)->toContain('calendarDayKey')
+        ->and($timeline)->toContain("type: 'separator'")
+        ->and($timeline)->toContain('timelineEntries')
+        ->and($timeline)->toContain("hour: '2-digit'")
+        ->and($timeline)->toContain("minute: '2-digit'")
+        ->and($timeline)->toContain("dateStyle: 'medium'")
         ->and($emojiPicker)->toContain('emojiOptions');
+});
+
+test('chat scroll-to-latest translations are available', function () {
+    expect(__('ui.chat.scroll_to_latest', [], 'en'))
+        ->toBe('Scroll to latest message')
+        ->and(__('ui.chat.scroll_to_latest', [], 'ru'))
+        ->toBe('Прокрутить к последнему сообщению')
+        ->and(__('ui.chat.pin_message', [], 'en'))
+        ->toBe('Pin')
+        ->and(__('ui.chat.unpin_message', [], 'ru'))
+        ->toBe('Открепить')
+        ->and(__('ui.chat.pinned_messages', [], 'ru'))
+        ->toBe('Закрепленные сообщения');
 });

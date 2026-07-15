@@ -12,6 +12,21 @@ test('system notifications are queued for asynchronous delivery', function () {
     ))->toBeInstanceOf(ShouldQueue::class);
 });
 
+test('system notifications honor the configured queue connection and queue name', function () {
+    config([
+        'realtime.notifications.queue_connection' => 'redis',
+        'realtime.notifications.queue' => 'notifications',
+    ]);
+
+    $notification = new SystemNotification(
+        title: 'Queued',
+        message: 'Notification payload.',
+    );
+
+    expect($notification->connection)->toBe('redis')
+        ->and($notification->queue)->toBe('notifications');
+});
+
 test('authenticated users receive notifications and unread count in shared props', function () {
     $user = User::factory()->create();
 
@@ -129,6 +144,39 @@ test('users cannot mark another user notification as read', function () {
         ->assertNotFound();
 
     expect($notification->refresh()->read_at)->toBeNull();
+});
+
+test('shared notification props are invalidated after notification delivery and read updates', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('notifications.unreadCount', 0));
+
+    $user->notify(new SystemNotification(
+        title: 'Fresh notice',
+        message: 'This notification should refresh cached props.',
+    ));
+
+    $notification = $user->notifications()->firstOrFail();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('notifications.unreadCount', 1)
+            ->where('notifications.items.0.title', 'Fresh notice')
+        );
+
+    $this->actingAs($user)
+        ->patch(route('notifications.read.update', $notification->id))
+        ->assertRedirect();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('notifications.unreadCount', 0));
 });
 
 test('notification ui renders bell trigger in both header variants and sidebar page access', function () {

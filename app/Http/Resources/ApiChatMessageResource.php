@@ -46,9 +46,35 @@ class ApiChatMessageResource extends JsonResource
                         'extension' => $attachment->extension,
                         'size_bytes' => $attachment->size_bytes,
                         'download_url' => route('chats.attachments.download', $attachment),
+                        'preview_url' => $this->previewUrl($attachment),
+                        'audio_url' => $this->audioUrl($attachment),
                     ])
                     ->values()
                     ->all(),
         ];
+    }
+
+    private function previewUrl(ChatMessageAttachment $attachment): ?string
+    {
+        $mimeType = strtolower((string) $attachment->mime_type);
+
+        if (! str_starts_with($mimeType, 'image/')) {
+            return null;
+        }
+
+        if (in_array($mimeType, ['image/svg', 'image/svg+xml'], true)) {
+            return null;
+        }
+
+        return route('chats.attachments.preview', $attachment);
+    }
+
+    private function audioUrl(ChatMessageAttachment $attachment): ?string
+    {
+        if (! str_starts_with(strtolower((string) $attachment->mime_type), 'audio/')) {
+            return null;
+        }
+
+        return route('chats.attachments.preview', $attachment);
     }
 }

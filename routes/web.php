@@ -276,6 +276,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('chats/{chatConversation}/messages', [ChatMessageController::class, 'store'])->name('chats.messages.store');
         Route::patch('chats/{chatConversation}/messages/{chatMessage}', [ChatMessageController::class, 'update'])->name('chats.messages.update');
         Route::delete('chats/{chatConversation}/messages/{chatMessage}', [ChatMessageController::class, 'destroy'])->name('chats.messages.destroy');
+        Route::patch('chats/{chatConversation}/messages/{chatMessage}/pin', [ChatMessageController::class, 'pin'])->name('chats.messages.pin');
+        Route::delete('chats/{chatConversation}/messages/{chatMessage}/pin', [ChatMessageController::class, 'unpin'])->name('chats.messages.unpin');
         Route::get('chats/attachments/{chatMessageAttachment}/preview', [ChatMessageController::class, 'previewAttachment'])
             ->whereNumber('chatMessageAttachment')
             ->name('chats.attachments.preview');

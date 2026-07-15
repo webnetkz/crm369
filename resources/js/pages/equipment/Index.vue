@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { Download, Eye, Hash, Package, PencilLine, Plus, Printer, Upload, UserCog, Wrench } from '@lucide/vue';
+import { Head, router, setLayoutProps, useForm } from '@inertiajs/vue3';
+import { Download, Eye, Hash, History, Package, PencilLine, Plus, Printer, Search, Upload, UserCog, Wrench, X } from '@lucide/vue';
 import { computed, ref, watch, watchEffect } from 'vue';
 import {
     downloadCsvTemplate,
@@ -9,6 +9,7 @@ import {
 } from '@/actions/App/Http/Controllers/EquipmentController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import PaginationControls from '@/components/PaginationControls.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,6 +35,7 @@ import {
     store as storeEquipment,
     update as updateEquipment,
 } from '@/routes/equipment';
+import type { PaginatedCollection } from '@/types/ui';
 
 type EquipmentUser = {
     id: number;
@@ -52,6 +54,7 @@ type EquipmentItem = {
     issued_to_user: EquipmentUser | null;
     responsible_user: EquipmentUser | null;
     updated_at: string | null;
+    history_entries: EquipmentHistoryEntry[];
 };
 
 type StatusOption = {
@@ -60,10 +63,36 @@ type StatusOption = {
     description: string;
 };
 
+type EquipmentHistoryChange = {
+    field: string;
+    label: string;
+    from: string | null;
+    to: string | null;
+};
+
+type EquipmentHistoryEntry = {
+    id: string;
+    kind: 'change' | 'scan';
+    event_label: string;
+    source_label: string | null;
+    happened_at: string | null;
+    actor: EquipmentUser | null;
+    changes: EquipmentHistoryChange[];
+    location: string | null;
+    context: string | null;
+    device_name: string | null;
+    payload_preview: string | null;
+    webhook_name: string | null;
+};
+
 const props = defineProps<{
-    equipmentItems: EquipmentItem[];
+    equipmentItems: PaginatedCollection<EquipmentItem>;
     availableUsers: EquipmentUser[];
     statusOptions: StatusOption[];
+    filters: {
+        search: string;
+    };
+    perPageOptions: number[];
     stats: {
         total: number;
         on_balance: number;
@@ -90,14 +119,20 @@ const csvImportForm = useForm({
     delimiter: ';',
     file: null as File | null,
 });
+const filtersForm = useForm('EquipmentFilters', {
+    search: props.filters.search,
+});
 
 const dialogOpen = ref(false);
 const editingEquipmentId = ref<number | null>(null);
 const detailsDialogOpen = ref(false);
 const selectedEquipmentItem = ref<EquipmentItem | null>(null);
+const historyDialogOpen = ref(false);
+const historyEquipmentItem = ref<EquipmentItem | null>(null);
 const csvImportInput = ref<HTMLInputElement | null>(null);
 
 const isEditing = computed(() => editingEquipmentId.value !== null);
+const equipmentRows = computed(() => props.equipmentItems.data);
 
 watchEffect(() => {
     setLayoutProps({
@@ -143,6 +178,11 @@ const closeDetailsDialog = (): void => {
     selectedEquipmentItem.value = null;
 };
 
+const closeHistoryDialog = (): void => {
+    historyDialogOpen.value = false;
+    historyEquipmentItem.value = null;
+};
+
 const openCreateDialog = (): void => {
     resetForm();
     dialogOpen.value = true;
@@ -151,6 +191,11 @@ const openCreateDialog = (): void => {
 const openDetailsDialog = (equipmentItem: EquipmentItem): void => {
     selectedEquipmentItem.value = equipmentItem;
     detailsDialogOpen.value = true;
+};
+
+const openHistoryDialog = (equipmentItem: EquipmentItem): void => {
+    historyEquipmentItem.value = equipmentItem;
+    historyDialogOpen.value = true;
 };
 
 const openEditDialog = (equipmentItem: EquipmentItem): void => {
@@ -185,6 +230,29 @@ const submitForm = (): void => {
     form.patch(updateEquipment.url(editingEquipmentId.value), options);
 };
 
+const submitFilters = (): void => {
+    router.get(
+        equipmentIndex(),
+        {
+            search: filtersForm.search.trim() !== '' ? filtersForm.search.trim() : null,
+        },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        },
+    );
+};
+
+const clearFilters = (): void => {
+    filtersForm.search = '';
+    submitFilters();
+};
+
+const updatePerPage = (): void => {
+    // Equipment page is intentionally fixed to 50 rows per page.
+};
+
 const statusMeta = (status: string) => {
     switch (status) {
         case 'issued':
@@ -213,6 +281,20 @@ const formattedDate = (value: string | null): string => {
     }
 
     return new Date(value).toLocaleString();
+};
+
+const historyActorLabel = (actor: EquipmentUser | null): string | null => {
+    return actor ? userLabel(actor, actor.email) : null;
+};
+
+const historyEventTone = (entry: EquipmentHistoryEntry): string => {
+    return entry.kind === 'scan'
+        ? 'bg-primary/10 text-primary'
+        : 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
+};
+
+const displayHistoryValue = (value: string | null): string => {
+    return value && value.trim() !== '' ? value : '—';
 };
 
 const escapeHtml = (value: string): string => {
@@ -418,6 +500,11 @@ const maintenanceStatusDescription = computed(() => {
         .map((statusOption) => statusOption.label)
         .join(' / ');
 });
+
+const selectedStatusLabel = computed(() => {
+    return props.statusOptions.find((statusOption) => statusOption.value === form.status)?.label
+        ?? t.value.equipment.status;
+});
 </script>
 
 <template>
@@ -553,13 +640,50 @@ const maintenanceStatusDescription = computed(() => {
         </div>
 
         <div class="rounded-3xl border border-border bg-card">
+            <div class="border-b border-border p-6">
+                <form class="flex flex-col gap-3 md:flex-row md:items-end" @submit.prevent="submitFilters">
+                    <div class="grid flex-1 gap-2">
+                        <Label for="equipment-search">{{ t.equipment.search }}</Label>
+                        <div class="relative">
+                            <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                id="equipment-search"
+                                v-model="filtersForm.search"
+                                :placeholder="t.equipment.search_placeholder"
+                                class="pl-9"
+                                autocomplete="off"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        <Button type="submit" class="gap-2">
+                            <Search class="size-4" />
+                            {{ t.equipment.search_submit }}
+                        </Button>
+                        <Button
+                            v-if="filtersForm.search.trim() !== ''"
+                            type="button"
+                            variant="outline"
+                            class="gap-2"
+                            @click="clearFilters"
+                        >
+                            <X class="size-4" />
+                            {{ t.equipment.search_reset }}
+                        </Button>
+                    </div>
+                </form>
+            </div>
+
             <div
-                v-if="equipmentItems.length === 0"
+                v-if="equipmentRows.length === 0"
                 class="space-y-2 px-6 py-12 text-center"
             >
-                <h2 class="text-lg font-semibold">{{ t.equipment.empty_title }}</h2>
+                <h2 class="text-lg font-semibold">
+                    {{ props.filters.search !== '' ? t.equipment.search_empty_title : t.equipment.empty_title }}
+                </h2>
                 <p class="mx-auto max-w-2xl text-sm leading-6 text-muted-foreground">
-                    {{ t.equipment.empty_description }}
+                    {{ props.filters.search !== '' ? t.equipment.search_empty_description : t.equipment.empty_description }}
                 </p>
             </div>
 
@@ -567,7 +691,7 @@ const maintenanceStatusDescription = computed(() => {
                 <table class="min-w-full divide-y divide-border text-sm">
                     <thead class="bg-muted/40">
                         <tr class="text-left">
-                            <th class="px-6 py-4 font-medium text-muted-foreground">
+                            <th class="min-w-[24rem] px-6 py-4 font-medium text-muted-foreground">
                                 {{ t.equipment.name }}
                             </th>
                             <th class="px-6 py-4 font-medium text-muted-foreground">
@@ -585,21 +709,53 @@ const maintenanceStatusDescription = computed(() => {
                             <th class="px-6 py-4 font-medium text-muted-foreground">
                                 {{ t.equipment.last_updated }}
                             </th>
-                            <th class="px-6 py-4 text-right font-medium text-muted-foreground">
-                                {{ t.equipment.actions }}
-                            </th>
                         </tr>
                     </thead>
 
                     <tbody class="divide-y divide-border">
                         <tr
-                            v-for="equipmentItem in equipmentItems"
+                            v-for="equipmentItem in equipmentRows"
                             :key="equipmentItem.id"
                             class="align-top"
                         >
-                            <td class="px-6 py-4">
-                                <div class="font-medium text-foreground">
-                                    {{ equipmentItem.name }}
+                            <td class="min-w-[24rem] px-6 py-4">
+                                <div class="min-w-0">
+                                    <div class="font-medium text-foreground">
+                                        {{ equipmentItem.name }}
+                                    </div>
+
+                                    <div class="relative z-10 mt-3 flex flex-wrap gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="gap-2"
+                                            @click="openDetailsDialog(equipmentItem)"
+                                        >
+                                            <Eye class="size-4" />
+                                            <span>{{ t.equipment.view }}</span>
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            class="gap-2"
+                                            @click="openEditDialog(equipmentItem)"
+                                        >
+                                            <PencilLine class="size-4" />
+                                            <span>{{ t.equipment.edit }}</span>
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            class="gap-2"
+                                            @click="openHistoryDialog(equipmentItem)"
+                                        >
+                                            <History class="size-4" />
+                                            <span>{{ t.equipment.history }}</span>
+                                        </Button>
+                                    </div>
                                 </div>
                             </td>
 
@@ -639,34 +795,17 @@ const maintenanceStatusDescription = computed(() => {
                             <td class="px-6 py-4 text-muted-foreground">
                                 {{ formattedDate(equipmentItem.updated_at) }}
                             </td>
-
-                            <td class="px-6 py-4">
-                                <div class="flex justify-end gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        class="gap-2"
-                                        @click="openDetailsDialog(equipmentItem)"
-                                    >
-                                        <Eye class="size-4" />
-                                        <span>{{ t.equipment.view }}</span>
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        class="gap-2"
-                                        @click="openEditDialog(equipmentItem)"
-                                    >
-                                        <PencilLine class="size-4" />
-                                        <span>{{ t.equipment.edit }}</span>
-                                    </Button>
-                                </div>
-                            </td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="border-t border-border p-6">
+                <PaginationControls
+                    :pagination="props.equipmentItems"
+                    :per-page-options="props.perPageOptions"
+                    @update:per-page="updatePerPage"
+                />
             </div>
         </div>
     </div>
@@ -786,6 +925,186 @@ const maintenanceStatusDescription = computed(() => {
         </DialogContent>
     </Dialog>
 
+    <Dialog
+        :open="historyDialogOpen"
+        @update:open="(value) => (value ? (historyDialogOpen = true) : closeHistoryDialog())"
+    >
+        <DialogContent class="sm:max-w-3xl">
+            <DialogHeader>
+                <DialogTitle>{{ t.equipment.history_title }}</DialogTitle>
+                <DialogDescription>
+                    {{ t.equipment.history_description }}
+                </DialogDescription>
+            </DialogHeader>
+
+            <div v-if="historyEquipmentItem" class="space-y-5">
+                <div class="rounded-3xl border border-border bg-muted/25 p-5">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <h2 class="text-lg font-semibold tracking-tight">
+                                {{ historyEquipmentItem.name }}
+                            </h2>
+                            <p class="mt-1 text-sm text-muted-foreground">
+                                {{ historyEquipmentItem.status_label }}
+                            </p>
+                        </div>
+
+                        <code class="rounded-md bg-background px-3 py-1.5 text-sm font-medium">
+                            {{ historyEquipmentItem.qr_code }}
+                        </code>
+                    </div>
+                </div>
+
+                <div
+                    v-if="historyEquipmentItem.history_entries.length > 0"
+                    class="max-h-[65vh] space-y-4 overflow-y-auto pr-1"
+                >
+                    <article
+                        v-for="entry in historyEquipmentItem.history_entries"
+                        :key="entry.id"
+                        class="rounded-2xl border border-border bg-background/80 p-5"
+                    >
+                        <div
+                            class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+                        >
+                            <div class="space-y-2">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <Badge
+                                        variant="secondary"
+                                        class="border-transparent"
+                                        :class="historyEventTone(entry)"
+                                    >
+                                        {{ entry.event_label }}
+                                    </Badge>
+                                    <Badge
+                                        v-if="entry.source_label"
+                                        variant="secondary"
+                                        class="border-transparent bg-muted text-muted-foreground"
+                                    >
+                                        {{ entry.source_label }}
+                                    </Badge>
+                                </div>
+
+                                <p class="text-sm text-muted-foreground">
+                                    {{
+                                        historyActorLabel(entry.actor)
+                                            ?? (entry.webhook_name
+                                                ? `${t.tsd.webhook}: ${entry.webhook_name}`
+                                                : '—')
+                                    }}
+                                </p>
+                            </div>
+
+                            <div class="text-sm text-muted-foreground">
+                                {{ formattedDate(entry.happened_at) }}
+                            </div>
+                        </div>
+
+                        <div v-if="entry.kind === 'change'" class="mt-4 space-y-3">
+                            <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                {{ t.equipment.history_changes }}
+                            </div>
+
+                            <div
+                                v-if="entry.changes.length > 0"
+                                class="grid gap-3 md:grid-cols-2"
+                            >
+                                <div
+                                    v-for="change in entry.changes"
+                                    :key="`${entry.id}-${change.field}`"
+                                    class="rounded-2xl border border-border bg-card px-4 py-3"
+                                >
+                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                        {{ change.label }}
+                                    </div>
+                                    <div class="mt-2 text-sm text-muted-foreground">
+                                        {{ displayHistoryValue(change.from) }}
+                                    </div>
+                                    <div class="mt-2 text-sm font-medium text-foreground">
+                                        {{ displayHistoryValue(change.to) }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p
+                                v-else
+                                class="rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground"
+                            >
+                                {{ t.equipment.history_no_changes }}
+                            </p>
+                        </div>
+
+                        <div v-else class="mt-4 space-y-4">
+                            <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                {{ t.equipment.history_scan_details }}
+                            </div>
+
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <div class="rounded-2xl border border-border bg-card px-4 py-3">
+                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                        {{ t.equipment.history_device }}
+                                    </div>
+                                    <p class="mt-2 text-sm">
+                                        {{ entry.device_name || '—' }}
+                                    </p>
+                                </div>
+
+                                <div class="rounded-2xl border border-border bg-card px-4 py-3">
+                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                        {{ t.tsd.location }}
+                                    </div>
+                                    <p class="mt-2 text-sm">
+                                        {{ entry.location || '—' }}
+                                    </p>
+                                </div>
+
+                                <div class="rounded-2xl border border-border bg-card px-4 py-3">
+                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                        {{ t.tsd.context }}
+                                    </div>
+                                    <p class="mt-2 text-sm">
+                                        {{ entry.context || '—' }}
+                                    </p>
+                                </div>
+
+                                <div class="rounded-2xl border border-border bg-card px-4 py-3">
+                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                        {{ t.tsd.scanned_at }}
+                                    </div>
+                                    <p class="mt-2 text-sm">
+                                        {{ formattedDate(entry.happened_at) }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="rounded-2xl border border-border bg-card px-4 py-3">
+                                <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                    {{ t.tsd.payload }}
+                                </div>
+                                <pre
+                                    class="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs leading-6 text-muted-foreground"
+                                >{{ entry.payload_preview || '—' }}</pre>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <p
+                    v-else
+                    class="rounded-2xl border border-dashed border-border/70 px-4 py-6 text-sm text-muted-foreground"
+                >
+                    {{ t.equipment.history_empty }}
+                </p>
+
+                <DialogFooter>
+                    <Button type="button" variant="outline" @click="closeHistoryDialog">
+                        {{ t.equipment.cancel }}
+                    </Button>
+                </DialogFooter>
+            </div>
+        </DialogContent>
+    </Dialog>
+
     <Dialog :open="dialogOpen" @update:open="(value) => (value ? (dialogOpen = true) : closeDialog())">
         <DialogContent class="sm:max-w-2xl">
             <DialogHeader>
@@ -834,7 +1153,9 @@ const maintenanceStatusDescription = computed(() => {
                             "
                         >
                             <SelectTrigger id="equipment-status" class="w-full">
-                                <SelectValue :placeholder="t.equipment.status" />
+                                <SelectValue :placeholder="t.equipment.status">
+                                    {{ selectedStatusLabel }}
+                                </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem

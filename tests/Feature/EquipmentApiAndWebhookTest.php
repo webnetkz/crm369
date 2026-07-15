@@ -2,6 +2,7 @@
 
 use App\Models\ApiAccessToken;
 use App\Models\EquipmentItem;
+use App\Models\EquipmentItemHistory;
 use App\Models\PortalSetting;
 use App\Models\PortalWebhook;
 use App\Models\User;
@@ -102,7 +103,13 @@ test('equipment api endpoints list show create and update items', function () {
         ->assertJsonPath('data.issued_to_user.id', $issuedUser->id);
 
     expect(EquipmentItem::query()->findOrFail($createdItemId)->status)->toBe(EquipmentItem::STATUS_ISSUED)
-        ->and(EquipmentItem::query()->findOrFail($createdItemId)->issued_to_user_id)->toBe($issuedUser->id);
+        ->and(EquipmentItem::query()->findOrFail($createdItemId)->issued_to_user_id)->toBe($issuedUser->id)
+        ->and(
+            EquipmentItemHistory::query()
+                ->where('equipment_item_id', $createdItemId)
+                ->where('source', EquipmentItemHistory::SOURCE_API)
+                ->count()
+        )->toBe(2);
 });
 
 test('equipment api endpoints enforce permissions and disabled module state', function () {
@@ -225,6 +232,13 @@ test('equipment webhook write endpoints can create update and enforce permission
         ->assertJsonPath('data.status', EquipmentItem::STATUS_ISSUED)
         ->assertJsonPath('data.issued_to_user.id', $issuedUser->id);
 
+    expect(
+        EquipmentItemHistory::query()
+            ->where('equipment_item_id', $createdItemId)
+            ->where('source', EquipmentItemHistory::SOURCE_WEBHOOK)
+            ->count()
+    )->toBe(2);
+
     $forbiddenWebhook = PortalWebhook::factory()->create([
         'permissions' => [PortalWebhook::PERMISSION_CONTACTS_READ],
     ]);
@@ -256,13 +270,16 @@ test('equipment api catalog and webhook settings documentation include equipment
         'user_group_id' => equipmentApiAdministratorsGroup()->id,
     ]);
 
-    $response = $this->actingAs($admin)
+    $documentationResponse = $this->actingAs($admin)
+        ->get(route('settings.webhooks.documentation.edit'))
+        ->assertSuccessful();
+    $settingsResponse = $this->actingAs($admin)
         ->get(route('settings.webhooks.edit'))
         ->assertSuccessful();
 
-    expect($response->inertiaProps('documentation.equipment_index_url'))->toBe(url('/portal-webhooks').'/{webhook_id}/equipment')
-        ->and($response->inertiaProps('documentation.equipment_show_url'))->toBe(url('/portal-webhooks').'/{webhook_id}/equipment/{equipment_id}')
-        ->and(collect($response->inertiaProps('availablePermissions'))->pluck('key')->all())
+    expect($documentationResponse->inertiaProps('documentation.equipment_index_url'))->toBe(url('/portal-webhooks').'/{webhook_id}/equipment')
+        ->and($documentationResponse->inertiaProps('documentation.equipment_show_url'))->toBe(url('/portal-webhooks').'/{webhook_id}/equipment/{equipment_id}')
+        ->and(collect($settingsResponse->inertiaProps('availablePermissions'))->pluck('key')->all())
         ->toContain(PortalWebhook::PERMISSION_EQUIPMENT_READ, PortalWebhook::PERMISSION_EQUIPMENT_WRITE);
 
     $equipmentSection = collect(app(ApiCatalog::class)->sections())

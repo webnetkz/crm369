@@ -8,9 +8,9 @@ use App\Models\PortalSetting;
 use App\Models\User;
 use App\Support\ChatSidebarData;
 use App\Support\ManagedUserProfileData;
+use App\Support\NotificationRuntimeCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Schema;
@@ -339,23 +339,7 @@ class HandleInertiaRequests extends Middleware
             ];
         }
 
-        return [
-            'unreadCount' => $user->unreadNotifications()->count(),
-            'items' => $user->notifications()
-                ->limit(20)
-                ->get()
-                ->map(fn (DatabaseNotification $notification): array => [
-                    'id' => $notification->id,
-                    'title' => (string) data_get($notification->data, 'title', __('ui.notifications.default_title')),
-                    'message' => (string) data_get($notification->data, 'message', ''),
-                    'actionUrl' => data_get($notification->data, 'action_url'),
-                    'actionLabel' => data_get($notification->data, 'action_label'),
-                    'createdAt' => $notification->created_at?->toISOString(),
-                    'isRead' => $notification->read_at !== null,
-                ])
-                ->values()
-                ->all(),
-        ];
+        return app(NotificationRuntimeCache::class)->shared($user);
     }
 
     private function impersonator(Request $request): ?User

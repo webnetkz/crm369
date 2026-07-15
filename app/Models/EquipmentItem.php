@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -121,6 +122,14 @@ class EquipmentItem extends Model
         return 'EQ-'.mb_strtoupper((string) Str::ulid());
     }
 
+    public static function normalizeQrCode(string $qrCode): string
+    {
+        return Str::of($qrCode)
+            ->replaceMatches('/\s+/', '')
+            ->upper()
+            ->value();
+    }
+
     public function qrCodeSvg(): string
     {
         $svg = (new Writer(
@@ -224,5 +233,15 @@ class EquipmentItem extends Model
     public function updatedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by_user_id');
+    }
+
+    /**
+     * @return HasMany<EquipmentItemHistory, $this>
+     */
+    public function historyEntries(): HasMany
+    {
+        return $this->hasMany(EquipmentItemHistory::class)
+            ->orderByDesc('changed_at')
+            ->orderByDesc('id');
     }
 }

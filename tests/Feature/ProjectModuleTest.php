@@ -838,6 +838,7 @@ test('projects page collects deadline time and transforms it before submit', fun
     $projectsPage = file_get_contents(resource_path('js/pages/projects/Index.vue'));
     $taskConversationPanel = file_get_contents(resource_path('js/components/ProjectTaskConversationPanel.vue'));
     $composer = file_get_contents(resource_path('js/components/ChatMessageComposer.vue'));
+    $attachments = file_get_contents(resource_path('js/components/ChatMessageAttachments.vue'));
     $consoleRoutes = file_get_contents(base_path('routes/console.php'));
 
     expect($projectsPage)
@@ -858,10 +859,36 @@ test('projects page collects deadline time and transforms it before submit', fun
         ->and($taskConversationPanel)->toContain('storeMessage.url')
         ->and($taskConversationPanel)->toContain('ChatMessageComposer')
         ->and($taskConversationPanel)->toContain('ChatMessageAttachments')
+        ->and($taskConversationPanel)->toContain('useChatMessageTimeline')
+        ->and($taskConversationPanel)->toContain('conversationMessages')
+        ->and($taskConversationPanel)->toContain('conversationPinnedMessages')
+        ->and($taskConversationPanel)->toContain('v-for="entry in timelineEntries"')
+        ->and($taskConversationPanel)->toContain("entry.type === 'separator'")
+        ->and($taskConversationPanel)->toContain('pin as pinMessage')
+        ->and($taskConversationPanel)->toContain('unpin as unpinMessage')
+        ->and($taskConversationPanel)->toContain('message.isPinned ? unpinMessage : pinMessage')
+        ->and($taskConversationPanel)->toContain('togglePinnedMessage')
+        ->and($taskConversationPanel)->toContain(':aria-pressed="entry.message.isPinned"')
+        ->and($taskConversationPanel)->toContain("'bg-primary text-primary-foreground hover:bg-primary/90'")
+        ->and($taskConversationPanel)->toContain('pinnedMessagePreview')
+        ->and($taskConversationPanel)->toContain('scrollToMessage(message.id)')
+        ->and($taskConversationPanel)->toContain('t.chat.pinned_messages')
+        ->and($taskConversationPanel)->toContain('class="h-5 w-9 shrink-0 rounded-md border border-border bg-background shadow-sm transition hover:border-primary/40 hover:bg-primary/8"')
+        ->and($taskConversationPanel)->toContain(':title="pinnedMessagePreview(message)"')
+        ->and($taskConversationPanel)->toContain(':aria-label="pinnedMessagePreview(message)"')
+        ->and($taskConversationPanel)->toContain(':data-message-id="entry.message.id"')
+        ->and($taskConversationPanel)->toContain('showScrollToLatest')
+        ->and($taskConversationPanel)->toContain('forceScrollToBottom')
+        ->and($taskConversationPanel)->toContain('isMessagesScrolledNearBottom')
+        ->and($taskConversationPanel)->toContain('@scroll.passive="handleMessagesScroll"')
+        ->and($taskConversationPanel)->toContain('t.chat.scroll_to_latest')
+        ->and($taskConversationPanel)->toContain('<ArrowDown class="size-4" />')
         ->and($taskConversationPanel)->toContain("formData.append('attachments[]', attachment)")
         ->and($taskConversationPanel)->toContain('v-model:attachments="selectedAttachments"')
         ->and($composer)->toContain('ChatEmojiPicker')
         ->and($composer)->toContain('multiple')
+        ->and($attachments)->toContain('attachment.audioUrl')
+        ->and($attachments)->toContain('<audio controls preload="metadata"')
         ->and($consoleRoutes)->toContain('SendProjectTaskDueSoonRemindersCommand::class')
         ->and($consoleRoutes)->toContain('everyMinute()')
         ->and($consoleRoutes)->toContain('withoutOverlapping()');

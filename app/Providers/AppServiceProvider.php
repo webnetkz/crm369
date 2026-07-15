@@ -2,14 +2,17 @@
 
 namespace App\Providers;
 
+use App\Listeners\InvalidateNotificationRuntimeCache;
 use App\Models\ApiAccessToken;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -65,6 +68,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-knowledge-bases', fn (User $user): bool => $user->canManageKnowledgeBases());
         Gate::define('manage-news', fn (User $user): bool => $user->canManageNews());
         Gate::define('manage-funnels', fn (User $user): bool => $user->canManageFunnels());
+        Event::listen(NotificationSent::class, InvalidateNotificationRuntimeCache::class);
 
         Auth::viaRequest('api-token', function (Request $request): ?User {
             $plainTextToken = trim((string) $request->bearerToken());

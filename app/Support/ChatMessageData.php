@@ -31,8 +31,10 @@ class ChatMessageData
             'createdAt' => $message->created_at?->toISOString(),
             'editedAt' => $isDeleted ? null : $message->edited_at?->toISOString(),
             'deletedAt' => $message->deleted_at?->toISOString(),
+            'pinnedAt' => $isDeleted ? null : $message->pinned_at?->toISOString(),
             'isEdited' => ! $isDeleted && $message->wasEdited(),
             'isDeleted' => $isDeleted,
+            'isPinned' => ! $isDeleted && $message->isPinned(),
             'isOwn' => $message->user_id === $viewer->id,
             'user' => $this->serializeUserSummary($message->user),
             'attachments' => $isDeleted
@@ -76,7 +78,7 @@ class ChatMessageData
     }
 
     /**
-     * @return array{id: int, name: string, mimeType: string|null, extension: string|null, sizeBytes: int, downloadUrl: string, previewUrl: string|null}
+     * @return array{id: int, name: string, mimeType: string|null, extension: string|null, sizeBytes: int, downloadUrl: string, previewUrl: string|null, audioUrl: string|null}
      */
     public function serializeAttachment(ChatMessageAttachment $attachment): array
     {
@@ -88,6 +90,7 @@ class ChatMessageData
             'sizeBytes' => $attachment->size_bytes,
             'downloadUrl' => route('chats.attachments.download', $attachment),
             'previewUrl' => $this->previewUrl($attachment),
+            'audioUrl' => $this->audioUrl($attachment),
         ];
     }
 
@@ -100,12 +103,31 @@ class ChatMessageData
         return route('chats.attachments.preview', $attachment);
     }
 
+    public function audioUrl(ChatMessageAttachment $attachment): ?string
+    {
+        if (! $this->isPreviewableAudio($attachment)) {
+            return null;
+        }
+
+        return route('chats.attachments.preview', $attachment);
+    }
+
     public function isPreviewableImage(ChatMessageAttachment $attachment): bool
     {
         $mimeType = strtolower((string) $attachment->mime_type);
 
         return str_starts_with($mimeType, 'image/')
             && ! in_array($mimeType, self::NON_PREVIEWABLE_IMAGE_MIME_TYPES, true);
+    }
+
+    public function isPreviewableAudio(ChatMessageAttachment $attachment): bool
+    {
+        return str_starts_with(strtolower((string) $attachment->mime_type), 'audio/');
+    }
+
+    public function isInlinePreviewable(ChatMessageAttachment $attachment): bool
+    {
+        return $this->isPreviewableImage($attachment) || $this->isPreviewableAudio($attachment);
     }
 
     /**
