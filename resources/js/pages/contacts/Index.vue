@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import { Head, router, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { Ban, Building2, Download, Pencil, Plus, Search, Trash2, Upload, UserRound } from '@lucide/vue';
+import {
+    Ban,
+    Building2,
+    Download,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
+    Upload,
+    UserRound,
+} from '@lucide/vue';
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue';
+import { store as storeComment } from '@/actions/App/Http/Controllers/ContactCommentController';
 import {
     downloadCsvTemplate,
     destroy,
@@ -10,7 +21,7 @@ import {
     store,
     update,
 } from '@/actions/App/Http/Controllers/ContactController';
-import { store as storeComment } from '@/actions/App/Http/Controllers/ContactCommentController';
+import CsvExchangeSheet from '@/components/CsvExchangeSheet.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import LocalizedFilePicker from '@/components/LocalizedFilePicker.vue';
@@ -36,6 +47,7 @@ import type { PaginatedCollection } from '@/types/ui';
 
 type ContactType = 'person' | 'company';
 type BlacklistFilter = 'all' | 'blacklisted' | 'not_blacklisted';
+type CsvPanelMode = 'import' | 'export';
 
 type ContactActor = {
     id: number;
@@ -61,7 +73,9 @@ type ContactRequisitesKey =
     | 'kbe';
 
 type ContactRequisitesForm = Record<ContactRequisitesKey, string>;
-type ContactRequisitesRow = Partial<Record<ContactRequisitesKey, string | null>> | null;
+type ContactRequisitesRow = Partial<
+    Record<ContactRequisitesKey, string | null>
+> | null;
 
 type ContactRow = {
     id: number;
@@ -115,6 +129,7 @@ const persistedAvatarUrl = ref<string | null>(null);
 const commentErrorContactId = ref<number | null>(null);
 const commentProcessingContactId = ref<number | null>(null);
 const commentDrafts = ref<Record<number, string>>({});
+const csvPanelMode = ref<CsvPanelMode | null>(null);
 
 const emptyContactRequisites = (): ContactRequisitesForm => ({
     iin: '',
@@ -137,7 +152,6 @@ const csvImportForm = useForm({
     delimiter: ';',
     file: null as File | null,
 });
-const csvImportInput = ref<HTMLInputElement | null>(null);
 
 const contactForm = useForm({
     _method: '' as '' | 'patch',
@@ -170,8 +184,16 @@ const requisitesFieldsForType = (
 
     return [
         { key: 'bin', label: t.value.contacts.bin },
-        { key: 'legal_address', label: t.value.contacts.legal_address, textarea: true },
-        { key: 'actual_address', label: t.value.contacts.actual_address, textarea: true },
+        {
+            key: 'legal_address',
+            label: t.value.contacts.legal_address,
+            textarea: true,
+        },
+        {
+            key: 'actual_address',
+            label: t.value.contacts.actual_address,
+            textarea: true,
+        },
         { key: 'bank_name', label: t.value.contacts.bank_name },
         { key: 'bank_bik', label: t.value.contacts.bank_bik },
         { key: 'iban', label: t.value.contacts.iban },
@@ -311,7 +333,8 @@ const resetContactForm = (): void => {
     contactForm.reset();
     contactForm.clearErrors();
     editingContactId.value = null;
-    contactForm.type = (props.availableTypes[0]?.value ?? 'person') as ContactType;
+    contactForm.type = (props.availableTypes[0]?.value ??
+        'person') as ContactType;
     contactForm.is_blacklisted = false;
     contactForm.company_requisites = emptyContactRequisites();
     persistedAvatarUrl.value = null;
@@ -349,6 +372,8 @@ const closeDialog = (): void => {
 };
 
 const downloadContactsCsv = (): void => {
+    closeContactsCsvPanel();
+
     window.location.assign(
         exportCsv.url({
             query: {
@@ -368,19 +393,20 @@ const downloadContactsCsvTemplate = (): void => {
     );
 };
 
-const openContactsCsvImport = (): void => {
+const openContactsCsvPanel = (mode: CsvPanelMode): void => {
     csvImportForm.clearErrors();
     csvImportForm.file = null;
-
-    if (csvImportInput.value) {
-        csvImportInput.value.value = '';
-        csvImportInput.value.click();
-    }
+    csvPanelMode.value = mode;
 };
 
-const handleContactsCsvFileChange = (event: Event): void => {
-    const input = event.target as HTMLInputElement;
-    csvImportForm.file = input.files?.[0] ?? null;
+const closeContactsCsvPanel = (): void => {
+    csvPanelMode.value = null;
+    csvImportForm.clearErrors();
+};
+
+const selectContactsCsvFile = (file: File | null): void => {
+    csvImportForm.file = file;
+    csvImportForm.clearErrors('file');
 };
 
 const submitContactsCsvImport = (): void => {
@@ -392,11 +418,7 @@ const submitContactsCsvImport = (): void => {
         preserveScroll: true,
         onSuccess: () => {
             csvImportForm.reset();
-        },
-        onFinish: () => {
-            if (csvImportInput.value) {
-                csvImportInput.value.value = '';
-            }
+            closeContactsCsvPanel();
         },
     });
 };
@@ -550,15 +572,37 @@ onBeforeUnmount(clearLocalAvatarUrl);
 <template>
     <Head :title="t.contacts.title" />
 
-    <input
-        ref="csvImportInput"
-        type="file"
-        accept=".csv,text/csv"
-        class="hidden"
-        @change="handleContactsCsvFileChange"
-    />
-
     <div class="space-y-8">
+        <CsvExchangeSheet
+            :open="csvPanelMode !== null"
+            :mode="csvPanelMode ?? 'export'"
+            :title="
+                csvPanelMode === 'import'
+                    ? t.contacts.csv_import
+                    : t.contacts.csv_export
+            "
+            :description="t.contacts.csv_description"
+            :delimiter="csvImportForm.delimiter"
+            :delimiter-label="t.contacts.csv_delimiter"
+            :delimiter-placeholder="t.contacts.csv_delimiter_placeholder"
+            :delimiter-hint="t.contacts.csv_delimiter_hint"
+            :file-label="t.contacts.csv_file"
+            :export-label="t.contacts.csv_export"
+            :import-label="t.contacts.csv_import"
+            :template-label="t.contacts.csv_download_template"
+            :selected-file="csvImportForm.file"
+            :processing="csvImportForm.processing"
+            :progress="csvImportForm.progress?.percentage ?? null"
+            :delimiter-error="csvImportForm.errors.delimiter"
+            :file-error="csvImportForm.errors.file"
+            @update:open="(isOpen) => !isOpen && closeContactsCsvPanel()"
+            @update:delimiter="csvImportForm.delimiter = $event"
+            @file-selected="selectContactsCsvFile"
+            @download-template="downloadContactsCsvTemplate"
+            @import="submitContactsCsvImport"
+            @export="downloadContactsCsv"
+        />
+
         <section
             class="rounded-3xl border border-border bg-gradient-to-br from-primary/10 via-background to-background p-6"
         >
@@ -572,7 +616,7 @@ onBeforeUnmount(clearLocalAvatarUrl);
                 <Button
                     type="button"
                     variant="outline"
-                    @click="downloadContactsCsv"
+                    @click="openContactsCsvPanel('export')"
                 >
                     <Download class="size-4" />
                     {{ t.contacts.csv_export }}
@@ -581,16 +625,7 @@ onBeforeUnmount(clearLocalAvatarUrl);
                     v-if="canCreateAny"
                     type="button"
                     variant="outline"
-                    @click="downloadContactsCsvTemplate"
-                >
-                    <Download class="size-4" />
-                    {{ t.contacts.csv_download_template }}
-                </Button>
-                <Button
-                    v-if="canCreateAny"
-                    type="button"
-                    variant="outline"
-                    @click="openContactsCsvImport"
+                    @click="openContactsCsvPanel('import')"
                 >
                     <Upload class="size-4" />
                     {{ t.contacts.csv_import }}
@@ -613,48 +648,17 @@ onBeforeUnmount(clearLocalAvatarUrl);
                     {{ t.contacts.create_company }}
                 </Button>
             </div>
-
-            <div class="mt-4 grid gap-2 rounded-2xl border border-dashed border-border/70 p-4">
-                <p class="text-sm text-muted-foreground">
-                    {{ t.contacts.csv_description }}
-                </p>
-                <div class="flex flex-col gap-2 md:flex-row md:items-end">
-                    <div class="grid gap-2">
-                        <Label for="contacts-csv-delimiter">
-                            {{ t.contacts.csv_delimiter }}
-                        </Label>
-                        <Input
-                            id="contacts-csv-delimiter"
-                            v-model="csvImportForm.delimiter"
-                            :placeholder="t.contacts.csv_delimiter_placeholder"
-                            class="w-28"
-                        />
-                    </div>
-                    <Button
-                        v-if="canCreateAny"
-                        type="button"
-                        :disabled="csvImportForm.processing || csvImportForm.file === null"
-                        @click="submitContactsCsvImport"
-                    >
-                        <Upload class="size-4" />
-                        {{ t.contacts.csv_import }}
-                    </Button>
-                </div>
-                <p class="text-xs text-muted-foreground">
-                    {{ t.contacts.csv_delimiter_hint }}
-                </p>
-                <InputError :message="csvImportForm.errors.delimiter" />
-                <InputError :message="csvImportForm.errors.file" />
-            </div>
         </section>
 
         <section class="rounded-2xl border border-border bg-card p-5">
-            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div
+                class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end"
+            >
                 <div class="space-y-2">
                     <Label for="contacts-search">{{ t.contacts.search }}</Label>
                     <div class="relative">
                         <Search
-                            class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                            class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
                         />
                         <Input
                             id="contacts-search"
@@ -676,7 +680,9 @@ onBeforeUnmount(clearLocalAvatarUrl);
                     v-if="availableTypes.length > 1"
                     type="button"
                     size="sm"
-                    :variant="filtersForm.type === 'all' ? 'default' : 'outline'"
+                    :variant="
+                        filtersForm.type === 'all' ? 'default' : 'outline'
+                    "
                     @click="
                         filtersForm.type = 'all';
                         submitFilters();
@@ -689,7 +695,9 @@ onBeforeUnmount(clearLocalAvatarUrl);
                     :key="type.value"
                     type="button"
                     size="sm"
-                    :variant="filtersForm.type === type.value ? 'default' : 'outline'"
+                    :variant="
+                        filtersForm.type === type.value ? 'default' : 'outline'
+                    "
                     @click="
                         filtersForm.type = type.value;
                         submitFilters();
@@ -703,7 +711,9 @@ onBeforeUnmount(clearLocalAvatarUrl);
                 <Button
                     type="button"
                     size="sm"
-                    :variant="filtersForm.blacklist === 'all' ? 'default' : 'outline'"
+                    :variant="
+                        filtersForm.blacklist === 'all' ? 'default' : 'outline'
+                    "
                     @click="
                         filtersForm.blacklist = 'all';
                         submitFilters();
@@ -714,7 +724,11 @@ onBeforeUnmount(clearLocalAvatarUrl);
                 <Button
                     type="button"
                     size="sm"
-                    :variant="filtersForm.blacklist === 'blacklisted' ? 'default' : 'outline'"
+                    :variant="
+                        filtersForm.blacklist === 'blacklisted'
+                            ? 'default'
+                            : 'outline'
+                    "
                     @click="
                         filtersForm.blacklist = 'blacklisted';
                         submitFilters();
@@ -725,7 +739,11 @@ onBeforeUnmount(clearLocalAvatarUrl);
                 <Button
                     type="button"
                     size="sm"
-                    :variant="filtersForm.blacklist === 'not_blacklisted' ? 'default' : 'outline'"
+                    :variant="
+                        filtersForm.blacklist === 'not_blacklisted'
+                            ? 'default'
+                            : 'outline'
+                    "
                     @click="
                         filtersForm.blacklist = 'not_blacklisted';
                         submitFilters();
@@ -748,7 +766,10 @@ onBeforeUnmount(clearLocalAvatarUrl);
                 v-for="contact in contacts.data"
                 :key="contact.id"
                 class="rounded-2xl border border-border bg-card p-5"
-                :class="{ 'border-destructive/40 bg-destructive/5': contact.is_blacklisted }"
+                :class="{
+                    'border-destructive/40 bg-destructive/5':
+                        contact.is_blacklisted,
+                }"
             >
                 <div
                     class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
@@ -831,10 +852,16 @@ onBeforeUnmount(clearLocalAvatarUrl);
                             {{ contact.notes }}
                         </p>
 
-                        <div class="space-y-4 rounded-2xl border border-border/60 bg-background p-4">
-                            <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div
+                            class="space-y-4 rounded-2xl border border-border/60 bg-background p-4"
+                        >
+                            <div
+                                class="flex flex-wrap items-center justify-between gap-2"
+                            >
                                 <div>
-                                    <div class="text-sm font-medium text-foreground">
+                                    <div
+                                        class="text-sm font-medium text-foreground"
+                                    >
                                         {{ t.contacts.history_title }}
                                     </div>
                                     <div class="text-xs text-muted-foreground">
@@ -857,17 +884,25 @@ onBeforeUnmount(clearLocalAvatarUrl);
                                     :key="comment.id"
                                     class="rounded-2xl bg-muted/30 px-4 py-3"
                                 >
-                                    <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                        <span class="font-medium text-foreground">
+                                    <div
+                                        class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+                                    >
+                                        <span
+                                            class="font-medium text-foreground"
+                                        >
                                             {{
-                                                actorName(comment.created_by)
-                                                || '—'
+                                                actorName(comment.created_by) ||
+                                                '—'
                                             }}
                                         </span>
                                         <span>•</span>
-                                        <span>{{ formatDateTime(comment.created_at) }}</span>
+                                        <span>{{
+                                            formatDateTime(comment.created_at)
+                                        }}</span>
                                     </div>
-                                    <p class="mt-2 whitespace-pre-line text-sm text-foreground/90">
+                                    <p
+                                        class="mt-2 text-sm whitespace-pre-line text-foreground/90"
+                                    >
                                         {{ comment.content }}
                                     </p>
                                 </div>
@@ -879,23 +914,31 @@ onBeforeUnmount(clearLocalAvatarUrl);
                                 {{ t.contacts.history_empty }}
                             </p>
 
-                            <div class="space-y-3 rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4">
+                            <div
+                                class="space-y-3 rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4"
+                            >
                                 <Label :for="`contact-comment-${contact.id}`">
                                     {{ t.contacts.comment_add }}
                                 </Label>
                                 <textarea
                                     :id="`contact-comment-${contact.id}`"
                                     :value="commentDrafts[contact.id] ?? ''"
-                                    class="min-h-24 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                                    :placeholder="t.contacts.comment_placeholder"
+                                    class="min-h-24 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-xs transition outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                    :placeholder="
+                                        t.contacts.comment_placeholder
+                                    "
                                     @input="
                                         updateCommentDraft(
                                             contact.id,
-                                            ($event.target as HTMLTextAreaElement).value,
+                                            (
+                                                $event.target as HTMLTextAreaElement
+                                            ).value,
                                         )
                                     "
                                 ></textarea>
-                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                <div
+                                    class="flex flex-wrap items-center justify-between gap-3"
+                                >
                                     <InputError
                                         :message="
                                             commentErrorContactId === contact.id
@@ -908,8 +951,9 @@ onBeforeUnmount(clearLocalAvatarUrl);
                                         size="sm"
                                         class="ml-auto"
                                         :disabled="
-                                            commentProcessingContactId === contact.id
-                                            || !canSubmitComment(contact.id)
+                                            commentProcessingContactId ===
+                                                contact.id ||
+                                            !canSubmitComment(contact.id)
                                         "
                                         @click="submitComment(contact)"
                                     >
@@ -920,13 +964,13 @@ onBeforeUnmount(clearLocalAvatarUrl);
                         </div>
 
                         <div
-                            v-if="
-                                contactHasRequisites(contact)
-                            "
+                            v-if="contactHasRequisites(contact)"
                             class="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-4"
                         >
                             <div>
-                                <div class="text-sm font-medium text-foreground">
+                                <div
+                                    class="text-sm font-medium text-foreground"
+                                >
                                     {{ t.contacts.requisites }}
                                 </div>
                                 <div class="text-xs text-muted-foreground">
@@ -934,9 +978,13 @@ onBeforeUnmount(clearLocalAvatarUrl);
                                 </div>
                             </div>
 
-                            <div class="grid gap-3 text-sm text-muted-foreground md:grid-cols-2 xl:grid-cols-3">
+                            <div
+                                class="grid gap-3 text-sm text-muted-foreground md:grid-cols-2 xl:grid-cols-3"
+                            >
                                 <div
-                                    v-for="field in requisitesFieldsForType(contact.type)"
+                                    v-for="field in requisitesFieldsForType(
+                                        contact.type,
+                                    )"
                                     v-show="
                                         requisitesValue(
                                             contact.company_requisites,
@@ -1004,7 +1052,9 @@ onBeforeUnmount(clearLocalAvatarUrl);
             <DialogContent class="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{{ dialogTitle }}</DialogTitle>
-                    <DialogDescription>{{ dialogDescription }}</DialogDescription>
+                    <DialogDescription>{{
+                        dialogDescription
+                    }}</DialogDescription>
                 </DialogHeader>
 
                 <div class="grid gap-4">
@@ -1014,7 +1064,11 @@ onBeforeUnmount(clearLocalAvatarUrl);
                             :key="type.value"
                             type="button"
                             size="sm"
-                            :variant="contactForm.type === type.value ? 'default' : 'outline'"
+                            :variant="
+                                contactForm.type === type.value
+                                    ? 'default'
+                                    : 'outline'
+                            "
                             @click="contactForm.type = type.value"
                         >
                             {{ type.label }}
@@ -1030,7 +1084,10 @@ onBeforeUnmount(clearLocalAvatarUrl);
                                     <AvatarImage
                                         v-if="avatarPreviewUrl"
                                         :src="avatarPreviewUrl"
-                                        :alt="contactForm.name || t.contacts.avatar"
+                                        :alt="
+                                            contactForm.name ||
+                                            t.contacts.avatar
+                                        "
                                         class="object-cover"
                                     />
                                     <AvatarFallback
@@ -1054,12 +1111,16 @@ onBeforeUnmount(clearLocalAvatarUrl);
                                 <p class="text-sm text-muted-foreground">
                                     {{ t.contacts.avatar_help }}
                                 </p>
-                                <InputError :message="contactForm.errors.avatar" />
+                                <InputError
+                                    :message="contactForm.errors.avatar"
+                                />
                             </div>
                         </div>
 
                         <div class="space-y-2 md:col-span-2">
-                            <Label for="contact-name">{{ t.contacts.name }}</Label>
+                            <Label for="contact-name">{{
+                                t.contacts.name
+                            }}</Label>
                             <Input
                                 id="contact-name"
                                 v-model="contactForm.name"
@@ -1078,7 +1139,9 @@ onBeforeUnmount(clearLocalAvatarUrl);
                             <Input
                                 id="contact-person"
                                 v-model="contactForm.contact_person"
-                                :placeholder="t.contacts.contact_person_placeholder"
+                                :placeholder="
+                                    t.contacts.contact_person_placeholder
+                                "
                             />
                             <InputError
                                 :message="contactForm.errors.contact_person"
@@ -1094,11 +1157,15 @@ onBeforeUnmount(clearLocalAvatarUrl);
                                 v-model="contactForm.position"
                                 :placeholder="t.contacts.position_placeholder"
                             />
-                            <InputError :message="contactForm.errors.position" />
+                            <InputError
+                                :message="contactForm.errors.position"
+                            />
                         </div>
 
                         <div class="space-y-2">
-                            <Label for="contact-email">{{ t.contacts.email }}</Label>
+                            <Label for="contact-email">{{
+                                t.contacts.email
+                            }}</Label>
                             <Input
                                 id="contact-email"
                                 v-model="contactForm.email"
@@ -1108,7 +1175,9 @@ onBeforeUnmount(clearLocalAvatarUrl);
                         </div>
 
                         <div class="space-y-2">
-                            <Label for="contact-phone">{{ t.contacts.phone }}</Label>
+                            <Label for="contact-phone">{{
+                                t.contacts.phone
+                            }}</Label>
                             <Input
                                 id="contact-phone"
                                 v-model="contactForm.phone"
@@ -1144,7 +1213,9 @@ onBeforeUnmount(clearLocalAvatarUrl);
                                 class="flex flex-col gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 md:flex-row md:items-center md:justify-between"
                             >
                                 <div class="space-y-1">
-                                    <div class="text-sm font-medium text-foreground">
+                                    <div
+                                        class="text-sm font-medium text-foreground"
+                                    >
                                         {{ t.contacts.requisites }}
                                     </div>
                                     <div class="text-sm text-muted-foreground">
@@ -1176,11 +1247,13 @@ onBeforeUnmount(clearLocalAvatarUrl);
                         </div>
 
                         <div class="space-y-2 md:col-span-2">
-                            <Label for="contact-notes">{{ t.contacts.notes }}</Label>
+                            <Label for="contact-notes">{{
+                                t.contacts.notes
+                            }}</Label>
                             <textarea
                                 id="contact-notes"
                                 v-model="contactForm.notes"
-                                class="min-h-28 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                class="min-h-28 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-xs transition outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                 :placeholder="t.contacts.notes_placeholder"
                             ></textarea>
                             <InputError :message="contactForm.errors.notes" />
@@ -1189,7 +1262,11 @@ onBeforeUnmount(clearLocalAvatarUrl);
                 </div>
 
                 <DialogFooter>
-                    <Button type="button" variant="outline" @click="closeDialog">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="closeDialog"
+                    >
                         {{ t.common.cancel }}
                     </Button>
                     <Button
@@ -1234,20 +1311,30 @@ onBeforeUnmount(clearLocalAvatarUrl);
                             v-if="field.textarea"
                             :id="`company-requisites-${field.key}`"
                             v-model="contactForm.company_requisites[field.key]"
-                            class="min-h-24 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                            class="min-h-24 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-xs transition outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                         ></textarea>
                         <Input
                             v-else
                             :id="`company-requisites-${field.key}`"
                             v-model="contactForm.company_requisites[field.key]"
-                            :inputmode="field.key === 'bin' || field.key === 'iin' ? 'numeric' : undefined"
-                            :maxlength="field.key === 'bin' || field.key === 'iin' ? 12 : undefined"
+                            :inputmode="
+                                field.key === 'bin' || field.key === 'iin'
+                                    ? 'numeric'
+                                    : undefined
+                            "
+                            :maxlength="
+                                field.key === 'bin' || field.key === 'iin'
+                                    ? 12
+                                    : undefined
+                            "
                             @input="normalizeRequisitesField(field.key)"
                         />
 
                         <InputError
                             :message="
-                                contactForm.errors[`company_requisites.${field.key}`]
+                                contactForm.errors[
+                                    `company_requisites.${field.key}`
+                                ]
                             "
                         />
                     </div>

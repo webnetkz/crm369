@@ -4,7 +4,7 @@ import { LoaderCircle, MessageSquareMore } from '@lucide/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { index } from '@/actions/App/Http/Controllers/ChatSidebarController';
 import ChatCenterSheet from '@/components/ChatCenterSheet.vue';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useChatCenterPresence } from '@/composables/useChatCenterPresence';
 import { getInitials } from '@/composables/useInitials';
@@ -20,6 +20,7 @@ type DockEntry = {
     subtitle: string | null;
     avatar: string | null;
     avatarScale: number;
+    isGeneral: boolean;
     unreadCount: number;
     conversationId: number | null;
     contactId: number | null;
@@ -34,7 +35,9 @@ const initialConversationId = ref<number | null>(null);
 const initialContactId = ref<number | null>(null);
 const payload = ref<ChatCenter | null>(null);
 const loading = ref(false);
+const failedAvatarKeys = ref(new Set<string>());
 let pollInterval: ReturnType<typeof setInterval> | null = null;
+let dockAbortController: AbortController | null = null;
 
 const unreadBadge = computed(() => {
     const count = page.props.chat.unreadCount;
@@ -63,7 +66,10 @@ const dockEntries = computed<DockEntry[]>(() => {
     const seenUsers = new Set<number>();
 
     for (const conversation of payload.value?.conversations ?? []) {
-        if (!conversation.participant) {
+        const participant = conversation.participant;
+        const isGeneral = conversation.type === 'general';
+
+        if (!isGeneral && !participant) {
             continue;
         }
 
@@ -71,13 +77,19 @@ const dockEntries = computed<DockEntry[]>(() => {
             key: `conversation-${conversation.id}`,
             title: conversation.title,
             subtitle: conversation.subtitle,
-            avatar: conversation.participant.avatar,
-            avatarScale: conversation.participant.avatarScale,
+            avatar: isGeneral
+                ? page.props.portal.logoUrl
+                : (participant?.avatar ?? null),
+            avatarScale: isGeneral ? 1 : (participant?.avatarScale ?? 1),
+            isGeneral,
             unreadCount: conversation.unreadCount,
             conversationId: conversation.id,
-            contactId: conversation.participant.id,
+            contactId: participant?.id ?? null,
         });
-        seenUsers.add(conversation.participant.id);
+
+        if (participant) {
+            seenUsers.add(participant.id);
+        }
     }
 
     for (const contact of payload.value?.contacts ?? []) {
@@ -91,6 +103,7 @@ const dockEntries = computed<DockEntry[]>(() => {
             subtitle: contact.email,
             avatar: contact.avatar,
             avatarScale: contact.avatarScale,
+            isGeneral: false,
             unreadCount: 0,
             conversationId: null,
             contactId: contact.id,
@@ -106,6 +119,23 @@ const avatarStyle = (entry: DockEntry): Record<string, string> => ({
     transform: `scale(${entry.avatarScale ?? 1})`,
 });
 
+const avatarKey = (entry: DockEntry): string =>
+    `${entry.key}:${entry.avatar ?? ''}`;
+
+const shouldShowAvatar = (
+    entry: DockEntry,
+): entry is DockEntry & {
+    avatar: string;
+} => {
+    return Boolean(
+        entry.avatar && !failedAvatarKeys.value.has(avatarKey(entry)),
+    );
+};
+
+const markAvatarFailed = (entry: DockEntry): void => {
+    failedAvatarKeys.value.add(avatarKey(entry));
+};
+
 const syncSharedUnread = (unreadCount: number): void => {
     (page.props as Record<string, unknown>).chat = {
         unreadCount,
@@ -113,19 +143,34 @@ const syncSharedUnread = (unreadCount: number): void => {
 };
 
 const fetchDockData = async (): Promise<void> => {
+    if (dockAbortController !== null) {
+        return;
+    }
+
+    const requestController = new AbortController();
+
+    dockAbortController = requestController;
     loading.value = payload.value === null;
 
     try {
         const data = await fetchSameOriginJson<ChatCenter>(index.url(), {
             method: 'GET',
+            signal: requestController.signal,
         });
 
         payload.value = data;
         syncSharedUnread(data.unreadCount);
     } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            return;
+        }
+
         console.error(error);
     } finally {
-        loading.value = false;
+        if (dockAbortController === requestController) {
+            dockAbortController = null;
+            loading.value = false;
+        }
     }
 };
 
@@ -135,8 +180,18 @@ const startPolling = (): void => {
     }
 
     pollInterval = setInterval(() => {
+        if (document.hidden || dockAbortController !== null) {
+            return;
+        }
+
         void fetchDockData();
     }, 10000);
+};
+
+const handleVisibilityChange = (): void => {
+    if (!document.hidden) {
+        void fetchDockData();
+    }
 };
 
 const stopPolling = (): void => {
@@ -162,10 +217,13 @@ const openChatCenter = (
 onMounted(() => {
     void fetchDockData();
     startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onBeforeUnmount(() => {
     stopPolling();
+    dockAbortController?.abort();
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>
 
@@ -210,13 +268,21 @@ onBeforeUnmount(() => {
                         <Avatar
                             class="size-12 rounded-2xl border border-border bg-background shadow-sm transition group-hover:border-primary/40"
                         >
-                            <AvatarImage
-                                v-if="entry.avatar"
+                            <img
+                                v-if="shouldShowAvatar(entry)"
                                 :src="entry.avatar"
                                 :alt="entry.title"
+                                class="absolute inset-0 z-10 aspect-square size-full"
+                                :class="
+                                    entry.isGeneral
+                                        ? 'bg-white object-contain p-1'
+                                        : 'object-cover'
+                                "
                                 :style="avatarStyle(entry)"
+                                @error="markAvatarFailed(entry)"
                             />
                             <AvatarFallback
+                                :aria-hidden="shouldShowAvatar(entry)"
                                 class="rounded-2xl bg-muted font-semibold text-foreground"
                             >
                                 {{ getInitials(entry.title) }}
@@ -224,7 +290,7 @@ onBeforeUnmount(() => {
                         </Avatar>
                         <span
                             v-if="entry.unreadCount > 0"
-                            class="absolute -top-1 -right-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground"
+                            class="absolute -top-1 -right-1 z-20 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground"
                         >
                             {{
                                 entry.unreadCount > 9 ? '9+' : entry.unreadCount

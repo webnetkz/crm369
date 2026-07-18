@@ -2,9 +2,11 @@
 
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\WarehouseFloor;
 use App\Models\WarehouseItem;
 use App\Models\WarehousePlace;
 use App\Support\WarehouseHierarchyManager;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('verified users can open the warehouses module page and see hierarchy summary', function () {
@@ -44,6 +46,13 @@ test('verified users can open a concrete warehouse page and see detailed hierarc
         warehouseHierarchyPayload(),
         $user,
     );
+    $place = WarehousePlace::query()->where('name', 'A-01-1-001')->firstOrFail();
+
+    WarehouseItem::factory()->forPlace($place)->create([
+        'name' => 'Паллет с подшипниками',
+        'sku' => 'PAL-001',
+        'quantity' => 4,
+    ]);
 
     $this->actingAs($user)
         ->get(route('warehouses.show', $warehouse))
@@ -52,12 +61,89 @@ test('verified users can open a concrete warehouse page and see detailed hierarc
             ->component('warehouses/Show')
             ->where('warehouse.name', 'Центральный склад')
             ->where('warehouse.row_count', 2)
-            ->where('warehouse.item_count', 0)
+            ->where('warehouse.item_count', 1)
             ->where('map.rows.0.name', 'Ряд A')
             ->where('map.rows.0.columns.0.name', 'Колонка 01')
-            ->where('map.rows.0.columns.0.floors.0.places.0.name', 'A-01-1-001')
-            ->where('inventoryQrCodes.data', [])
+            ->where('map.rows.0.columns.0.floors.0.place_count', 2)
+            ->where('map.rows.0.columns.0.floors.0.item_count', 1)
+            ->where('map.rows.0.columns.0.floors.0.places', [])
+            ->has('inventoryQrCodes.data', 1)
         );
+});
+
+test('verified users can load one warehouse floor on demand', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $warehouse = app(WarehouseHierarchyManager::class)->create(
+        warehouseHierarchyPayload(),
+        $user,
+    );
+    $place = WarehousePlace::query()->where('name', 'A-01-1-001')->firstOrFail();
+    $warehouseItem = WarehouseItem::factory()->forPlace($place)->create([
+        'name' => 'Паллет с подшипниками',
+        'sku' => 'PAL-001',
+        'quantity' => 4,
+    ]);
+
+    $this->actingAs($user)
+        ->getJson(route('warehouses.floors.show', [$warehouse, $place->warehouse_floor_id]))
+        ->assertSuccessful()
+        ->assertJsonPath('data.id', $place->warehouse_floor_id)
+        ->assertJsonPath('data.places.0.id', $place->id)
+        ->assertJsonPath('data.places.0.item_count', 1)
+        ->assertJsonPath('data.places.0.items.0.id', $warehouseItem->id)
+        ->assertJsonPath('data.places.0.items.0.sku', 'PAL-001');
+});
+
+test('warehouse floor endpoint rejects floors from another warehouse', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+    $warehouse = app(WarehouseHierarchyManager::class)->create(
+        warehouseHierarchyPayload('Основной склад'),
+        $user,
+    );
+    $otherWarehouse = app(WarehouseHierarchyManager::class)->create(
+        warehouseHierarchyPayload('Другой склад'),
+        $user,
+    );
+    $otherFloor = WarehouseFloor::query()
+        ->whereHas('column.row', fn ($query) => $query->where('warehouse_id', $otherWarehouse->id))
+        ->firstOrFail();
+
+    $this->actingAs($user)
+        ->getJson(route('warehouses.floors.show', [$warehouse, $otherFloor]))
+        ->assertNotFound();
+});
+
+test('warehouse index aggregates hierarchy in one database query', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    app(WarehouseHierarchyManager::class)->create(
+        warehouseHierarchyPayload(),
+        $user,
+    );
+
+    DB::connection()->flushQueryLog();
+    DB::enableQueryLog();
+
+    $this->actingAs($user)
+        ->get(route('warehouses.index'))
+        ->assertSuccessful();
+
+    $warehouseHierarchyQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains($query['query'], 'warehouse_rows')
+            || str_contains($query['query'], 'warehouse_columns')
+            || str_contains($query['query'], 'warehouse_floors')
+            || str_contains($query['query'], 'warehouse_places'));
+
+    DB::disableQueryLog();
+
+    expect($warehouseHierarchyQueries)->toHaveCount(1);
 });
 
 test('verified users can scan a warehouse item qr from the warehouses tab and get exact location', function () {

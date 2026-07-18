@@ -13,6 +13,7 @@ import {
     Columns3,
     Download,
     KeyRound,
+    LoaderCircle,
     LogIn,
     RefreshCw,
     RotateCcw,
@@ -30,6 +31,7 @@ import {
     importCsv as importUsersCsv,
     show as showManagedUser,
 } from '@/actions/App/Http/Controllers/Settings/UserController';
+import CsvExchangeSheet from '@/components/CsvExchangeSheet.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import PaginationControls from '@/components/PaginationControls.vue';
@@ -68,14 +70,17 @@ import { update as updateUserTableColumns } from '@/routes/settings/users/table-
 import type {
     CompanyStructureManagerOption,
     ManagedProfileSaveState,
+    ManagedUserListItem,
     ManagedUserProfile,
     PaginatedCollection,
     UserGroupOption,
 } from '@/types/ui';
 
-type UserRow = ManagedUserProfile & {
+type UserRow = ManagedUserListItem & {
     can_be_impersonated: boolean;
 };
+
+type CsvPanelMode = 'import' | 'export';
 
 type ManagedProfilePayload = {
     name: string;
@@ -97,11 +102,7 @@ type UserFilters = {
 };
 
 type UserTableOptionalColumnKey =
-    | 'position'
-    | 'manager'
-    | 'status'
-    | 'email_verified'
-    | 'group';
+    'position' | 'manager' | 'status' | 'email_verified' | 'group';
 
 type UserTableOptionalColumnOption = {
     key: UserTableOptionalColumnKey;
@@ -128,7 +129,6 @@ const props = defineProps<{
     filters: UserFilters;
     perPageOptions: number[];
     visibleUserTableColumns: UserTableOptionalColumnKey[];
-    managerOptions: CompanyStructureManagerOption[];
 }>();
 
 const page = usePage();
@@ -136,8 +136,11 @@ const { t } = useLanguage();
 const { copy: copyToClipboard } = useClipboard();
 const { generatePassword } = usePasswordGenerator();
 const createUserDialogOpen = ref(false);
-const selectedProfileUser = ref<UserRow | null>(null);
+const csvPanelMode = ref<CsvPanelMode | null>(null);
+const selectedProfileUser = ref<ManagedUserProfile | null>(null);
 const selectedPasswordUser = ref<UserRow | null>(null);
+const managerOptions = ref<CompanyStructureManagerOption[]>([]);
+const profileLoadingUserId = ref<number | null>(null);
 const visibleUserTableColumns = ref<UserTableOptionalColumnKey[]>([
     ...props.visibleUserTableColumns,
 ]);
@@ -192,8 +195,6 @@ const filtersForm = useForm<UserFilters>({
     registered_to: props.filters.registered_to,
     per_page: props.filters.per_page,
 });
-const usersCsvInput = ref<HTMLInputElement | null>(null);
-
 const visibleUsers = computed(() => props.users.data);
 const userTableColumnOptions = computed<UserTableOptionalColumnOption[]>(() => [
     {
@@ -272,7 +273,19 @@ const submitCreateUser = (): void => {
     });
 };
 
+const openCsvPanel = (mode: CsvPanelMode): void => {
+    csvImportForm.clearErrors();
+    csvPanelMode.value = mode;
+};
+
+const closeCsvPanel = (): void => {
+    csvPanelMode.value = null;
+    csvImportForm.clearErrors();
+};
+
 const downloadUsersCsvFile = (): void => {
+    closeCsvPanel();
+
     window.location.assign(
         exportUsersCsv.url({
             query: {
@@ -292,19 +305,9 @@ const downloadUsersCsvTemplateFile = (): void => {
     );
 };
 
-const openUsersCsvImport = (): void => {
-    csvImportForm.clearErrors();
-    csvImportForm.file = null;
-
-    if (usersCsvInput.value) {
-        usersCsvInput.value.value = '';
-        usersCsvInput.value.click();
-    }
-};
-
-const handleUsersCsvFileChange = (event: Event): void => {
-    const input = event.target as HTMLInputElement;
-    csvImportForm.file = input.files?.[0] ?? null;
+const selectUsersCsvFile = (file: File | null): void => {
+    csvImportForm.file = file;
+    csvImportForm.clearErrors('file');
 };
 
 const submitUsersCsvImport = (): void => {
@@ -316,11 +319,7 @@ const submitUsersCsvImport = (): void => {
         preserveScroll: true,
         onSuccess: () => {
             csvImportForm.reset();
-        },
-        onFinish: () => {
-            if (usersCsvInput.value) {
-                usersCsvInput.value.value = '';
-            }
+            closeCsvPanel();
         },
     });
 };
@@ -357,15 +356,17 @@ const hasActiveFilters = computed(() => {
 });
 
 const openProfile = (user: UserRow): void => {
-    selectedProfileUser.value = user;
+    void openManagedUserProfileById(user.id);
 };
 
 const openManagedUserProfileById = async (userId: number): Promise<void> => {
     const requestSequence = ++managedProfileRequestSequence;
+    profileLoadingUserId.value = userId;
 
     try {
         const response = await fetchSameOriginJson<{
-            data: UserRow;
+            data: ManagedUserProfile;
+            managerOptions: CompanyStructureManagerOption[];
         }>(showManagedUser.url(userId), {
             method: 'GET',
         });
@@ -374,9 +375,14 @@ const openManagedUserProfileById = async (userId: number): Promise<void> => {
             return;
         }
 
+        managerOptions.value = response.managerOptions;
         selectedProfileUser.value = response.data;
     } catch (error) {
         console.error(error);
+    } finally {
+        if (requestSequence === managedProfileRequestSequence) {
+            profileLoadingUserId.value = null;
+        }
     }
 };
 
@@ -386,6 +392,7 @@ const closeProfile = (): void => {
     selectedProfileUser.value = null;
     managedProfileSnapshot.value = null;
     managedProfileSaveState.value = 'idle';
+    profileLoadingUserId.value = null;
     managedProfileForm.clearErrors();
 };
 
@@ -454,7 +461,9 @@ const normalizeVisibleUserTableColumns = (
     );
 };
 
-const isUserTableColumnVisible = (column: UserTableOptionalColumnKey): boolean => {
+const isUserTableColumnVisible = (
+    column: UserTableOptionalColumnKey,
+): boolean => {
     return visibleUserTableColumnKeySet.value.has(column);
 };
 
@@ -470,9 +479,10 @@ const persistVisibleUserTableColumns = (): void => {
             replace: true,
             only: ['visibleUserTableColumns'],
             onError: () => {
-                visibleUserTableColumns.value = normalizeVisibleUserTableColumns(
-                    props.visibleUserTableColumns,
-                );
+                visibleUserTableColumns.value =
+                    normalizeVisibleUserTableColumns(
+                        props.visibleUserTableColumns,
+                    );
             },
         },
     );
@@ -522,7 +532,7 @@ const canResetPassword = (user: UserRow): boolean => {
     );
 };
 
-const canEditProfile = (user: UserRow | null): boolean => {
+const canEditProfile = (user: ManagedUserProfile | null): boolean => {
     if (!user || !props.can.manage_accounts) {
         return false;
     }
@@ -611,6 +621,7 @@ const submitFilters = (): void => {
         preserveScroll: true,
         preserveState: true,
         replace: true,
+        only: ['users', 'filters'],
     });
 };
 
@@ -643,7 +654,7 @@ const updatePerPage = (value: number): void => {
     submitFilters();
 };
 
-const syncManagedProfileForm = (user: UserRow | null): void => {
+const syncManagedProfileForm = (user: ManagedUserProfile | null): void => {
     isSyncingManagedProfile.value = true;
     clearManagedProfileSaveTimeout();
     managedProfileForm.clearErrors();
@@ -748,8 +759,11 @@ watch(
             return;
         }
 
-        selectedProfileUser.value = freshUser;
-        syncManagedProfileForm(freshUser);
+        selectedProfileUser.value = {
+            ...selectedProfileUser.value,
+            ...freshUser,
+        };
+        syncManagedProfileForm(selectedProfileUser.value);
     },
 );
 
@@ -862,14 +876,6 @@ const formatStructureSummary = (
 <template>
     <Head :title="t.admin.users_title" />
 
-    <input
-        ref="usersCsvInput"
-        type="file"
-        accept=".csv,text/csv"
-        class="hidden"
-        @change="handleUsersCsvFileChange"
-    />
-
     <h1 class="sr-only">{{ t.admin.users_title }}</h1>
 
     <div class="space-y-6">
@@ -893,27 +899,17 @@ const formatStructureSummary = (
                         type="button"
                         variant="outline"
                         size="sm"
-                        @click="downloadUsersCsvFile"
+                        @click="openCsvPanel('export')"
                     >
                         <Download class="size-4" />
                         {{ t.admin.csv_export }}
                     </Button>
                     <Button
-                        v-if="can.manage_accounts"
+                        v-if="can.manage_users"
                         type="button"
                         variant="outline"
                         size="sm"
-                        @click="downloadUsersCsvTemplateFile"
-                    >
-                        <Download class="size-4" />
-                        {{ t.admin.csv_download_template }}
-                    </Button>
-                    <Button
-                        v-if="can.manage_accounts"
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        @click="openUsersCsvImport"
+                        @click="openCsvPanel('import')"
                     >
                         <Upload class="size-4" />
                         {{ t.admin.csv_import }}
@@ -943,9 +939,7 @@ const formatStructureSummary = (
                             <DropdownMenuCheckboxItem
                                 v-for="column in userTableColumnOptions"
                                 :key="column.key"
-                                :checked="
-                                    isUserTableColumnVisible(column.key)
-                                "
+                                :checked="isUserTableColumnVisible(column.key)"
                                 class="pl-2"
                                 @select.prevent="
                                     setUserTableColumnVisibility(
@@ -989,39 +983,6 @@ const formatStructureSummary = (
                         {{ t.admin.reset_filters }}
                     </Button>
                 </div>
-            </div>
-
-            <div class="grid gap-2 rounded-lg border border-dashed border-border p-3">
-                <p class="text-sm text-muted-foreground">
-                    {{ t.admin.csv_description }}
-                </p>
-                <div class="flex flex-col gap-2 md:flex-row md:items-end">
-                    <div class="grid gap-2">
-                        <Label for="users-csv-delimiter">
-                            {{ t.admin.csv_delimiter }}
-                        </Label>
-                        <Input
-                            id="users-csv-delimiter"
-                            v-model="csvImportForm.delimiter"
-                            :placeholder="t.admin.csv_delimiter_placeholder"
-                            class="w-28"
-                        />
-                    </div>
-                    <Button
-                        v-if="can.manage_accounts"
-                        type="button"
-                        :disabled="csvImportForm.processing || csvImportForm.file === null"
-                        @click="submitUsersCsvImport"
-                    >
-                        <Upload class="size-4" />
-                        {{ t.admin.csv_import }}
-                    </Button>
-                </div>
-                <p class="text-xs text-muted-foreground">
-                    {{ t.admin.csv_delimiter_hint }}
-                </p>
-                <InputError :message="csvImportForm.errors.delimiter" />
-                <InputError :message="csvImportForm.errors.file" />
             </div>
 
             <div class="relative">
@@ -1099,6 +1060,36 @@ const formatStructureSummary = (
                 </div>
             </div>
         </section>
+
+        <CsvExchangeSheet
+            :open="csvPanelMode !== null"
+            :mode="csvPanelMode ?? 'export'"
+            :title="
+                csvPanelMode === 'import'
+                    ? t.admin.csv_import
+                    : t.admin.csv_export
+            "
+            :description="t.admin.csv_description"
+            :delimiter="csvImportForm.delimiter"
+            :delimiter-label="t.admin.csv_delimiter"
+            :delimiter-placeholder="t.admin.csv_delimiter_placeholder"
+            :delimiter-hint="t.admin.csv_delimiter_hint"
+            :file-label="t.admin.csv_file"
+            :export-label="t.admin.csv_export"
+            :import-label="t.admin.csv_import"
+            :template-label="t.admin.csv_download_template"
+            :selected-file="csvImportForm.file"
+            :processing="csvImportForm.processing"
+            :progress="csvImportForm.progress?.percentage ?? null"
+            :delimiter-error="csvImportForm.errors.delimiter"
+            :file-error="csvImportForm.errors.file"
+            @update:open="(isOpen) => !isOpen && closeCsvPanel()"
+            @update:delimiter="csvImportForm.delimiter = $event"
+            @file-selected="selectUsersCsvFile"
+            @download-template="downloadUsersCsvTemplateFile"
+            @import="submitUsersCsvImport"
+            @export="downloadUsersCsvFile"
+        />
 
         <Dialog
             :open="createUserDialogOpen"
@@ -1233,16 +1224,24 @@ const formatStructureSummary = (
                     <button
                         type="button"
                         class="min-w-0 flex-1 rounded-lg text-left transition hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
+                        :disabled="profileLoadingUserId === user.id"
                         @click="openProfile(user)"
                     >
-                        <div class="truncate font-medium">{{ user.name }}</div>
+                        <div class="flex items-center gap-2">
+                            <LoaderCircle
+                                v-if="profileLoadingUserId === user.id"
+                                class="size-4 shrink-0 animate-spin"
+                            />
+                            <div class="truncate font-medium">
+                                {{ user.name }}
+                            </div>
+                        </div>
                         <div
                             v-if="isUserTableColumnVisible('position')"
                             class="text-sm text-muted-foreground"
                         >
                             {{
-                                user.position ??
-                                t.company_structure.no_position
+                                user.position ?? t.company_structure.no_position
                             }}
                         </div>
                         <div class="text-sm break-all text-muted-foreground">
@@ -1366,10 +1365,7 @@ const formatStructureSummary = (
                     </div>
                 </dl>
 
-                <div
-                    v-if="showUserActions(user)"
-                    class="mt-4 grid gap-2"
-                >
+                <div v-if="showUserActions(user)" class="mt-4 grid gap-2">
                     <Button
                         v-if="can.impersonate_users"
                         class="w-full"
@@ -1451,19 +1447,19 @@ const formatStructureSummary = (
                         </th>
                         <th
                             v-if="isUserTableColumnVisible('email_verified')"
-                            class="w-[10%] px-4 py-3 text-center align-top font-medium leading-tight"
+                            class="w-[10%] px-4 py-3 text-center align-top leading-tight font-medium"
                         >
                             {{ t.admin.email_verified }}
                         </th>
                         <th
                             v-if="isUserTableColumnVisible('group')"
-                            class="w-[10%] px-4 py-3 align-top font-medium leading-tight"
+                            class="w-[10%] px-4 py-3 align-top leading-tight font-medium"
                         >
                             {{ t.admin.group }}
                         </th>
                         <th
                             v-if="showUserActionsColumn"
-                            class="w-[12%] px-4 py-3 text-right align-top font-medium leading-tight"
+                            class="w-[12%] px-4 py-3 text-right align-top leading-tight font-medium"
                         >
                             {{ t.admin.actions }}
                         </th>
@@ -1480,10 +1476,17 @@ const formatStructureSummary = (
                             <button
                                 type="button"
                                 class="w-full rounded-lg text-left transition hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
+                                :disabled="profileLoadingUserId === user.id"
                                 @click="openProfile(user)"
                             >
-                                <div class="truncate font-medium">
-                                    {{ user.name }}
+                                <div class="flex items-center gap-2">
+                                    <LoaderCircle
+                                        v-if="profileLoadingUserId === user.id"
+                                        class="size-4 shrink-0 animate-spin"
+                                    />
+                                    <div class="truncate font-medium">
+                                        {{ user.name }}
+                                    </div>
                                 </div>
                                 <div
                                     v-if="user.is_super_admin"
@@ -1498,8 +1501,7 @@ const formatStructureSummary = (
                             class="px-4 py-3 text-muted-foreground"
                         >
                             {{
-                                user.position ??
-                                t.company_structure.no_position
+                                user.position ?? t.company_structure.no_position
                             }}
                         </td>
                         <td
@@ -1595,10 +1597,7 @@ const formatStructureSummary = (
                                 }}
                             </span>
                         </td>
-                        <td
-                            v-if="showUserActionsColumn"
-                            class="px-4 py-3"
-                        >
+                        <td v-if="showUserActionsColumn" class="px-4 py-3">
                             <div
                                 v-if="showUserActions(user)"
                                 class="flex justify-end gap-2"

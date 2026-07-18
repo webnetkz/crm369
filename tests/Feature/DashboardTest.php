@@ -89,6 +89,10 @@ test('authenticated users can visit the dashboard', function () {
             ->has('dashboardStats.bars.items')
             ->has('dashboardStats.radar.items')
             ->has('dashboardStats.highlights', 4)
+            ->where('dashboardConfiguration.version', 1)
+            ->where('dashboardConfiguration.activeDashboardId', 'overview')
+            ->has('dashboardConfiguration.dashboards', 1)
+            ->has('dashboardConfiguration.dashboards.0.widgets', 6)
         );
 
     expect(collect($response->inertiaProps('dashboardStats.cards'))->pluck('title')->all())
@@ -99,6 +103,107 @@ test('authenticated users can visit the dashboard', function () {
     expect($donuts['Статусы задач']['total'])->toBe(2)
         ->and($donuts['Состояние проектов']['total'])->toBe(1)
         ->and($donuts['Портальные формы']['total'])->toBe(1);
+});
+
+test('users can save their own dashboard configuration', function () {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $configuration = [
+        'version' => 1,
+        'activeDashboardId' => 'sales_focus',
+        'dashboards' => [
+            [
+                'id' => 'sales_focus',
+                'name' => 'Продажи и клиенты',
+                'period' => 30,
+                'density' => 'compact',
+                'widgets' => [
+                    ['id' => 'metrics', 'visible' => true, 'size' => 'full', 'chartType' => 'cards'],
+                    ['id' => 'activity', 'visible' => true, 'size' => 'full', 'chartType' => 'line'],
+                    ['id' => 'donuts', 'visible' => true, 'size' => 'wide', 'chartType' => 'progress'],
+                    ['id' => 'bars', 'visible' => false, 'size' => 'wide', 'chartType' => 'bars'],
+                    ['id' => 'radar', 'visible' => true, 'size' => 'standard', 'chartType' => 'progress'],
+                    ['id' => 'highlights', 'visible' => true, 'size' => 'full', 'chartType' => 'cards'],
+                ],
+            ],
+        ],
+    ];
+
+    $this->actingAs($user)
+        ->patch(route('dashboard.configuration.update'), [
+            'configuration' => $configuration,
+        ])
+        ->assertRedirect(route('dashboard'))
+        ->assertSessionHasNoErrors();
+
+    expect($user->refresh()->dashboard_configuration)
+        ->toMatchArray($configuration)
+        ->and($otherUser->refresh()->dashboard_configuration)->toBeNull();
+
+    $this->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('dashboardConfiguration.activeDashboardId', 'sales_focus')
+            ->where('dashboardConfiguration.dashboards.0.period', 30)
+            ->has('dashboardStats.activity.labels', 30)
+        );
+});
+
+test('dashboard configuration only accepts supported and visible widgets', function () {
+    $user = User::factory()->create();
+    $configuration = [
+        'version' => 1,
+        'activeDashboardId' => 'overview',
+        'dashboards' => [
+            [
+                'id' => 'overview',
+                'name' => 'Обзор',
+                'period' => 7,
+                'density' => 'comfortable',
+                'widgets' => [
+                    ['id' => 'activity', 'visible' => false, 'size' => 'full', 'chartType' => 'radar'],
+                    ['id' => 'metrics', 'visible' => false, 'size' => 'full', 'chartType' => 'cards'],
+                ],
+            ],
+        ],
+    ];
+
+    $this->actingAs($user)
+        ->from(route('dashboard'))
+        ->patch(route('dashboard.configuration.update'), [
+            'configuration' => $configuration,
+        ])
+        ->assertRedirect(route('dashboard'))
+        ->assertSessionHasErrors([
+            'configuration.dashboards.0.widgets',
+            'configuration.dashboards.0.widgets.0.chartType',
+        ]);
+
+    expect($user->refresh()->dashboard_configuration)->toBeNull();
+});
+
+test('dashboard configuration requires an existing active dashboard', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->patch(route('dashboard.configuration.update'), [
+            'configuration' => [
+                'version' => 1,
+                'activeDashboardId' => 'missing',
+                'dashboards' => [
+                    [
+                        'id' => 'overview',
+                        'name' => 'Обзор',
+                        'period' => 7,
+                        'density' => 'comfortable',
+                        'widgets' => [
+                            ['id' => 'metrics', 'visible' => true, 'size' => 'full', 'chartType' => 'cards'],
+                        ],
+                    ],
+                ],
+            ],
+        ])
+        ->assertSessionHasErrors('configuration.activeDashboardId');
 });
 
 test('dashboard stays available before the system key migration is applied', function () {

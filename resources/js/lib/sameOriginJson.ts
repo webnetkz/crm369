@@ -44,24 +44,82 @@ const buildHeaders = (
     return mergedHeaders;
 };
 
+const defaultTimeoutMs = 30_000;
+
+const isJsonResponse = (response: Response): boolean => {
+    return (
+        response.headers.get('content-type')?.includes('application/json') ??
+        false
+    );
+};
+
+const responseErrorMessage = async (response: Response): Promise<string> => {
+    if (!isJsonResponse(response)) {
+        return `Request failed with status ${response.status}`;
+    }
+
+    const payload = (await response.json().catch(() => null)) as unknown;
+    const message =
+        typeof payload === 'object' &&
+        payload !== null &&
+        'message' in payload &&
+        typeof payload.message === 'string'
+            ? payload.message
+            : null;
+
+    return message
+        ? `Request failed with status ${response.status}: ${message}`
+        : `Request failed with status ${response.status}`;
+};
+
 export async function fetchSameOriginJson<T>(
     url: string,
     options?: RequestInit,
 ): Promise<T> {
     const isFormData =
         typeof FormData !== 'undefined' && options?.body instanceof FormData;
+    const requestController = new AbortController();
+    const externalSignal = options?.signal;
+    const forwardExternalAbort = (): void => {
+        requestController.abort(externalSignal?.reason);
+    };
+    const timeoutId = setTimeout(() => {
+        requestController.abort(
+            new DOMException('Request timed out.', 'TimeoutError'),
+        );
+    }, defaultTimeoutMs);
 
-    const response = await fetch(url, {
-        credentials: 'same-origin',
-        ...options,
-        headers: buildHeaders(options?.headers, {
-            omitJsonContentType: isFormData,
-        }),
-    });
-
-    if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
+    if (externalSignal?.aborted) {
+        forwardExternalAbort();
+    } else {
+        externalSignal?.addEventListener('abort', forwardExternalAbort, {
+            once: true,
+        });
     }
 
-    return (await response.json()) as T;
+    try {
+        const response = await fetch(url, {
+            credentials: 'same-origin',
+            ...options,
+            signal: requestController.signal,
+            headers: buildHeaders(options?.headers, {
+                omitJsonContentType: isFormData,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(await responseErrorMessage(response));
+        }
+
+        if (!isJsonResponse(response)) {
+            throw new Error(
+                `Expected a JSON response but received ${response.headers.get('content-type') ?? 'an unknown content type'}.`,
+            );
+        }
+
+        return (await response.json()) as T;
+    } finally {
+        clearTimeout(timeoutId);
+        externalSignal?.removeEventListener('abort', forwardExternalAbort);
+    }
 }

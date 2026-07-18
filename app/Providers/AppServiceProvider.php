@@ -52,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('access-projects', fn (User $user): bool => $user->canAccessProjects());
         Gate::define('access-chats', fn (User $user): bool => $user->canAccessChats());
         Gate::define('access-conferences', fn (User $user): bool => $user->canAccessConferences());
+        Gate::define('access-calendar', fn (User $user): bool => $user->canAccessCalendar());
         Gate::define('access-knowledge-bases', fn (User $user): bool => $user->canAccessKnowledgeBases());
         Gate::define('access-forms', fn (User $user): bool => $user->canAccessForms());
         Gate::define('access-edo', fn (User $user): bool => $user->canAccessEdo());
@@ -63,6 +64,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('access-directories', fn (User $user): bool => $user->canAccessDirectories());
         Gate::define('manage-directories', fn (User $user): bool => $user->canManageDirectories());
         Gate::define('manage-messenger-integrations', fn (User $user): bool => $user->canManageMessengerIntegrations());
+        Gate::define('manage-one-c', fn (User $user): bool => $user->isSuperAdmin());
         Gate::define('manage-business-processes', fn (User $user): bool => $user->canManageBusinessProcesses());
         Gate::define('manage-webhooks', fn (User $user): bool => $user->canManageWebhooks());
         Gate::define('access-contacts', fn (User $user): bool => $user->canAccessContacts());

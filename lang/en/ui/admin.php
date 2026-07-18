@@ -71,6 +71,8 @@ return [
     'permission_access_tsd_description' => 'Allow opening the TSD module and saving QR scans.',
     'permission_access_equipment' => 'Access equipment',
     'permission_access_equipment_description' => 'Allow opening the equipment module and working with equipment records.',
+    'permission_access_calendar' => 'Access calendar',
+    'permission_access_calendar_description' => 'Allow opening the calendar of visible tasks and assigned conferences.',
     'permission_access_directories' => 'Access directories',
     'permission_access_directories_description' => 'Allow opening the directories module and viewing available directory schemas and records.',
     'permission_manage_directories' => 'Manage directories',

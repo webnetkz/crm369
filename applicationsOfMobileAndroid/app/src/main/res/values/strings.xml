@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CRM369</string>
+    <string name="domain_brand">CRM369</string>
+    <string name="domain_title">Подключение к сайту</string>
+    <string name="domain_description">При первом запуске укажите домен сайта. После этого приложение откроет мобильную версию и предложит стандартную авторизацию пользователя.</string>
+    <string name="domain_hint">Введите домен</string>
+    <string name="domain_helper">Например: crm.company.com или https://crm.company.com</string>
+    <string name="domain_continue">Продолжить</string>
+    <string name="domain_error_invalid">Введите корректный домен или URL сайта.</string>
+    <string name="action_refresh">Обновить</string>
+    <string name="action_scan_qr">Сканировать QR</string>
+    <string name="action_change_domain">Сменить домен</string>
+    <string name="download_started">Загрузка файла началась</string>
+    <string name="notification_channel_name">Обновления CRM369</string>
+    <string name="notification_channel_description">Чаты и системные уведомления CRM369</string>
+</resources>

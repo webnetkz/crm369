@@ -241,4 +241,10 @@ return [
     'permission_tsd_read_description' => 'Просмотр журнала QR-сканов терминалов сбора данных.',
     'permission_tsd_write' => 'Запись ТСД-сканов',
     'permission_tsd_write_description' => 'Отправка новых QR-сканов в журнал ТСД.',
+    'permission_calendar_read' => 'Чтение календаря',
+    'permission_calendar_read_description' => 'Просмотр доступных пользователю сроков задач и назначенных конференций.',
+    'section_calendar' => 'Календарь',
+    'section_calendar_description' => 'Агрегированный список событий календаря текущего или целевого пользователя.',
+    'section_calendar_note' => 'Поддерживаются фильтры from, to и types[] со значениями task и conference. Максимальный период — 370 дней.',
+    'endpoint_calendar_events_index' => 'Получить события календаря за указанный период.',
 ];

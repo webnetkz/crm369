@@ -75,12 +75,28 @@ class Conference extends Model
             ->orderByDesc('created_at');
     }
 
+    /** @return HasMany<ConferenceParticipant, $this> */
+    public function participants(): HasMany
+    {
+        return $this->hasMany(ConferenceParticipant::class);
+    }
+
+    /** @return HasMany<ConferenceMessage, $this> */
+    public function messages(): HasMany
+    {
+        return $this->hasMany(ConferenceMessage::class);
+    }
+
     /**
      * @param  Builder<Conference>  $query
      * @return Builder<Conference>
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
         return $query->where(function (Builder $conferenceQuery) use ($user): void {
             $conferenceQuery
                 ->where('created_by_user_id', $user->id)

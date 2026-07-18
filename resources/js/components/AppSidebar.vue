@@ -5,6 +5,7 @@ import {
     BookText,
     BookOpenText,
     Boxes,
+    CalendarDays,
     ClipboardList,
     FileText,
     Factory,
@@ -44,6 +45,7 @@ import { useSettingsNavigation } from '@/composables/useSettingsNavigation';
 import { resolveMenuIcon } from '@/lib/menuIcons';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
 import { dashboard } from '@/routes';
+import { index as calendarIndex } from '@/routes/calendar';
 import { index as chatsIndex } from '@/routes/chats';
 import { index as companyStructureIndex } from '@/routes/company-structure';
 import { index as conferencesIndex } from '@/routes/conferences';
@@ -177,6 +179,16 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                               href: projectsIndex(),
                           },
                       ],
+                  },
+              ]
+            : []),
+        ...(page.props.auth.canAccessCalendar && isMenuItemVisible('calendar')
+            ? [
+                  {
+                      key: 'calendar',
+                      title: t.value.calendar.title,
+                      href: calendarIndex(),
+                      icon: CalendarDays,
                   },
               ]
             : []),
@@ -355,8 +367,7 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                   },
               ]
             : []),
-        ...(page.props.auth.canAccessEquipment &&
-        isMenuItemVisible('equipment')
+        ...(page.props.auth.canAccessEquipment && isMenuItemVisible('equipment')
             ? [
                   {
                       key: 'equipment',

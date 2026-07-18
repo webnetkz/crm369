@@ -1,12 +1,27 @@
 <script setup lang="ts">
 import { Head, router, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { Download, Eye, Hash, History, Package, PencilLine, Plus, Printer, Search, Upload, UserCog, Wrench, X } from '@lucide/vue';
+import {
+    Download,
+    Eye,
+    Hash,
+    History,
+    Package,
+    PencilLine,
+    Plus,
+    Printer,
+    Search,
+    Upload,
+    UserCog,
+    Wrench,
+    X,
+} from '@lucide/vue';
 import { computed, ref, watch, watchEffect } from 'vue';
 import {
     downloadCsvTemplate,
     exportCsv,
     importCsv,
 } from '@/actions/App/Http/Controllers/EquipmentController';
+import CsvExchangeSheet from '@/components/CsvExchangeSheet.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import PaginationControls from '@/components/PaginationControls.vue';
@@ -86,6 +101,7 @@ type EquipmentHistoryEntry = {
 };
 
 type ActiveDialog = 'details' | 'edit' | 'history' | null;
+type CsvPanelMode = 'import' | 'export';
 const allStatusesValue = 'all';
 
 const props = defineProps<{
@@ -126,7 +142,8 @@ const csvImportForm = useForm({
 });
 const filtersForm = useForm('EquipmentFilters', {
     search: props.filters.search,
-    status: props.filters.status !== '' ? props.filters.status : allStatusesValue,
+    status:
+        props.filters.status !== '' ? props.filters.status : allStatusesValue,
 });
 
 const dialogOpen = ref(false);
@@ -135,7 +152,7 @@ const detailsDialogOpen = ref(false);
 const selectedEquipmentItem = ref<EquipmentItem | null>(null);
 const historyDialogOpen = ref(false);
 const historyEquipmentItem = ref<EquipmentItem | null>(null);
-const csvImportInput = ref<HTMLInputElement | null>(null);
+const csvPanelMode = ref<CsvPanelMode | null>(null);
 
 const isEditing = computed(() => editingEquipmentId.value !== null);
 const equipmentRows = computed(() => props.equipmentItems.data);
@@ -149,7 +166,10 @@ const statusFilterOptions = computed(() => {
     ];
 });
 const hasActiveFilters = computed(() => {
-    return filtersForm.search.trim() !== '' || filtersForm.status !== allStatusesValue;
+    return (
+        filtersForm.search.trim() !== '' ||
+        filtersForm.status !== allStatusesValue
+    );
 });
 
 function populateEditForm(equipmentItem: EquipmentItem): void {
@@ -180,7 +200,7 @@ watchEffect(() => {
 watch(
     [() => props.activeEquipmentItem, () => props.activeDialog],
     ([equipmentItem, activeDialog]) => {
-        if (! equipmentItem || ! activeDialog) {
+        if (!equipmentItem || !activeDialog) {
             return;
         }
 
@@ -243,7 +263,7 @@ const equipmentDialogUrl = (equipmentItemId: number, dialog: Exclude<ActiveDialo
 };
 
 const clearActiveEquipmentDialog = (): void => {
-    if (! props.activeDialog && ! props.activeEquipmentItem) {
+    if (!props.activeDialog && !props.activeEquipmentItem) {
         return;
     }
 
@@ -304,8 +324,14 @@ const submitFilters = (): void => {
     router.get(
         equipmentIndex(),
         {
-            search: filtersForm.search.trim() !== '' ? filtersForm.search.trim() : null,
-            status: filtersForm.status !== allStatusesValue ? filtersForm.status : null,
+            search:
+                filtersForm.search.trim() !== ''
+                    ? filtersForm.search.trim()
+                    : null,
+            status:
+                filtersForm.status !== allStatusesValue
+                    ? filtersForm.status
+                    : null,
         },
         {
             preserveScroll: true,
@@ -340,7 +366,7 @@ const statusMeta = (status: string) => {
 };
 
 const userLabel = (user: EquipmentUser | null, emptyLabel: string): string => {
-    if (! user) {
+    if (!user) {
         return emptyLabel;
     }
 
@@ -348,7 +374,7 @@ const userLabel = (user: EquipmentUser | null, emptyLabel: string): string => {
 };
 
 const formattedDate = (value: string | null): string => {
-    if (! value) {
+    if (!value) {
         return '—';
     }
 
@@ -387,14 +413,14 @@ const printableStatusLabel = (equipmentItem: EquipmentItem): string | null => {
 };
 
 const printEquipmentQr = (): void => {
-    if (! selectedEquipmentItem.value) {
+    if (!selectedEquipmentItem.value) {
         return;
     }
 
     const equipmentItem = selectedEquipmentItem.value;
     const qrCode = equipmentItem.qr_code_svg_data_uri;
 
-    if (! qrCode) {
+    if (!qrCode) {
         return;
     }
 
@@ -490,7 +516,8 @@ const printEquipmentQr = (): void => {
     const printFrame = document.createElement('iframe');
 
     printFrame.setAttribute('aria-hidden', 'true');
-    printFrame.className = 'pointer-events-none fixed bottom-0 right-0 h-0 w-0 border-0 opacity-0';
+    printFrame.className =
+        'pointer-events-none fixed bottom-0 right-0 h-0 w-0 border-0 opacity-0';
 
     const cleanup = (): void => {
         printFrame.remove();
@@ -499,7 +526,7 @@ const printEquipmentQr = (): void => {
     printFrame.onload = () => {
         const frameWindow = printFrame.contentWindow;
 
-        if (! frameWindow) {
+        if (!frameWindow) {
             cleanup();
 
             return;
@@ -519,6 +546,8 @@ const printEquipmentQr = (): void => {
 };
 
 const downloadEquipmentCsv = (): void => {
+    closeEquipmentCsvPanel();
+
     window.location.assign(
         exportCsv.url({
             query: {
@@ -538,19 +567,20 @@ const downloadEquipmentCsvTemplate = (): void => {
     );
 };
 
-const openEquipmentCsvImport = (): void => {
+const openEquipmentCsvPanel = (mode: CsvPanelMode): void => {
     csvImportForm.clearErrors();
     csvImportForm.file = null;
-
-    if (csvImportInput.value) {
-        csvImportInput.value.value = '';
-        csvImportInput.value.click();
-    }
+    csvPanelMode.value = mode;
 };
 
-const handleEquipmentCsvFileChange = (event: Event): void => {
-    const input = event.target as HTMLInputElement;
-    csvImportForm.file = input.files?.[0] ?? null;
+const closeEquipmentCsvPanel = (): void => {
+    csvPanelMode.value = null;
+    csvImportForm.clearErrors();
+};
+
+const selectEquipmentCsvFile = (file: File | null): void => {
+    csvImportForm.file = file;
+    csvImportForm.clearErrors('file');
 };
 
 const submitEquipmentCsvImport = (): void => {
@@ -562,18 +592,16 @@ const submitEquipmentCsvImport = (): void => {
         preserveScroll: true,
         onSuccess: () => {
             csvImportForm.reset();
-        },
-        onFinish: () => {
-            if (csvImportInput.value) {
-                csvImportInput.value.value = '';
-            }
+            closeEquipmentCsvPanel();
         },
     });
 };
 
 const maintenanceStatusDescription = computed(() => {
     return props.statusOptions
-        .filter((statusOption) => ['maintenance', 'repair'].includes(statusOption.value))
+        .filter((statusOption) =>
+            ['maintenance', 'repair'].includes(statusOption.value),
+        )
         .map((statusOption) => statusOption.label)
         .join(' / ');
 });
@@ -587,21 +615,45 @@ const selectedStatusLabel = computed(() => {
 <template>
     <Head :title="t.equipment.title" />
 
-    <input
-        ref="csvImportInput"
-        type="file"
-        accept=".csv,text/csv"
-        class="hidden"
-        @change="handleEquipmentCsvFileChange"
-    />
-
     <h1 class="sr-only">{{ t.equipment.title }}</h1>
 
     <div class="space-y-8">
+        <CsvExchangeSheet
+            :open="csvPanelMode !== null"
+            :mode="csvPanelMode ?? 'export'"
+            :title="
+                csvPanelMode === 'import'
+                    ? t.equipment.csv_import
+                    : t.equipment.csv_export
+            "
+            :description="t.equipment.csv_description"
+            :delimiter="csvImportForm.delimiter"
+            :delimiter-label="t.equipment.csv_delimiter"
+            :delimiter-placeholder="t.equipment.csv_delimiter_placeholder"
+            :delimiter-hint="t.equipment.csv_delimiter_hint"
+            :file-label="t.equipment.csv_file"
+            :export-label="t.equipment.csv_export"
+            :import-label="t.equipment.csv_import"
+            :template-label="t.equipment.csv_download_template"
+            :selected-file="csvImportForm.file"
+            :processing="csvImportForm.processing"
+            :progress="csvImportForm.progress?.percentage ?? null"
+            :delimiter-error="csvImportForm.errors.delimiter"
+            :file-error="csvImportForm.errors.file"
+            @update:open="(isOpen) => !isOpen && closeEquipmentCsvPanel()"
+            @update:delimiter="csvImportForm.delimiter = $event"
+            @file-selected="selectEquipmentCsvFile"
+            @download-template="downloadEquipmentCsvTemplate"
+            @import="submitEquipmentCsvImport"
+            @export="downloadEquipmentCsv"
+        />
+
         <div
             class="flex flex-col gap-4 rounded-3xl border border-border bg-card p-6"
         >
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div
+                class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+            >
                 <Heading
                     variant="small"
                     :title="t.equipment.title"
@@ -609,61 +661,39 @@ const selectedStatusLabel = computed(() => {
                 />
 
                 <div class="flex flex-wrap gap-2">
-                    <Button type="button" variant="outline" @click="downloadEquipmentCsv">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="openEquipmentCsvPanel('export')"
+                    >
                         <Download class="size-4" />
                         {{ t.equipment.csv_export }}
                     </Button>
-                    <Button type="button" variant="outline" @click="downloadEquipmentCsvTemplate">
-                        <Download class="size-4" />
-                        {{ t.equipment.csv_download_template }}
-                    </Button>
-                    <Button type="button" variant="outline" @click="openEquipmentCsvImport">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="openEquipmentCsvPanel('import')"
+                    >
                         <Upload class="size-4" />
                         {{ t.equipment.csv_import }}
                     </Button>
-                    <Button type="button" class="gap-2 self-start" @click="openCreateDialog">
+                    <Button
+                        type="button"
+                        class="gap-2 self-start"
+                        @click="openCreateDialog"
+                    >
                         <Plus class="size-4" />
                         <span>{{ t.equipment.create_item }}</span>
                     </Button>
                 </div>
             </div>
-
-            <div class="grid gap-2 rounded-2xl border border-dashed border-border p-4">
-                <p class="text-sm text-muted-foreground">
-                    {{ t.equipment.csv_description }}
-                </p>
-                <div class="flex flex-col gap-2 md:flex-row md:items-end">
-                    <div class="grid gap-2">
-                        <Label for="equipment-csv-delimiter">
-                            {{ t.equipment.csv_delimiter }}
-                        </Label>
-                        <Input
-                            id="equipment-csv-delimiter"
-                            v-model="csvImportForm.delimiter"
-                            :placeholder="t.equipment.csv_delimiter_placeholder"
-                            class="w-28"
-                        />
-                    </div>
-                    <Button
-                        type="button"
-                        :disabled="csvImportForm.processing || csvImportForm.file === null"
-                        @click="submitEquipmentCsvImport"
-                    >
-                        <Upload class="size-4" />
-                        {{ t.equipment.csv_import }}
-                    </Button>
-                </div>
-                <p class="text-xs text-muted-foreground">
-                    {{ t.equipment.csv_delimiter_hint }}
-                </p>
-                <InputError :message="csvImportForm.errors.delimiter" />
-                <InputError :message="csvImportForm.errors.file" />
-            </div>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div class="rounded-2xl border border-border bg-card p-5">
-                <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <div
+                    class="flex items-center gap-2 text-sm font-medium text-muted-foreground"
+                >
                     <Package class="size-4" />
                     <span>{{ t.equipment.summary.total }}</span>
                 </div>
@@ -673,7 +703,9 @@ const selectedStatusLabel = computed(() => {
             </div>
 
             <div class="rounded-2xl border border-border bg-card p-5">
-                <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <div
+                    class="flex items-center gap-2 text-sm font-medium text-muted-foreground"
+                >
                     <Package class="size-4" />
                     <span>{{ t.equipment.summary.on_balance }}</span>
                 </div>
@@ -683,7 +715,9 @@ const selectedStatusLabel = computed(() => {
             </div>
 
             <div class="rounded-2xl border border-border bg-card p-5">
-                <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <div
+                    class="flex items-center gap-2 text-sm font-medium text-muted-foreground"
+                >
                     <UserCog class="size-4" />
                     <span>{{ t.equipment.summary.issued }}</span>
                 </div>
@@ -693,7 +727,9 @@ const selectedStatusLabel = computed(() => {
             </div>
 
             <div class="rounded-2xl border border-border bg-card p-5">
-                <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <div
+                    class="flex items-center gap-2 text-sm font-medium text-muted-foreground"
+                >
                     <Wrench class="size-4" />
                     <span>{{ t.equipment.summary.maintenance }}</span>
                 </div>
@@ -706,7 +742,9 @@ const selectedStatusLabel = computed(() => {
             </div>
 
             <div class="rounded-2xl border border-border bg-card p-5">
-                <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <div
+                    class="flex items-center gap-2 text-sm font-medium text-muted-foreground"
+                >
                     <Hash class="size-4" />
                     <span>{{ t.equipment.summary.written_off }}</span>
                 </div>
@@ -718,11 +756,18 @@ const selectedStatusLabel = computed(() => {
 
         <div class="rounded-3xl border border-border bg-card">
             <div class="border-b border-border p-6">
-                <form class="flex flex-col gap-3 lg:flex-row lg:items-end" @submit.prevent="submitFilters">
+                <form
+                    class="flex flex-col gap-3 lg:flex-row lg:items-end"
+                    @submit.prevent="submitFilters"
+                >
                     <div class="grid flex-1 gap-2">
-                        <Label for="equipment-search">{{ t.equipment.search }}</Label>
+                        <Label for="equipment-search">{{
+                            t.equipment.search
+                        }}</Label>
                         <div class="relative">
-                            <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Search
+                                class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                            />
                             <Input
                                 id="equipment-search"
                                 v-model="filtersForm.search"
@@ -734,10 +779,17 @@ const selectedStatusLabel = computed(() => {
                     </div>
 
                     <div class="grid gap-2 lg:w-72">
-                        <Label for="equipment-filter-status">{{ t.equipment.status }}</Label>
+                        <Label for="equipment-filter-status">{{
+                            t.equipment.status
+                        }}</Label>
                         <Select v-model="filtersForm.status">
-                            <SelectTrigger id="equipment-filter-status" class="w-full">
-                                <SelectValue :placeholder="t.equipment.status" />
+                            <SelectTrigger
+                                id="equipment-filter-status"
+                                class="w-full"
+                            >
+                                <SelectValue
+                                    :placeholder="t.equipment.status"
+                                />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem
@@ -775,10 +827,20 @@ const selectedStatusLabel = computed(() => {
                 class="space-y-2 px-6 py-12 text-center"
             >
                 <h2 class="text-lg font-semibold">
-                    {{ hasActiveFilters ? t.equipment.search_empty_title : t.equipment.empty_title }}
+                    {{
+                        hasActiveFilters
+                            ? t.equipment.search_empty_title
+                            : t.equipment.empty_title
+                    }}
                 </h2>
-                <p class="mx-auto max-w-2xl text-sm leading-6 text-muted-foreground">
-                    {{ hasActiveFilters ? t.equipment.search_empty_description : t.equipment.empty_description }}
+                <p
+                    class="mx-auto max-w-2xl text-sm leading-6 text-muted-foreground"
+                >
+                    {{
+                        hasActiveFilters
+                            ? t.equipment.search_empty_description
+                            : t.equipment.empty_description
+                    }}
                 </p>
             </div>
 
@@ -786,22 +848,34 @@ const selectedStatusLabel = computed(() => {
                 <table class="min-w-full divide-y divide-border text-sm">
                     <thead class="bg-muted/40">
                         <tr class="text-left">
-                            <th class="min-w-[24rem] px-6 py-4 font-medium text-muted-foreground">
+                            <th
+                                class="min-w-[24rem] px-6 py-4 font-medium text-muted-foreground"
+                            >
                                 {{ t.equipment.name }}
                             </th>
-                            <th class="px-6 py-4 font-medium text-muted-foreground">
+                            <th
+                                class="px-6 py-4 font-medium text-muted-foreground"
+                            >
                                 {{ t.equipment.qr_code }}
                             </th>
-                            <th class="px-6 py-4 font-medium text-muted-foreground">
+                            <th
+                                class="px-6 py-4 font-medium text-muted-foreground"
+                            >
                                 {{ t.equipment.status }}
                             </th>
-                            <th class="px-6 py-4 font-medium text-muted-foreground">
+                            <th
+                                class="px-6 py-4 font-medium text-muted-foreground"
+                            >
                                 {{ t.equipment.responsible_user }}
                             </th>
-                            <th class="px-6 py-4 font-medium text-muted-foreground">
+                            <th
+                                class="px-6 py-4 font-medium text-muted-foreground"
+                            >
                                 {{ t.equipment.issued_to_user }}
                             </th>
-                            <th class="px-6 py-4 font-medium text-muted-foreground">
+                            <th
+                                class="px-6 py-4 font-medium text-muted-foreground"
+                            >
                                 {{ t.equipment.last_updated }}
                             </th>
                         </tr>
@@ -819,7 +893,9 @@ const selectedStatusLabel = computed(() => {
                                         {{ equipmentItem.name }}
                                     </div>
 
-                                    <div class="relative z-10 mt-3 flex flex-wrap gap-2">
+                                    <div
+                                        class="relative z-10 mt-3 flex flex-wrap gap-2"
+                                    >
                                         <Button
                                             as-child
                                             variant="ghost"
@@ -828,7 +904,9 @@ const selectedStatusLabel = computed(() => {
                                         >
                                             <a :href="equipmentDialogUrl(equipmentItem.id, 'details')">
                                                 <Eye class="size-4" />
-                                                <span>{{ t.equipment.view }}</span>
+                                                <span>{{
+                                                    t.equipment.view
+                                                }}</span>
                                             </a>
                                         </Button>
                                         <Button
@@ -839,7 +917,9 @@ const selectedStatusLabel = computed(() => {
                                         >
                                             <a :href="equipmentDialogUrl(equipmentItem.id, 'edit')">
                                                 <PencilLine class="size-4" />
-                                                <span>{{ t.equipment.edit }}</span>
+                                                <span>{{
+                                                    t.equipment.edit
+                                                }}</span>
                                             </a>
                                         </Button>
                                         <Button
@@ -858,7 +938,9 @@ const selectedStatusLabel = computed(() => {
                             </td>
 
                             <td class="px-6 py-4">
-                                <code class="rounded-md bg-muted px-2 py-1 text-xs">
+                                <code
+                                    class="rounded-md bg-muted px-2 py-1 text-xs"
+                                >
                                     {{ equipmentItem.qr_code }}
                                 </code>
                             </td>
@@ -910,7 +992,10 @@ const selectedStatusLabel = computed(() => {
 
     <Dialog
         :open="detailsDialogOpen"
-        @update:open="(value) => (value ? (detailsDialogOpen = true) : closeDetailsDialog())"
+        @update:open="
+            (value) =>
+                value ? (detailsDialogOpen = true) : closeDetailsDialog()
+        "
     >
         <DialogContent class="sm:max-w-lg">
             <DialogHeader>
@@ -921,9 +1006,7 @@ const selectedStatusLabel = computed(() => {
             </DialogHeader>
 
             <div v-if="selectedEquipmentItem" class="space-y-6">
-                <div
-                    class="rounded-3xl border border-border bg-muted/30 p-6"
-                >
+                <div class="rounded-3xl border border-border bg-muted/30 p-6">
                     <div class="text-center">
                         <h2 class="text-xl font-semibold tracking-tight">
                             {{ selectedEquipmentItem.name }}
@@ -938,7 +1021,9 @@ const selectedStatusLabel = computed(() => {
                             class="overflow-hidden rounded-[1.75rem] border border-border bg-white p-4 shadow-sm"
                         >
                             <img
-                                :src="selectedEquipmentItem.qr_code_svg_data_uri"
+                                :src="
+                                    selectedEquipmentItem.qr_code_svg_data_uri
+                                "
                                 :alt="`${t.equipment.qr_code}: ${selectedEquipmentItem.qr_code}`"
                                 class="size-52"
                             />
@@ -946,7 +1031,9 @@ const selectedStatusLabel = computed(() => {
                     </div>
 
                     <div class="mt-4 text-center">
-                        <code class="rounded-md bg-background px-3 py-1.5 text-sm font-medium">
+                        <code
+                            class="rounded-md bg-background px-3 py-1.5 text-sm font-medium"
+                        >
                             {{ selectedEquipmentItem.qr_code }}
                         </code>
                     </div>
@@ -988,7 +1075,9 @@ const selectedStatusLabel = computed(() => {
                         <div class="mt-2">
                             <Badge
                                 variant="secondary"
-                                :class="statusMeta(selectedEquipmentItem.status)"
+                                :class="
+                                    statusMeta(selectedEquipmentItem.status)
+                                "
                             >
                                 {{ selectedEquipmentItem.status_label }}
                             </Badge>
@@ -1000,7 +1089,9 @@ const selectedStatusLabel = computed(() => {
                             {{ t.equipment.last_updated }}
                         </div>
                         <div class="mt-1 font-medium">
-                            {{ formattedDate(selectedEquipmentItem.updated_at) }}
+                            {{
+                                formattedDate(selectedEquipmentItem.updated_at)
+                            }}
                         </div>
                     </div>
                 </div>
@@ -1015,7 +1106,11 @@ const selectedStatusLabel = computed(() => {
                         <Printer class="size-4" />
                         <span>{{ t.equipment.print_qr }}</span>
                     </Button>
-                    <Button type="button" variant="outline" @click="closeDetailsDialog">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="closeDetailsDialog"
+                    >
                         {{ t.equipment.cancel }}
                     </Button>
                 </DialogFooter>
@@ -1025,7 +1120,10 @@ const selectedStatusLabel = computed(() => {
 
     <Dialog
         :open="historyDialogOpen"
-        @update:open="(value) => (value ? (historyDialogOpen = true) : closeHistoryDialog())"
+        @update:open="
+            (value) =>
+                value ? (historyDialogOpen = true) : closeHistoryDialog()
+        "
     >
         <DialogContent class="sm:max-w-3xl">
             <DialogHeader>
@@ -1037,7 +1135,9 @@ const selectedStatusLabel = computed(() => {
 
             <div v-if="historyEquipmentItem" class="space-y-5">
                 <div class="rounded-3xl border border-border bg-muted/25 p-5">
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div
+                        class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"
+                    >
                         <div>
                             <h2 class="text-lg font-semibold tracking-tight">
                                 {{ historyEquipmentItem.name }}
@@ -1047,7 +1147,9 @@ const selectedStatusLabel = computed(() => {
                             </p>
                         </div>
 
-                        <code class="rounded-md bg-background px-3 py-1.5 text-sm font-medium">
+                        <code
+                            class="rounded-md bg-background px-3 py-1.5 text-sm font-medium"
+                        >
                             {{ historyEquipmentItem.qr_code }}
                         </code>
                     </div>
@@ -1085,10 +1187,10 @@ const selectedStatusLabel = computed(() => {
 
                                 <p class="text-sm text-muted-foreground">
                                     {{
-                                        historyActorLabel(entry.actor)
-                                            ?? (entry.webhook_name
-                                                ? `${t.tsd.webhook}: ${entry.webhook_name}`
-                                                : '—')
+                                        historyActorLabel(entry.actor) ??
+                                        (entry.webhook_name
+                                            ? `${t.tsd.webhook}: ${entry.webhook_name}`
+                                            : '—')
                                     }}
                                 </p>
                             </div>
@@ -1098,8 +1200,13 @@ const selectedStatusLabel = computed(() => {
                             </div>
                         </div>
 
-                        <div v-if="entry.kind === 'change'" class="mt-4 space-y-3">
-                            <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        <div
+                            v-if="entry.kind === 'change'"
+                            class="mt-4 space-y-3"
+                        >
+                            <div
+                                class="text-xs tracking-[0.18em] text-muted-foreground uppercase"
+                            >
                                 {{ t.equipment.history_changes }}
                             </div>
 
@@ -1112,13 +1219,19 @@ const selectedStatusLabel = computed(() => {
                                     :key="`${entry.id}-${change.field}`"
                                     class="rounded-2xl border border-border bg-card px-4 py-3"
                                 >
-                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                    <div
+                                        class="text-xs tracking-[0.18em] text-muted-foreground uppercase"
+                                    >
                                         {{ change.label }}
                                     </div>
-                                    <div class="mt-2 text-sm text-muted-foreground">
+                                    <div
+                                        class="mt-2 text-sm text-muted-foreground"
+                                    >
                                         {{ displayHistoryValue(change.from) }}
                                     </div>
-                                    <div class="mt-2 text-sm font-medium text-foreground">
+                                    <div
+                                        class="mt-2 text-sm font-medium text-foreground"
+                                    >
                                         {{ displayHistoryValue(change.to) }}
                                     </div>
                                 </div>
@@ -1133,13 +1246,19 @@ const selectedStatusLabel = computed(() => {
                         </div>
 
                         <div v-else class="mt-4 space-y-4">
-                            <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                            <div
+                                class="text-xs tracking-[0.18em] text-muted-foreground uppercase"
+                            >
                                 {{ t.equipment.history_scan_details }}
                             </div>
 
                             <div class="grid gap-3 md:grid-cols-2">
-                                <div class="rounded-2xl border border-border bg-card px-4 py-3">
-                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                <div
+                                    class="rounded-2xl border border-border bg-card px-4 py-3"
+                                >
+                                    <div
+                                        class="text-xs tracking-[0.18em] text-muted-foreground uppercase"
+                                    >
                                         {{ t.equipment.history_device }}
                                     </div>
                                     <p class="mt-2 text-sm">
@@ -1147,8 +1266,12 @@ const selectedStatusLabel = computed(() => {
                                     </p>
                                 </div>
 
-                                <div class="rounded-2xl border border-border bg-card px-4 py-3">
-                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                <div
+                                    class="rounded-2xl border border-border bg-card px-4 py-3"
+                                >
+                                    <div
+                                        class="text-xs tracking-[0.18em] text-muted-foreground uppercase"
+                                    >
                                         {{ t.tsd.location }}
                                     </div>
                                     <p class="mt-2 text-sm">
@@ -1156,8 +1279,12 @@ const selectedStatusLabel = computed(() => {
                                     </p>
                                 </div>
 
-                                <div class="rounded-2xl border border-border bg-card px-4 py-3">
-                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                <div
+                                    class="rounded-2xl border border-border bg-card px-4 py-3"
+                                >
+                                    <div
+                                        class="text-xs tracking-[0.18em] text-muted-foreground uppercase"
+                                    >
                                         {{ t.tsd.context }}
                                     </div>
                                     <p class="mt-2 text-sm">
@@ -1165,8 +1292,12 @@ const selectedStatusLabel = computed(() => {
                                     </p>
                                 </div>
 
-                                <div class="rounded-2xl border border-border bg-card px-4 py-3">
-                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                                <div
+                                    class="rounded-2xl border border-border bg-card px-4 py-3"
+                                >
+                                    <div
+                                        class="text-xs tracking-[0.18em] text-muted-foreground uppercase"
+                                    >
                                         {{ t.tsd.scanned_at }}
                                     </div>
                                     <p class="mt-2 text-sm">
@@ -1175,13 +1306,17 @@ const selectedStatusLabel = computed(() => {
                                 </div>
                             </div>
 
-                            <div class="rounded-2xl border border-border bg-card px-4 py-3">
-                                <div class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                            <div
+                                class="rounded-2xl border border-border bg-card px-4 py-3"
+                            >
+                                <div
+                                    class="text-xs tracking-[0.18em] text-muted-foreground uppercase"
+                                >
                                     {{ t.tsd.payload }}
                                 </div>
                                 <pre
-                                    class="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs leading-6 text-muted-foreground"
-                                >{{ entry.payload_preview || '—' }}</pre>
+                                    class="mt-2 overflow-x-auto text-xs leading-6 break-words whitespace-pre-wrap text-muted-foreground"
+                                    >{{ entry.payload_preview || '—' }}</pre>
                             </div>
                         </div>
                     </article>
@@ -1195,7 +1330,11 @@ const selectedStatusLabel = computed(() => {
                 </p>
 
                 <DialogFooter>
-                    <Button type="button" variant="outline" @click="closeHistoryDialog">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="closeHistoryDialog"
+                    >
                         {{ t.equipment.cancel }}
                     </Button>
                 </DialogFooter>
@@ -1203,11 +1342,18 @@ const selectedStatusLabel = computed(() => {
         </DialogContent>
     </Dialog>
 
-    <Dialog :open="dialogOpen" @update:open="(value) => (value ? (dialogOpen = true) : closeDialog())">
+    <Dialog
+        :open="dialogOpen"
+        @update:open="(value) => (value ? (dialogOpen = true) : closeDialog())"
+    >
         <DialogContent class="sm:max-w-2xl">
             <DialogHeader>
                 <DialogTitle>
-                    {{ isEditing ? t.equipment.edit_item : t.equipment.create_item }}
+                    {{
+                        isEditing
+                            ? t.equipment.edit_item
+                            : t.equipment.create_item
+                    }}
                 </DialogTitle>
                 <DialogDescription>
                     {{ t.equipment.description }}
@@ -1217,7 +1363,9 @@ const selectedStatusLabel = computed(() => {
             <form class="space-y-5" @submit.prevent="submitForm">
                 <div class="grid gap-5 md:grid-cols-2">
                     <div class="grid gap-2 md:col-span-2">
-                        <Label for="equipment-name">{{ t.equipment.name }}</Label>
+                        <Label for="equipment-name">{{
+                            t.equipment.name
+                        }}</Label>
                         <Input
                             id="equipment-name"
                             v-model="form.name"
@@ -1228,7 +1376,9 @@ const selectedStatusLabel = computed(() => {
                     </div>
 
                     <div class="grid gap-2">
-                        <Label for="equipment-qr-code">{{ t.equipment.qr_code }}</Label>
+                        <Label for="equipment-qr-code">{{
+                            t.equipment.qr_code
+                        }}</Label>
                         <Input
                             id="equipment-qr-code"
                             v-model="form.qr_code"
@@ -1239,7 +1389,9 @@ const selectedStatusLabel = computed(() => {
                     </div>
 
                     <div class="grid gap-2">
-                        <Label for="equipment-status">{{ t.equipment.status }}</Label>
+                        <Label for="equipment-status">{{
+                            t.equipment.status
+                        }}</Label>
                         <Select
                             :model-value="form.status"
                             @update:model-value="
@@ -1263,7 +1415,9 @@ const selectedStatusLabel = computed(() => {
                                 >
                                     <div class="space-y-1">
                                         <div>{{ statusOption.label }}</div>
-                                        <div class="text-xs text-muted-foreground">
+                                        <div
+                                            class="text-xs text-muted-foreground"
+                                        >
                                             {{ statusOption.description }}
                                         </div>
                                     </div>
@@ -1287,8 +1441,13 @@ const selectedStatusLabel = computed(() => {
                                             : emptyUserValue)
                             "
                         >
-                            <SelectTrigger id="equipment-responsible-user" class="w-full">
-                                <SelectValue :placeholder="t.equipment.not_assigned" />
+                            <SelectTrigger
+                                id="equipment-responsible-user"
+                                class="w-full"
+                            >
+                                <SelectValue
+                                    :placeholder="t.equipment.not_assigned"
+                                />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem :value="emptyUserValue">
@@ -1303,7 +1462,9 @@ const selectedStatusLabel = computed(() => {
                                 </SelectItem>
                             </SelectContent>
                         </Select>
-                        <InputError :message="form.errors.responsible_user_id" />
+                        <InputError
+                            :message="form.errors.responsible_user_id"
+                        />
                     </div>
 
                     <div class="grid gap-2">
@@ -1320,8 +1481,13 @@ const selectedStatusLabel = computed(() => {
                                             : emptyUserValue)
                             "
                         >
-                            <SelectTrigger id="equipment-issued-user" class="w-full">
-                                <SelectValue :placeholder="t.equipment.not_issued" />
+                            <SelectTrigger
+                                id="equipment-issued-user"
+                                class="w-full"
+                            >
+                                <SelectValue
+                                    :placeholder="t.equipment.not_issued"
+                                />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem :value="emptyUserValue">
@@ -1341,7 +1507,11 @@ const selectedStatusLabel = computed(() => {
                 </div>
 
                 <DialogFooter>
-                    <Button type="button" variant="outline" @click="closeDialog">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="closeDialog"
+                    >
                         {{ t.equipment.cancel }}
                     </Button>
                     <Button type="submit" :disabled="form.processing">

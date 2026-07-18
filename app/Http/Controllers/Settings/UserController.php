@@ -42,8 +42,6 @@ class UserController extends Controller
             ->with([
                 'group:id,name',
                 'manager:id,name,last_name,middle_name,email,position,avatar_path,avatar_scale,is_active',
-                'subordinates:id,name,last_name,middle_name,email,position,avatar_path,avatar_scale,is_active,manager_id',
-                ...$this->issuedEquipmentRelations(),
             ])
             ->select([
                 'id',
@@ -86,7 +84,7 @@ class UserController extends Controller
             ->paginate($filters['per_page'])
             ->withQueryString()
             ->through(fn (User $user): array => [
-                ...$managedUserProfileData->serialize($user),
+                ...$managedUserProfileData->serializeListItem($user),
                 'can_be_impersonated' => $user->canBeImpersonatedBy($viewer),
             ]);
 
@@ -99,7 +97,7 @@ class UserController extends Controller
             ],
             'filters' => $filters,
             'users' => PaginationData::from($users),
-            'groups' => $canManageUsers
+            'groups' => fn () => $canManageUsers
                 ? UserGroup::query()
                     ->select(['id', 'name'])
                     ->orderBy('name')
@@ -113,7 +111,6 @@ class UserController extends Controller
                 : [],
             'perPageOptions' => PerPageOptions::allowed(),
             'visibleUserTableColumns' => $this->visibleUserTableColumns($viewer),
-            'managerOptions' => $managedUserProfileData->managerOptions($viewer),
         ]);
     }
 
@@ -130,7 +127,7 @@ class UserController extends Controller
         return back();
     }
 
-    public function show(User $user, ManagedUserProfileData $managedUserProfileData): JsonResponse
+    public function show(Request $request, User $user, ManagedUserProfileData $managedUserProfileData): JsonResponse
     {
         return response()->json([
             'data' => $managedUserProfileData->serialize($user->load([
@@ -139,7 +136,8 @@ class UserController extends Controller
                 'subordinates:id,name,last_name,middle_name,email,position,avatar_path,avatar_scale,is_active,manager_id',
                 ...$this->issuedEquipmentRelations(),
             ])),
-            'canEdit' => $managedUserProfileData->canEdit(request()->user(), $user),
+            'canEdit' => $managedUserProfileData->canEdit($request->user(), $user),
+            'managerOptions' => $managedUserProfileData->managerOptions($request->user()),
         ]);
     }
 
@@ -149,9 +147,22 @@ class UserController extends Controller
 
         $users = User::query()
             ->with(['group:id,name', 'manager:id,email'])
+            ->select([
+                'id',
+                'name',
+                'last_name',
+                'middle_name',
+                'email',
+                'phone',
+                'position',
+                'manager_id',
+                'user_group_id',
+                'is_active',
+                'email_verified_at',
+            ])
             ->orderBy('name')
             ->orderBy('last_name')
-            ->get();
+            ->lazy(500);
 
         return $userCsvService->download(
             $users,

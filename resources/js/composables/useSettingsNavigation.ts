@@ -2,6 +2,7 @@ import { usePage } from '@inertiajs/vue3';
 import {
     BadgeCheck,
     Building2,
+    DatabaseZap,
     FileText,
     GitBranchPlus,
     LayoutGrid,
@@ -28,6 +29,7 @@ import { edit as editIntegrations } from '@/routes/settings/integrations';
 import { edit as editLogs } from '@/routes/settings/logs';
 import { edit as editMenu } from '@/routes/settings/menu';
 import { edit as editModules } from '@/routes/settings/modules';
+import { edit as editOneC } from '@/routes/settings/one-c';
 import { edit as editPortal } from '@/routes/settings/portal';
 import { index as rightsIndex } from '@/routes/settings/rights';
 import { index as usersIndex } from '@/routes/settings/users';
@@ -156,6 +158,18 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                           title: t.value.settings.integrations,
                           href: editIntegrations(),
                           icon: MessageSquareShare,
+                      },
+                  ]
+                : []),
+            ...(page.props.auth.isSuperAdmin &&
+            isVisible('settings.one-c') &&
+            isModuleEnabled('one-c')
+                ? [
+                      {
+                          key: 'settings.one-c',
+                          title: t.value.settings.one_c,
+                          href: editOneC(),
+                          icon: DatabaseZap,
                       },
                   ]
                 : []),

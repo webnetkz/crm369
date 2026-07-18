@@ -182,4 +182,8 @@ return [
     'permission_tsd_read_description' => 'Разрешить чтение журнала QR-сканов, созданных через веб-хук.',
     'permission_tsd_write' => 'Запись ТСД-сканов',
     'permission_tsd_write_description' => 'Разрешить создание новых QR-сканов из внешнего ТСД.',
+    'permission_calendar_read' => 'Чтение календаря',
+    'permission_calendar_read_description' => 'Разрешить чтение сроков задач и конференций, доступных создателю веб-хука.',
+    'documentation_endpoint_calendar_events_title' => 'События календаря',
+    'documentation_endpoint_calendar_events_description' => 'Возвращает задачи и назначенные конференции создателя веб-хука. Поддерживает from, to и types[].',
 ];

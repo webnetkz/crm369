@@ -17,6 +17,7 @@ class ChatMessageSender
 {
     public function __construct(
         private readonly ChatRuntimeCache $chatRuntimeCache,
+        private readonly GeneralChatManager $generalChatManager,
     ) {}
 
     public function sendPlainText(
@@ -29,6 +30,8 @@ class ChatMessageSender
             $body,
             $user,
         ): ChatMessage {
+            $this->generalChatManager->ensureActiveParticipants($chatConversation);
+
             $message = $chatConversation->messages()->create([
                 'user_id' => $user->id,
                 'body' => $body,
@@ -57,6 +60,8 @@ class ChatMessageSender
                 &$storedAttachments,
                 $user,
             ): ChatMessage {
+                $this->generalChatManager->ensureActiveParticipants($chatConversation);
+
                 $message = $chatConversation->messages()->create([
                     'user_id' => $user->id,
                     'body' => $request->body(),

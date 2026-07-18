@@ -8,6 +8,7 @@ use App\Models\EquipmentItem;
 use App\Models\TsdQrScan;
 use App\Support\TsdQrScanManager;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -18,12 +19,15 @@ class TsdController extends Controller
         return $this->renderPage();
     }
 
-    public function scan(): Response
+    public function scan(Request $request): Response
     {
-        return $this->renderPage(autoStartScanner: true);
+        return $this->renderPage(
+            autoStartScanner: true,
+            initialQrCode: $request->string('qr_code')->trim()->limit(2048, '')->value(),
+        );
     }
 
-    private function renderPage(bool $autoStartScanner = false): Response
+    private function renderPage(bool $autoStartScanner = false, string $initialQrCode = ''): Response
     {
         return Inertia::render('tsd/Index', [
             'stats' => [
@@ -34,6 +38,7 @@ class TsdController extends Controller
                 'webhook' => TsdQrScan::query()->where('source', TsdQrScan::SOURCE_WEBHOOK)->count(),
             ],
             'autoStartScanner' => $autoStartScanner,
+            'initialQrCode' => $initialQrCode,
             'recentScans' => ApiTsdQrScanResource::collection(
                 TsdQrScan::query()
                     ->with(['scannedBy:id,name,last_name,email', 'portalWebhook:id,name'])

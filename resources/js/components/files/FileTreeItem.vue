@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { ChevronRight, FolderOpen, Trash2 } from '@lucide/vue';
-import { index as filesIndex } from '@/routes/files';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { index as filesIndex } from '@/routes/files';
 import type { FileTreeDirectory } from '@/types/ui';
 
 const props = defineProps<{

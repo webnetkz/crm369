@@ -121,6 +121,12 @@ class MenuItem extends Model
                 'url' => '/projects',
                 'sort_order' => 40,
             ],
+            'calendar' => [
+                'title_key' => 'ui.calendar.title',
+                'fallback_title' => 'Calendar',
+                'url' => '/calendar',
+                'sort_order' => 45,
+            ],
             'chats' => [
                 'title_key' => 'ui.chat.title',
                 'fallback_title' => 'Chats',
@@ -259,6 +265,12 @@ class MenuItem extends Model
                 'url' => '/settings/integrations',
                 'sort_order' => 175,
             ],
+            'settings.one-c' => [
+                'title_key' => 'ui.settings.one_c',
+                'fallback_title' => '1C integration',
+                'url' => '/settings/one-c',
+                'sort_order' => 176,
+            ],
             'settings.api' => [
                 'title_key' => 'ui.settings.api',
                 'fallback_title' => 'API',
@@ -291,7 +303,9 @@ class MenuItem extends Model
             'dashboard',
             'company-structure',
             'projects',
+            'calendar',
             'chats',
+            'conferences',
             'knowledge-bases',
             'funnels',
             'forms',

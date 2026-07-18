@@ -15,6 +15,7 @@ use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\ProjectTaskStage;
 use App\Models\User;
+use App\Support\DashboardConfiguration;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -26,15 +27,23 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request): Response
-    {
+    /** @var list<string>|null */
+    private ?array $tableNames = null;
+
+    public function __invoke(
+        Request $request,
+        DashboardConfiguration $dashboardConfiguration,
+    ): Response {
         $user = $request->user();
         abort_unless($user !== null, 403);
 
         $enabledModules = PortalSetting::current()->enabledModules();
+        $configuration = $dashboardConfiguration->normalize($user->dashboard_configuration);
+        $activeDashboard = $dashboardConfiguration->activeDashboard($configuration);
 
         return Inertia::render('Dashboard', [
-            'dashboardStats' => $this->buildDashboardStats($user, $enabledModules),
+            'dashboardStats' => $this->buildDashboardStats($user, $enabledModules, $activeDashboard['period']),
+            'dashboardConfiguration' => $configuration,
         ]);
     }
 
@@ -42,10 +51,10 @@ class DashboardController extends Controller
      * @param  array<int, string>  $enabledModules
      * @return array<string, mixed>
      */
-    private function buildDashboardStats(User $user, array $enabledModules): array
+    private function buildDashboardStats(User $user, array $enabledModules, int $period): array
     {
         $counts = $this->buildCounts($user, $enabledModules);
-        $activity = $this->buildActivity($user, $enabledModules);
+        $activity = $this->buildActivity($user, $enabledModules, $period);
 
         return [
             'eyebrow' => __('ui.dashboard.eyebrow'),
@@ -416,14 +425,13 @@ class DashboardController extends Controller
 
     /**
      * @param  array<int, string>  $enabledModules
-     * @param  array<string, mixed>  $counts
      * @return array<string, mixed>
      */
-    private function buildActivity(User $user, array $enabledModules): array
+    private function buildActivity(User $user, array $enabledModules, int $period): array
     {
-        $start = now()->startOfDay()->subDays(6);
+        $start = now()->startOfDay()->subDays($period - 1);
         $end = now()->endOfDay();
-        $labels = collect(range(0, 6))
+        $labels = collect(range(0, $period - 1))
             ->map(fn (int $offset): string => $start->copy()->addDays($offset)->translatedFormat('d M'))
             ->all();
         $series = [];
@@ -461,8 +469,8 @@ class DashboardController extends Controller
         }
 
         return [
-            'title' => __('ui.dashboard.activity.title'),
-            'subtitle' => __('ui.dashboard.activity.subtitle'),
+            'title' => __('ui.dashboard.activity.title', ['days' => $period]),
+            'subtitle' => __('ui.dashboard.activity.subtitle', ['days' => $period]),
             'labels' => $labels,
             'series' => $series,
         ];
@@ -695,7 +703,7 @@ class DashboardController extends Controller
             ->groupBy(DB::raw('date(created_at)'))
             ->pluck('aggregate', 'day');
 
-        return collect(range(0, 6))
+        return collect(range(0, (int) $start->diffInDays($end)))
             ->map(function (int $offset) use ($rows, $start): int {
                 $day = $start->copy()->addDays($offset)->toDateString();
 
@@ -717,6 +725,8 @@ class DashboardController extends Controller
 
     private function hasTable(string $table): bool
     {
-        return Schema::hasTable($table);
+        $this->tableNames ??= array_values(Schema::getTableListing(null, false));
+
+        return in_array($table, $this->tableNames, true);
     }
 }

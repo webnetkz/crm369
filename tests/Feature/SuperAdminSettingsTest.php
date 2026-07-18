@@ -71,11 +71,15 @@ test('super admin can view every user and their group state', function () {
             ->where('can.manage_users', true)
             ->where('visibleUserTableColumns', [])
             ->has('groups')
+            ->missing('managerOptions')
         );
 
     $users = collect($response->inertiaProps('users.data'));
     $groups = collect($response->inertiaProps('groups'));
-    $managerOptions = collect($response->inertiaProps('managerOptions'));
+    $profileResponse = $this->actingAs($admin)
+        ->getJson(route('settings.users.show', $assignedUser))
+        ->assertSuccessful();
+    $managerOptions = collect($profileResponse->json('managerOptions'));
 
     expect($users->firstWhere('email', $admin->email)['is_super_admin'])->toBeTrue()
         ->and($users->firstWhere('email', $admin->email)['can_be_impersonated'])->toBeFalse()
@@ -83,6 +87,7 @@ test('super admin can view every user and their group state', function () {
         ->and($users->firstWhere('email', $assignedUser->email)['phone'])->toBe('+77011234567')
         ->and($users->firstWhere('email', $assignedUser->email)['can_be_impersonated'])->toBeTrue()
         ->and($users->firstWhere('email', $assignedUser->email))->toHaveKeys(['avatar', 'avatar_scale', 'created_at'])
+        ->and($users->firstWhere('email', $assignedUser->email))->not->toHaveKeys(['issued_equipment', 'subordinates'])
         ->and($users->firstWhere('email', $administrator->email)['group']['name'])->toBe(UserGroup::ADMINISTRATORS_NAME)
         ->and($users->firstWhere('email', $administrator->email)['can_be_impersonated'])->toBeTrue()
         ->and($users->firstWhere('email', $assignedUser->email)['group']['name'])->toBe('Managers')
@@ -177,6 +182,80 @@ CSV;
         ->and($importedUser->user_group_id)->toBe($group->id)
         ->and($importedUser->is_active)->toBeFalse()
         ->and($importedUser->email_verified_at)->not->toBeNull();
+});
+
+test('csv import is limited to the super admin and cannot deactivate that account', function () {
+    config(['admin.super_admin_email' => 'admin@example.com']);
+
+    $admin = User::factory()->create([
+        'email' => 'admin@example.com',
+    ]);
+    $accountManagers = UserGroup::factory()->create([
+        'permissions' => [
+            UserGroup::PERMISSION_VIEW_USERS,
+            UserGroup::PERMISSION_MANAGE_USER_ACCOUNTS,
+        ],
+    ]);
+    $accountManager = User::factory()->create([
+        'user_group_id' => $accountManagers->id,
+    ]);
+    $csv = <<<'CSV'
+name;last_name;middle_name;email;phone;position;manager_email;group_name;is_active;email_verified
+Admin;;;admin@example.com;;;;;false;true
+CSV;
+
+    $this->actingAs($accountManager)
+        ->post(route('settings.users.import'), [
+            'delimiter' => ';',
+            'file' => UploadedFile::fake()->createWithContent('users.csv', $csv),
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($admin)
+        ->post(route('settings.users.import'), [
+            'delimiter' => ';',
+            'file' => UploadedFile::fake()->createWithContent('users.csv', $csv),
+        ])
+        ->assertSessionHasErrors('file');
+
+    expect($admin->fresh()->is_active)->toBeTrue();
+});
+
+test('table csv pages open import and export settings in the shared sidebar', function () {
+    $csvExchangeSheet = file_get_contents(resource_path('js/components/CsvExchangeSheet.vue'));
+    $pages = [
+        resource_path('js/pages/settings/Users.vue') => 'openCsvPanel',
+        resource_path('js/pages/contacts/Index.vue') => 'openContactsCsvPanel',
+        resource_path('js/pages/equipment/Index.vue') => 'openEquipmentCsvPanel',
+        resource_path('js/pages/directories/Index.vue') => 'openDirectoryCsvPanel',
+        resource_path('js/pages/projects/Index.vue') => 'openTaskCsvPanel',
+    ];
+
+    expect($csvExchangeSheet)
+        ->toContain('<SheetContent')
+        ->toContain('side="right"')
+        ->toContain('id="csv-exchange-file"')
+        ->toContain('progress !== null')
+        ->toContain("emit('download-template')");
+
+    foreach ($pages as $pagePath => $openPanelMethod) {
+        $page = file_get_contents($pagePath);
+
+        expect($page)
+            ->toContain("import CsvExchangeSheet from '@/components/CsvExchangeSheet.vue'")
+            ->toContain('<CsvExchangeSheet')
+            ->toContain($openPanelMethod)
+            ->toContain('@download-template=')
+            ->toContain('@file-selected=');
+    }
+
+    $projectsPage = file_get_contents(resource_path('js/pages/projects/Index.vue'));
+
+    expect($projectsPage)
+        ->toContain("openTaskCsvPanel('export', null)")
+        ->toContain("openTaskCsvPanel('import', null)")
+        ->toContain('props.activeProject.id')
+        ->and(substr_count($projectsPage, 'openTaskCsvPanel('))->toBe(4);
 });
 
 test('super admin can paginate user groups with supported page sizes', function () {

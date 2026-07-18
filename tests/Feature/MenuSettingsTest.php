@@ -280,6 +280,7 @@ test('users can save personal sidebar menu order', function () {
 
     $expectedOrder = [
         'projects',
+        'conferences',
         sprintf('custom:%d', $menuItem->id),
         'dashboard',
         'settings',
@@ -289,6 +290,7 @@ test('users can save personal sidebar menu order', function () {
         ->patchJson(route('settings.menu.order.update'), [
             'items' => [
                 'projects',
+                'conferences',
                 sprintf('custom:%d', $menuItem->id),
                 'dashboard',
                 'unknown-item',
@@ -487,6 +489,7 @@ test('menu settings page exposes explicit sidebar order controls including setti
     $russian = require lang_path('ru/ui/menu.php');
 
     expect($menuPage)->toContain('const sidebarBuiltInKeys = [')
+        ->and($menuPage)->toContain("    'conferences',")
         ->and($menuPage)->toContain("key: 'settings'")
         ->and($menuPage)->toContain('const orderedSidebarItems = computed<SidebarOrderItem[]>(() => {')
         ->and($menuPage)->toContain('const optimisticSidebarOrder = ref<string[]>([]);')

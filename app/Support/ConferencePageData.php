@@ -5,51 +5,56 @@ namespace App\Support;
 use App\Models\Conference;
 use App\Models\ConferenceInvitation;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
 
 class ConferencePageData
 {
     /**
-     * @param  Collection<int, Conference>  $conferences
-     * @param  Collection<int, User>  $availableUsers
+     * @param  EloquentCollection<int, Conference>  $conferences
+     * @param  EloquentCollection<int, User>  $availableUsers
      * @return array<string, mixed>
      */
-    public function buildIndex(Collection $conferences, Collection $availableUsers): array
+    public function buildIndex(EloquentCollection $conferences, EloquentCollection $availableUsers): array
     {
+        $serializedConferences = $this->serializeConferences($conferences);
+
         return [
-            'conferences' => $conferences
-                ->map(fn (Conference $conference): array => $this->serializeListItem($conference))
-                ->values()
-                ->all(),
+            'conferences' => $serializedConferences->all(),
+            'conferenceGroups' => $this->groupConferences($serializedConferences),
             'availableUsers' => $availableUsers
                 ->map(fn (User $user): array => $this->serializeUser($user))
                 ->values()
                 ->all(),
             'provider' => [
-                'label' => (string) config('conference.provider_label', 'Jitsi Meet'),
+                'label' => (string) config('conference.provider_label', 'CRM369 Local WebRTC'),
             ],
         ];
     }
 
     /**
-     * @param  Collection<int, Conference>  $conferences
-     * @param  Collection<int, User>  $availableUsers
+     * @param  EloquentCollection<int, Conference>  $conferences
+     * @param  EloquentCollection<int, User>  $availableUsers
      * @return array<string, mixed>
      */
-    public function buildShow(Conference $conference, Collection $conferences, Collection $availableUsers, User $viewer): array
-    {
+    public function buildShow(
+        Conference $conference,
+        EloquentCollection $conferences,
+        EloquentCollection $availableUsers,
+        User $viewer,
+    ): array {
+        $serializedConferences = $this->serializeConferences($conferences);
+
         return [
             'conference' => $this->serializeDetailItem($conference, $viewer),
-            'conferences' => $conferences
-                ->map(fn (Conference $listConference): array => $this->serializeListItem($listConference))
-                ->values()
-                ->all(),
+            'conferences' => $serializedConferences->all(),
+            'conferenceGroups' => $this->groupConferences($serializedConferences),
             'availableUsers' => $availableUsers
                 ->map(fn (User $user): array => $this->serializeUser($user))
                 ->values()
                 ->all(),
             'provider' => [
-                'label' => (string) config('conference.provider_label', 'Jitsi Meet'),
+                'label' => (string) config('conference.provider_label', 'CRM369 Local WebRTC'),
             ],
         ];
     }
@@ -67,9 +72,8 @@ class ConferencePageData
                 'starts_at' => $conference->starts_at?->toISOString(),
                 'ended_at' => $conference->ended_at?->toISOString(),
                 'status' => $conference->status(),
-                'provider_label' => (string) config('conference.provider_label', 'Jitsi Meet'),
-                'embed_url' => $this->meetingUrl($conference, true),
-                'meeting_url' => $this->meetingUrl($conference, true),
+                'provider_label' => (string) config('conference.provider_label', 'CRM369 Local WebRTC'),
+                'room_key' => $conference->public_token,
                 'creator' => $conference->creator
                     ? [
                         'id' => $conference->creator->id,
@@ -113,6 +117,45 @@ class ConferencePageData
     }
 
     /**
+     * @param  EloquentCollection<int, Conference>  $conferences
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function serializeConferences(EloquentCollection $conferences): Collection
+    {
+        return $conferences
+            ->map(fn (Conference $conference): array => $this->serializeListItem($conference))
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $conferences
+     * @return array{
+     *     current: array<int, array<string, mixed>>,
+     *     upcoming: array<int, array<string, mixed>>,
+     *     past: array<int, array<string, mixed>>
+     * }
+     */
+    private function groupConferences(Collection $conferences): array
+    {
+        return [
+            'current' => $conferences
+                ->where('status', Conference::STATUS_LIVE)
+                ->values()
+                ->all(),
+            'upcoming' => $conferences
+                ->where('status', Conference::STATUS_SCHEDULED)
+                ->sortBy('starts_at')
+                ->values()
+                ->all(),
+            'past' => $conferences
+                ->where('status', Conference::STATUS_ENDED)
+                ->sortByDesc('ended_at')
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function serializeDetailItem(Conference $conference, User $viewer): array
@@ -121,9 +164,8 @@ class ConferencePageData
             ...$this->serializeListItem($conference),
             'public_token' => $conference->public_token,
             'room_name' => $conference->room_name,
-            'provider_label' => (string) config('conference.provider_label', 'Jitsi Meet'),
-            'embed_url' => $this->meetingUrl($conference, false),
-            'meeting_url' => $this->meetingUrl($conference, false),
+            'provider_label' => (string) config('conference.provider_label', 'CRM369 Local WebRTC'),
+            'room_key' => $conference->public_token,
             'can' => [
                 'manage' => $conference->canBeManagedBy($viewer),
                 'invite' => $conference->canBeManagedBy($viewer),
@@ -157,15 +199,5 @@ class ConferencePageData
             'avatar_position_y' => $user->avatar_position_y,
             'avatar_scale' => $user->avatar_scale,
         ];
-    }
-
-    private function meetingUrl(Conference $conference, bool $prejoinEnabled): string
-    {
-        $baseUrl = rtrim((string) config('conference.embed_base_url', 'https://meet.jit.si'), '/');
-        $hash = http_build_query([
-            'config.prejoinPageEnabled' => $prejoinEnabled ? 'true' : 'false',
-        ]);
-
-        return $baseUrl.'/'.rawurlencode($conference->room_name).($hash !== '' ? '#'.$hash : '');
     }
 }

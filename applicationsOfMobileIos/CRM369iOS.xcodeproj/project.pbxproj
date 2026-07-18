@@ -1,0 +1,451 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0DB2AA613734B24AD1D23FCA /* QRScannerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA7FA2B194C1153052EDE47D /* QRScannerViewController.swift */; };
+		132B1575B8D3AF208FE11374 /* DomainPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B23B2EC185523B0829FB212 /* DomainPreferences.swift */; };
+		1A947D9F76BD7B102BAD0847 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55004280138D549564841100 /* AppRouter.swift */; };
+		1D9FF68B6BCA068B2BC81BCC /* MobileNotificationStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDE09A8AFB2FC4532FA191C1 /* MobileNotificationStateStore.swift */; };
+		4CB15FB5963B721C9CB1C267 /* MobileNotificationFeedParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7BB995B5497D5B7B2B89ECF /* MobileNotificationFeedParserTests.swift */; };
+		5935C81F9F6FD499EFDEB2D5 /* DomainURLNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53BF6C04EC69A5322C71543 /* DomainURLNormalizer.swift */; };
+		829A876E5765F099093A79EB /* DomainSetupViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED7579A43FDDF4D711EDC158 /* DomainSetupViewController.swift */; };
+		B1D14187D00622D5095F2FA0 /* NotificationSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4231A3A4BBDB75C3962DB9BF /* NotificationSyncService.swift */; };
+		BE3716D07FE0BF51ED40DD17 /* DomainURLNormalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B6EB63891ED96219F36CEF3 /* DomainURLNormalizerTests.swift */; };
+		C6A336F7EBCD4C13ECDE0CC1 /* MobileNotificationFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71AC89B1BE8810464BC777CA /* MobileNotificationFeed.swift */; };
+		E0DCBEDFBD3FD4386F1F23D7 /* CRMWebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BBA6DCD868E88CD64ED5C93 /* CRMWebViewController.swift */; };
+		F19F9EC2FABCBE27518A3CD9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C7AFC6501FACE8B8E67D93B2 /* Assets.xcassets */; };
+		F86DA0212FC196A22CA60BBB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A632A8E63CECA2331E8C6C0 /* AppDelegate.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		362686144184C6B86D71AF8F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 985998A3DB89D6A3B0D88D1F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A189969798B9E3382E33181A;
+			remoteInfo = CRM369iOS;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0791D99E4006274DD0FF7FA2 /* CRM369iOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CRM369iOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1BBA6DCD868E88CD64ED5C93 /* CRMWebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRMWebViewController.swift; sourceTree = "<group>"; };
+		2A632A8E63CECA2331E8C6C0 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		4231A3A4BBDB75C3962DB9BF /* NotificationSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSyncService.swift; sourceTree = "<group>"; };
+		55004280138D549564841100 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
+		71AC89B1BE8810464BC777CA /* MobileNotificationFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileNotificationFeed.swift; sourceTree = "<group>"; };
+		7B6EB63891ED96219F36CEF3 /* DomainURLNormalizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainURLNormalizerTests.swift; sourceTree = "<group>"; };
+		9B23B2EC185523B0829FB212 /* DomainPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainPreferences.swift; sourceTree = "<group>"; };
+		B7BB995B5497D5B7B2B89ECF /* MobileNotificationFeedParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileNotificationFeedParserTests.swift; sourceTree = "<group>"; };
+		BCCCAEABCDE8D22185152426 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		C53BF6C04EC69A5322C71543 /* DomainURLNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainURLNormalizer.swift; sourceTree = "<group>"; };
+		C7AFC6501FACE8B8E67D93B2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D47E97085971218A770AD8C8 /* CRM369iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CRM369iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA7FA2B194C1153052EDE47D /* QRScannerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerViewController.swift; sourceTree = "<group>"; };
+		DDE09A8AFB2FC4532FA191C1 /* MobileNotificationStateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileNotificationStateStore.swift; sourceTree = "<group>"; };
+		ED7579A43FDDF4D711EDC158 /* DomainSetupViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainSetupViewController.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		01ABEC14DEF51AC4EE74D264 /* CRM369iOSTests */ = {
+			isa = PBXGroup;
+			children = (
+				7B6EB63891ED96219F36CEF3 /* DomainURLNormalizerTests.swift */,
+				B7BB995B5497D5B7B2B89ECF /* MobileNotificationFeedParserTests.swift */,
+			);
+			path = CRM369iOSTests;
+			sourceTree = "<group>";
+		};
+		69C98CB422C25618A3EB15E6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D47E97085971218A770AD8C8 /* CRM369iOS.app */,
+				0791D99E4006274DD0FF7FA2 /* CRM369iOSTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		93E74A20005BCE4E981F1A67 = {
+			isa = PBXGroup;
+			children = (
+				E3A8340858F1C581868C1476 /* CRM369iOS */,
+				01ABEC14DEF51AC4EE74D264 /* CRM369iOSTests */,
+				69C98CB422C25618A3EB15E6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E3A8340858F1C581868C1476 /* CRM369iOS */ = {
+			isa = PBXGroup;
+			children = (
+				2A632A8E63CECA2331E8C6C0 /* AppDelegate.swift */,
+				55004280138D549564841100 /* AppRouter.swift */,
+				C7AFC6501FACE8B8E67D93B2 /* Assets.xcassets */,
+				1BBA6DCD868E88CD64ED5C93 /* CRMWebViewController.swift */,
+				9B23B2EC185523B0829FB212 /* DomainPreferences.swift */,
+				ED7579A43FDDF4D711EDC158 /* DomainSetupViewController.swift */,
+				C53BF6C04EC69A5322C71543 /* DomainURLNormalizer.swift */,
+				BCCCAEABCDE8D22185152426 /* Info.plist */,
+				71AC89B1BE8810464BC777CA /* MobileNotificationFeed.swift */,
+				DDE09A8AFB2FC4532FA191C1 /* MobileNotificationStateStore.swift */,
+				4231A3A4BBDB75C3962DB9BF /* NotificationSyncService.swift */,
+				DA7FA2B194C1153052EDE47D /* QRScannerViewController.swift */,
+			);
+			path = CRM369iOS;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A189969798B9E3382E33181A /* CRM369iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 550D1D83FD77BF76D0F82623 /* Build configuration list for PBXNativeTarget "CRM369iOS" */;
+			buildPhases = (
+				43FFF6C865803F2BFBBB9ABC /* Sources */,
+				B31B41C6EB6191A80E1F0899 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CRM369iOS;
+			packageProductDependencies = (
+			);
+			productName = CRM369iOS;
+			productReference = D47E97085971218A770AD8C8 /* CRM369iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		BCF56FF382C5545C80B6F467 /* CRM369iOSTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D7482095B808209B262DD232 /* Build configuration list for PBXNativeTarget "CRM369iOSTests" */;
+			buildPhases = (
+				6AAF72BD578FB4D74DF0202B /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BCC47AAAE3C55BBA5E3ADBB9 /* PBXTargetDependency */,
+			);
+			name = CRM369iOSTests;
+			packageProductDependencies = (
+			);
+			productName = CRM369iOSTests;
+			productReference = 0791D99E4006274DD0FF7FA2 /* CRM369iOSTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		985998A3DB89D6A3B0D88D1F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					A189969798B9E3382E33181A = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 8AA85A98C070314EB520555F /* Build configuration list for PBXProject "CRM369iOS" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 93E74A20005BCE4E981F1A67;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 69C98CB422C25618A3EB15E6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A189969798B9E3382E33181A /* CRM369iOS */,
+				BCF56FF382C5545C80B6F467 /* CRM369iOSTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B31B41C6EB6191A80E1F0899 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F19F9EC2FABCBE27518A3CD9 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		43FFF6C865803F2BFBBB9ABC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F86DA0212FC196A22CA60BBB /* AppDelegate.swift in Sources */,
+				1A947D9F76BD7B102BAD0847 /* AppRouter.swift in Sources */,
+				E0DCBEDFBD3FD4386F1F23D7 /* CRMWebViewController.swift in Sources */,
+				132B1575B8D3AF208FE11374 /* DomainPreferences.swift in Sources */,
+				829A876E5765F099093A79EB /* DomainSetupViewController.swift in Sources */,
+				5935C81F9F6FD499EFDEB2D5 /* DomainURLNormalizer.swift in Sources */,
+				C6A336F7EBCD4C13ECDE0CC1 /* MobileNotificationFeed.swift in Sources */,
+				1D9FF68B6BCA068B2BC81BCC /* MobileNotificationStateStore.swift in Sources */,
+				B1D14187D00622D5095F2FA0 /* NotificationSyncService.swift in Sources */,
+				0DB2AA613734B24AD1D23FCA /* QRScannerViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6AAF72BD578FB4D74DF0202B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BE3716D07FE0BF51ED40DD17 /* DomainURLNormalizerTests.swift in Sources */,
+				4CB15FB5963B721C9CB1C267 /* MobileNotificationFeedParserTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BCC47AAAE3C55BBA5E3ADBB9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A189969798B9E3382E33181A /* CRM369iOS */;
+			targetProxy = 362686144184C6B86D71AF8F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		412F9FC33A2562A7A54420EF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.appswebnetkz.crm369.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CRM369.app/CRM369";
+			};
+			name = Debug;
+		};
+		4B74455F2A98FCC4B88293E5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.appswebnetkz.crm369.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CRM369.app/CRM369";
+			};
+			name = Release;
+		};
+		5D981E297CFF30DED51CD00D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		77300FC868745D69AE5B36FF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = CRM369iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.appswebnetkz.crm369.ios;
+				PRODUCT_MODULE_NAME = CRM369iOS;
+				PRODUCT_NAME = CRM369;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		8A33CC80F78C451439726CB2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = CRM369iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.appswebnetkz.crm369.ios;
+				PRODUCT_MODULE_NAME = CRM369iOS;
+				PRODUCT_NAME = CRM369;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CF1C169D70BE8C29F348FE9D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		550D1D83FD77BF76D0F82623 /* Build configuration list for PBXNativeTarget "CRM369iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A33CC80F78C451439726CB2 /* Debug */,
+				77300FC868745D69AE5B36FF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8AA85A98C070314EB520555F /* Build configuration list for PBXProject "CRM369iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CF1C169D70BE8C29F348FE9D /* Debug */,
+				5D981E297CFF30DED51CD00D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D7482095B808209B262DD232 /* Build configuration list for PBXNativeTarget "CRM369iOSTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				412F9FC33A2562A7A54420EF /* Debug */,
+				4B74455F2A98FCC4B88293E5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 985998A3DB89D6A3B0D88D1F /* Project object */;
+}

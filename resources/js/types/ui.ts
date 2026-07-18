@@ -6,7 +6,7 @@ export type LocaleMessages = Record<string, any>;
 
 export type Locale = {
     current: Language;
-    messages: Record<Language, LocaleMessages>;
+    messages: LocaleMessages;
 };
 
 export type AppVariant = 'header' | 'sidebar';
@@ -629,6 +629,27 @@ export type ManagedUserProfile = {
     subordinates: CompanyStructurePerson[];
 };
 
+export type ManagedUserListItem = Pick<
+    ManagedUserProfile,
+    | 'id'
+    | 'name'
+    | 'last_name'
+    | 'middle_name'
+    | 'email'
+    | 'phone'
+    | 'position'
+    | 'email_verified_at'
+    | 'avatar'
+    | 'avatar_scale'
+    | 'created_at'
+    | 'is_super_admin'
+    | 'is_active'
+    | 'deactivated_at'
+    | 'group'
+    | 'manager_id'
+    | 'manager'
+>;
+
 export type ManagedProfileSaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 export type ManagedProfileFormState = {
@@ -673,6 +694,11 @@ export type ChatAttachmentItem = {
     audioUrl: string | null;
 };
 
+export type ChatMessageReader = {
+    id: number;
+    name: string;
+};
+
 export type ChatMessageItem = {
     id: number;
     body: string;
@@ -684,6 +710,9 @@ export type ChatMessageItem = {
     isDeleted: boolean;
     isPinned: boolean;
     isOwn: boolean;
+    isRead: boolean;
+    readCount: number;
+    readBy: ChatMessageReader[];
     user: ChatUserSummary;
     attachments: ChatAttachmentItem[];
 };

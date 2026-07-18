@@ -25,6 +25,7 @@ import {
     update as updateDirectory,
     updateRecord,
 } from '@/actions/App/Http/Controllers/ReferenceDirectoryController';
+import CsvExchangeSheet from '@/components/CsvExchangeSheet.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +43,7 @@ import {
 import { useLanguage } from '@/composables/useLanguage';
 
 type ColumnType = 'text' | 'textarea' | 'number' | 'date' | 'boolean';
+type CsvPanelMode = 'import' | 'export';
 
 type DirectoryColumn = {
     key: string;
@@ -116,6 +118,7 @@ const recordSheetOpen = ref(false);
 const directoryMode = ref<'create' | 'edit'>('create');
 const recordMode = ref<'create' | 'edit'>('create');
 const editingRecordId = ref<number | null>(null);
+const csvPanelMode = ref<CsvPanelMode | null>(null);
 
 const blankColumn = (): EditableColumn => ({
     key: '',
@@ -438,6 +441,8 @@ const downloadDirectoryExport = (): void => {
         return;
     }
 
+    closeDirectoryCsvPanel();
+
     window.location.assign(
         exportCsv.url(props.activeDirectory.id, {
             query: {
@@ -461,9 +466,20 @@ const downloadDirectoryTemplate = (): void => {
     );
 };
 
-const handleCsvFileChange = (event: Event): void => {
-    const input = event.target as HTMLInputElement;
-    csvImportForm.file = input.files?.[0] ?? null;
+const openDirectoryCsvPanel = (mode: CsvPanelMode): void => {
+    csvImportForm.clearErrors();
+    csvImportForm.file = null;
+    csvPanelMode.value = mode;
+};
+
+const closeDirectoryCsvPanel = (): void => {
+    csvPanelMode.value = null;
+    csvImportForm.clearErrors();
+};
+
+const selectDirectoryCsvFile = (file: File | null): void => {
+    csvImportForm.file = file;
+    csvImportForm.clearErrors('file');
 };
 
 const submitCsvImport = (): void => {
@@ -474,7 +490,8 @@ const submitCsvImport = (): void => {
     csvImportForm.post(importCsv.url(props.activeDirectory.id), {
         preserveScroll: true,
         onSuccess: () => {
-            csvImportForm.file = null;
+            csvImportForm.reset();
+            closeDirectoryCsvPanel();
         },
     });
 };
@@ -486,6 +503,37 @@ const submitCsvImport = (): void => {
     <h1 class="sr-only">{{ t.directories.title }}</h1>
 
     <div class="space-y-8">
+        <CsvExchangeSheet
+            :open="csvPanelMode !== null"
+            :mode="csvPanelMode ?? 'export'"
+            :title="
+                csvPanelMode === 'import'
+                    ? t.directories.csv_import
+                    : t.directories.csv_export
+            "
+            :description="t.directories.csv_description"
+            :delimiter="csvImportForm.delimiter"
+            :delimiter-label="t.directories.csv_delimiter"
+            :delimiter-placeholder="t.directories.csv_delimiter_placeholder"
+            :delimiter-hint="t.directories.csv_delimiter_hint"
+            :file-label="t.directories.csv_file"
+            :export-label="t.directories.csv_export"
+            :import-label="t.directories.csv_import"
+            :template-label="t.directories.csv_download_template"
+            :selected-file="csvImportForm.file"
+            :processing="csvImportForm.processing"
+            :progress="csvImportForm.progress?.percentage ?? null"
+            :delimiter-error="csvImportForm.errors.delimiter"
+            :file-error="csvImportForm.errors.file"
+            accept=".csv,text/csv,text/plain,.txt"
+            @update:open="(isOpen) => !isOpen && closeDirectoryCsvPanel()"
+            @update:delimiter="csvImportForm.delimiter = $event"
+            @file-selected="selectDirectoryCsvFile"
+            @download-template="downloadDirectoryTemplate"
+            @import="submitCsvImport"
+            @export="downloadDirectoryExport"
+        />
+
         <div
             class="flex flex-col gap-4 rounded-3xl border border-border bg-card/70 p-6 shadow-xs lg:flex-row lg:items-end lg:justify-between"
         >
@@ -756,85 +804,28 @@ const submitCsvImport = (): void => {
 
                         <div
                             v-if="isActiveDirectoryCsvEnabled"
-                            class="grid w-full gap-4 lg:max-w-xl"
+                            class="flex w-full flex-wrap gap-3 lg:max-w-xl lg:justify-end"
                         >
-                            <div class="grid gap-2">
-                                <Label for="directory-csv-delimiter">
-                                    {{ t.directories.csv_delimiter }}
-                                </Label>
-                                <Input
-                                    id="directory-csv-delimiter"
-                                    v-model="csvImportForm.delimiter"
-                                    :placeholder="
-                                        t.directories.csv_delimiter_placeholder
-                                    "
-                                    maxlength="10"
-                                />
-                                <p class="text-xs text-muted-foreground">
-                                    {{ t.directories.csv_delimiter_hint }}
-                                </p>
-                                <InputError
-                                    :message="csvImportForm.errors.delimiter"
-                                />
-                            </div>
-
-                            <div class="flex flex-wrap gap-3">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    class="gap-2"
-                                    @click="downloadDirectoryExport"
-                                >
-                                    <Download class="size-4" />
-                                    {{ t.directories.csv_export }}
-                                </Button>
-
-                                <Button
-                                    v-if="canManageDirectories"
-                                    type="button"
-                                    variant="outline"
-                                    class="gap-2"
-                                    @click="downloadDirectoryTemplate"
-                                >
-                                    <Download class="size-4" />
-                                    {{ t.directories.csv_download_template }}
-                                </Button>
-                            </div>
-
-                            <form
-                                v-if="canManageDirectories"
-                                class="grid gap-3 rounded-2xl border border-dashed border-border p-4"
-                                @submit.prevent="submitCsvImport"
+                            <Button
+                                type="button"
+                                variant="outline"
+                                class="gap-2"
+                                @click="openDirectoryCsvPanel('export')"
                             >
-                                <div class="grid gap-2">
-                                    <Label for="directory-csv-file">
-                                        {{ t.directories.csv_file }}
-                                    </Label>
-                                    <Input
-                                        id="directory-csv-file"
-                                        type="file"
-                                        accept=".csv,text/csv,.txt"
-                                        @change="handleCsvFileChange"
-                                    />
-                                    <InputError
-                                        :message="csvImportForm.errors.file"
-                                    />
-                                </div>
+                                <Download class="size-4" />
+                                {{ t.directories.csv_export }}
+                            </Button>
 
-                                <div class="flex justify-end">
-                                    <Button
-                                        type="submit"
-                                        class="gap-2"
-                                        :disabled="
-                                            csvImportForm.processing ||
-                                            csvImportForm.file === null
-                                        "
-                                    >
-                                        <Upload class="size-4" />
-                                        {{ t.directories.csv_import }}
-                                    </Button>
-                                </div>
-                            </form>
+                            <Button
+                                v-if="canManageDirectories"
+                                type="button"
+                                variant="outline"
+                                class="gap-2"
+                                @click="openDirectoryCsvPanel('import')"
+                            >
+                                <Upload class="size-4" />
+                                {{ t.directories.csv_import }}
+                            </Button>
                         </div>
 
                         <div

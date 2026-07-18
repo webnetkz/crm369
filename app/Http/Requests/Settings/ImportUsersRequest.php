@@ -15,7 +15,7 @@ class ImportUsersRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('manage-user-accounts') ?? false;
+        return $this->user()?->can('manage-users') ?? false;
     }
 
     /**

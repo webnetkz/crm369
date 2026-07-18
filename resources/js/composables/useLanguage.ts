@@ -1,6 +1,6 @@
+import { router, usePage } from '@inertiajs/vue3';
 import type { ComputedRef, Ref } from 'vue';
 import { computed, ref, watchEffect } from 'vue';
-import { router, usePage } from '@inertiajs/vue3';
 import { update } from '@/routes/language';
 import type { Language, LocaleMessages } from '@/types';
 
@@ -30,11 +30,10 @@ export function useLanguage(): UseLanguageReturn {
     });
 
     const t = computed(() => {
-        return page.props.locale.messages[globalLanguage.value];
+        return page.props.locale.messages;
     });
 
     const updateLanguage = async (value: Language) => {
-        globalLanguage.value = value;
         setCookie('language', value);
 
         router.post(

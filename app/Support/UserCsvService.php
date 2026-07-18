@@ -6,7 +6,6 @@ use App\Models\PortalSetting;
 use App\Models\User;
 use App\Models\UserGroup;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -31,9 +30,9 @@ class UserCsvService
     ];
 
     /**
-     * @param  Collection<int, User>  $users
+     * @param  iterable<int, User>  $users
      */
-    public function download(Collection $users, string $fileName, string $delimiter = ';'): StreamedResponse
+    public function download(iterable $users, string $fileName, string $delimiter = ';'): StreamedResponse
     {
         return response()->streamDownload(function () use ($users, $delimiter): void {
             $output = fopen('php://output', 'wb');
@@ -266,6 +265,12 @@ class UserCsvService
             }
         }
 
+        $isActive = $this->parseBoolean($row['is_active'], $rowNumber, 'is_active');
+
+        if (! $isActive && $this->isSuperAdminEmail($email)) {
+            $this->throwRowError($rowNumber, __('ui.admin.user_activation_denied'));
+        }
+
         return [
             'name' => Str::limit($name, 255, ''),
             'last_name' => $this->nullableString($row['last_name']),
@@ -275,7 +280,7 @@ class UserCsvService
             'position' => $this->nullableString($row['position']),
             'manager_id' => $managerId,
             'group_id' => $groupId,
-            'is_active' => $this->parseBoolean($row['is_active'], $rowNumber, 'is_active'),
+            'is_active' => $isActive,
             'email_verified' => $this->parseBoolean($row['email_verified'], $rowNumber, 'email_verified'),
         ];
     }
@@ -340,6 +345,14 @@ class UserCsvService
             '0', 'false', 'no', 'off' => false,
             default => $this->throwBooleanRowError($rowNumber, $field),
         };
+    }
+
+    private function isSuperAdminEmail(string $email): bool
+    {
+        $superAdminEmail = config('admin.super_admin_email');
+
+        return is_string($superAdminEmail)
+            && Str::lower(trim($superAdminEmail)) === $email;
     }
 
     private function throwBooleanRowError(int $rowNumber, string $field): never

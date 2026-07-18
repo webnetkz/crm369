@@ -143,6 +143,73 @@ test('log settings paginate entries by one hundred records per page', function (
     }
 });
 
+test('large log files are paginated with bounded memory usage', function () {
+    $directory = fakeLogDirectory([]);
+    $path = $directory.'/browser.log';
+    $stream = fopen($path, 'wb');
+
+    if ($stream === false) {
+        throw new RuntimeException('Unable to create the large log fixture.');
+    }
+
+    $message = str_repeat('x', 16 * 1024);
+
+    try {
+        foreach (range(1, 1000) as $index) {
+            fwrite(
+                $stream,
+                sprintf(
+                    '[2026-07-01 12:00:00] local.INFO: Entry %04d %s%s',
+                    $index,
+                    $message,
+                    PHP_EOL,
+                ),
+            );
+        }
+    } finally {
+        fclose($stream);
+    }
+
+    try {
+        memory_reset_peak_usage();
+        $memoryBeforeReading = memory_get_usage();
+
+        $logData = app(LogEntryReader::class)->paginate(1, 100);
+
+        $peakMemoryIncrease = memory_get_peak_usage() - $memoryBeforeReading;
+
+        expect($logData['total'])->toBe(1000)
+            ->and($logData['entries'])->toHaveCount(100)
+            ->and($logData['entries'][0]['summary'])->toStartWith('Entry 1000')
+            ->and($logData['entries'][99]['summary'])->toStartWith('Entry 0901')
+            ->and($peakMemoryIncrease)->toBeLessThan(8 * 1024 * 1024);
+    } finally {
+        File::deleteDirectory($directory);
+    }
+});
+
+test('oversized individual log entries are truncated', function () {
+    $directory = fakeLogDirectory([
+        'browser.log' => [
+            'content' => '[2026-07-01 12:00:00] local.ERROR: '.str_repeat('x', 128 * 1024),
+            'mtime' => 1_783_000_300,
+        ],
+    ]);
+
+    try {
+        $logData = app(LogEntryReader::class)->paginate(1, 100);
+
+        expect($logData['total'])->toBe(1)
+            ->and($logData['entries'])->toHaveCount(1)
+            ->and(mb_strlen($logData['entries'][0]['content'], '8bit'))->toBeLessThan(66 * 1024)
+            ->and($logData['entries'][0]['content'])->toEndWith(
+                '[Entry content truncated after 64 KB to protect memory.]',
+            );
+    } finally {
+        File::deleteDirectory($directory);
+    }
+});
+
 /**
  * @param  array<string, array{content: string, mtime: int}>  $files
  */

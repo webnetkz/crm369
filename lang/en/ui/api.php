@@ -241,4 +241,10 @@ return [
     'permission_tsd_read_description' => 'Allows reading the handheld terminal QR scan journal.',
     'permission_tsd_write' => 'TSD scans write',
     'permission_tsd_write_description' => 'Allows sending new QR scans into the TSD journal.',
+    'permission_calendar_read' => 'Calendar read',
+    'permission_calendar_read_description' => 'Allows reading visible task deadlines and assigned conferences.',
+    'section_calendar' => 'Calendar',
+    'section_calendar_description' => 'An aggregated calendar event list for the current or target user.',
+    'section_calendar_note' => 'Supports from, to, and types[] filters with task and conference values. The maximum range is 370 days.',
+    'endpoint_calendar_events_index' => 'Get calendar events for a date range.',
 ];

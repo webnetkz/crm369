@@ -3,6 +3,8 @@ import { useForm, usePage } from '@inertiajs/vue3';
 import {
     ArrowDown,
     ArrowLeft,
+    Check,
+    Eye,
     MessageSquareMore,
     Pencil,
     Pin,
@@ -30,9 +32,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import UserProfileSheet from '@/components/UserProfileSheet.vue';
 import { useChatCenterPresence } from '@/composables/useChatCenterPresence';
+import { useChatMessageTimeline } from '@/composables/useChatMessageTimeline';
 import { useInitials } from '@/composables/useInitials';
 import { useLanguage } from '@/composables/useLanguage';
-import { useChatMessageTimeline } from '@/composables/useChatMessageTimeline';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
 import type {
     ChatActiveConversation,
@@ -791,7 +793,11 @@ const startPolling = (): void => {
     }
 
     pollInterval = setInterval(() => {
-        if (!props.active) {
+        if (
+            !props.active ||
+            document.hidden ||
+            sidebarAbortController !== null
+        ) {
             return;
         }
 
@@ -815,6 +821,7 @@ watch(
 
         if (!isActive) {
             stopPolling();
+            sidebarAbortController?.abort();
 
             return;
         }
@@ -1032,7 +1039,7 @@ onBeforeUnmount(() => {
                                             :src="
                                                 conversationAvatarSrc(
                                                     conversation,
-                                                ) ?? undefined
+                                                ) ?? ''
                                             "
                                             :alt="conversation.title"
                                             :style="
@@ -1226,7 +1233,7 @@ onBeforeUnmount(() => {
                                     :src="
                                         conversationAvatarSrc(
                                             activeConversation,
-                                        ) ?? undefined
+                                        ) ?? ''
                                     "
                                     :alt="activeConversation.title"
                                     :style="
@@ -1366,6 +1373,62 @@ onBeforeUnmount(() => {
                                     >
                                         · {{ t.chat.edited }}
                                     </template>
+                                    <span
+                                        v-if="
+                                            entry.message.isOwn &&
+                                            !entry.message.isDeleted &&
+                                            activeConversation.type ===
+                                                'direct' &&
+                                            entry.message.isRead
+                                        "
+                                        class="ml-2 inline-flex align-middle text-emerald-600 dark:text-emerald-400"
+                                        :title="t.chat.message_read"
+                                        :aria-label="t.chat.message_read"
+                                    >
+                                        <Check class="size-3.5" />
+                                    </span>
+                                    <span
+                                        v-if="
+                                            entry.message.isOwn &&
+                                            !entry.message.isDeleted &&
+                                            isGeneralConversation(
+                                                activeConversation,
+                                            )
+                                        "
+                                        class="group/readers relative ml-2 inline-flex align-middle"
+                                    >
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                            :aria-label="t.chat.message_viewers"
+                                        >
+                                            <Eye class="size-3.5" />
+                                            <span>{{
+                                                entry.message.readCount
+                                            }}</span>
+                                        </button>
+                                        <span
+                                            v-if="
+                                                entry.message.readBy.length > 0
+                                            "
+                                            role="tooltip"
+                                            class="pointer-events-none invisible absolute right-0 bottom-full z-20 mb-2 w-max max-w-64 min-w-40 translate-y-1 rounded-xl border border-border bg-popover p-3 text-left text-popover-foreground opacity-0 shadow-lg transition group-focus-within/readers:visible group-focus-within/readers:translate-y-0 group-focus-within/readers:opacity-100 group-hover/readers:visible group-hover/readers:translate-y-0 group-hover/readers:opacity-100"
+                                        >
+                                            <span
+                                                class="mb-1.5 block text-[10px] font-semibold tracking-wide text-muted-foreground uppercase"
+                                            >
+                                                {{ t.chat.seen_by }}
+                                            </span>
+                                            <span
+                                                v-for="reader in entry.message
+                                                    .readBy"
+                                                :key="reader.id"
+                                                class="block truncate py-0.5 text-xs font-medium"
+                                            >
+                                                {{ reader.name }}
+                                            </span>
+                                        </span>
+                                    </span>
                                     <button
                                         v-if="!entry.message.isDeleted"
                                         type="button"

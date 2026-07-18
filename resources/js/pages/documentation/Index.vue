@@ -41,6 +41,7 @@ type WebhookDocumentation = {
     users_show_url: string;
     company_structure_index_url: string;
     company_structure_show_url: string;
+    calendar_events_url: string;
     contacts_index_url: string;
     contacts_show_url: string;
     contacts_store_url: string;
@@ -324,6 +325,16 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         },
         {
             method: 'GET',
+            path: `${props.webhookDocumentation.calendar_events_url}?from={Y-m-d}&to={Y-m-d}&types[]=task&types[]=conference&token=${tokenPlaceholder}`,
+            title: t.value.webhooks
+                .documentation_endpoint_calendar_events_title,
+            description:
+                t.value.webhooks
+                    .documentation_endpoint_calendar_events_description,
+            permission: 'calendar.read',
+        },
+        {
+            method: 'GET',
             path: `${props.webhookDocumentation.users_index_url}?token=${tokenPlaceholder}`,
             title: t.value.webhooks.documentation_endpoint_users_index_title,
             description:
@@ -369,7 +380,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         {
             method: 'GET',
             path: `${props.webhookDocumentation.directories_index_url}?token=${tokenPlaceholder}`,
-            title: t.value.webhooks.documentation_endpoint_directories_index_title,
+            title: t.value.webhooks
+                .documentation_endpoint_directories_index_title,
             description:
                 t.value.webhooks
                     .documentation_endpoint_directories_index_description,
@@ -378,7 +390,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         {
             method: 'GET',
             path: `${props.webhookDocumentation.directories_show_url}?token=${tokenPlaceholder}`,
-            title: t.value.webhooks.documentation_endpoint_directories_show_title,
+            title: t.value.webhooks
+                .documentation_endpoint_directories_show_title,
             description:
                 t.value.webhooks
                     .documentation_endpoint_directories_show_description,
@@ -387,7 +400,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         {
             method: 'GET',
             path: `${props.webhookDocumentation.directories_export_url}?token=${tokenPlaceholder}`,
-            title: t.value.webhooks.documentation_endpoint_directories_export_title,
+            title: t.value.webhooks
+                .documentation_endpoint_directories_export_title,
             description:
                 t.value.webhooks
                     .documentation_endpoint_directories_export_description,
@@ -396,7 +410,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         {
             method: 'GET',
             path: `${props.webhookDocumentation.directories_template_url}?token=${tokenPlaceholder}`,
-            title: t.value.webhooks.documentation_endpoint_directories_template_title,
+            title: t.value.webhooks
+                .documentation_endpoint_directories_template_title,
             description:
                 t.value.webhooks
                     .documentation_endpoint_directories_template_description,
@@ -405,7 +420,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         {
             method: 'POST',
             path: `${props.webhookDocumentation.directories_store_url}?token=${tokenPlaceholder}`,
-            title: t.value.webhooks.documentation_endpoint_directories_store_title,
+            title: t.value.webhooks
+                .documentation_endpoint_directories_store_title,
             description:
                 t.value.webhooks
                     .documentation_endpoint_directories_store_description,
@@ -414,7 +430,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         {
             method: 'PATCH',
             path: `${props.webhookDocumentation.directories_update_url}?token=${tokenPlaceholder}`,
-            title: t.value.webhooks.documentation_endpoint_directories_update_title,
+            title: t.value.webhooks
+                .documentation_endpoint_directories_update_title,
             description:
                 t.value.webhooks
                     .documentation_endpoint_directories_update_description,
@@ -423,7 +440,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         {
             method: 'DELETE',
             path: `${props.webhookDocumentation.directories_destroy_url}?token=${tokenPlaceholder}`,
-            title: t.value.webhooks.documentation_endpoint_directories_destroy_title,
+            title: t.value.webhooks
+                .documentation_endpoint_directories_destroy_title,
             description:
                 t.value.webhooks
                     .documentation_endpoint_directories_destroy_description,
@@ -432,7 +450,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         {
             method: 'POST',
             path: `${props.webhookDocumentation.directories_import_url}?token=${tokenPlaceholder}`,
-            title: t.value.webhooks.documentation_endpoint_directories_import_title,
+            title: t.value.webhooks
+                .documentation_endpoint_directories_import_title,
             description:
                 t.value.webhooks
                     .documentation_endpoint_directories_import_description,
@@ -441,7 +460,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         {
             method: 'POST',
             path: `${props.webhookDocumentation.directory_records_store_url}?token=${tokenPlaceholder}`,
-            title: t.value.webhooks.documentation_endpoint_directory_records_store_title,
+            title: t.value.webhooks
+                .documentation_endpoint_directory_records_store_title,
             description:
                 t.value.webhooks
                     .documentation_endpoint_directory_records_store_description,
@@ -450,7 +470,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         {
             method: 'PATCH',
             path: `${props.webhookDocumentation.directory_records_update_url}?token=${tokenPlaceholder}`,
-            title: t.value.webhooks.documentation_endpoint_directory_records_update_title,
+            title: t.value.webhooks
+                .documentation_endpoint_directory_records_update_title,
             description:
                 t.value.webhooks
                     .documentation_endpoint_directory_records_update_description,
@@ -459,7 +480,8 @@ const webhookEndpointExamples = computed<WebhookEndpointExample[]>(() => {
         {
             method: 'DELETE',
             path: `${props.webhookDocumentation.directory_records_destroy_url}?token=${tokenPlaceholder}`,
-            title: t.value.webhooks.documentation_endpoint_directory_records_destroy_title,
+            title: t.value.webhooks
+                .documentation_endpoint_directory_records_destroy_title,
             description:
                 t.value.webhooks
                     .documentation_endpoint_directory_records_destroy_description,

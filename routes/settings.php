@@ -7,6 +7,7 @@ use App\Http\Controllers\Settings\LogController;
 use App\Http\Controllers\Settings\MenuController;
 use App\Http\Controllers\Settings\MessengerIntegrationController;
 use App\Http\Controllers\Settings\ModuleController;
+use App\Http\Controllers\Settings\OneCIntegrationController;
 use App\Http\Controllers\Settings\PortalController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
@@ -127,6 +128,20 @@ Route::middleware(['auth', 'verified', 'module.enabled:integrations', 'can:manag
         ->name('settings.integrations.edit');
     Route::patch('settings/integrations/{messengerIntegration}', [MessengerIntegrationController::class, 'update'])
         ->name('settings.integrations.update');
+});
+
+Route::middleware(['auth', 'verified', 'module.enabled:one-c', 'can:manage-one-c'])->group(function () {
+    Route::get('settings/one-c', [OneCIntegrationController::class, 'edit'])
+        ->name('settings.one-c.edit');
+    Route::post('settings/one-c', [OneCIntegrationController::class, 'store'])
+        ->name('settings.one-c.store');
+    Route::patch('settings/one-c/{oneCIntegration}', [OneCIntegrationController::class, 'update'])
+        ->name('settings.one-c.update');
+    Route::post('settings/one-c/{oneCIntegration}/test', [OneCIntegrationController::class, 'test'])
+        ->middleware('throttle:6,1')
+        ->name('settings.one-c.test');
+    Route::delete('settings/one-c/{oneCIntegration}', [OneCIntegrationController::class, 'destroy'])
+        ->name('settings.one-c.destroy');
 });
 
 Route::middleware(['auth', 'verified', 'module.enabled:webhooks', 'can:manage-webhooks'])->group(function () {

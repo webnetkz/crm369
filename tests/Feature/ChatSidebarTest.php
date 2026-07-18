@@ -3,6 +3,7 @@
 use App\Models\ChatConversation;
 use App\Models\ChatConversationParticipant;
 use App\Models\ChatMessage;
+use App\Models\ChatMessageRead;
 use App\Models\User;
 use App\Models\UserGroup;
 use Illuminate\Database\Schema\Blueprint;
@@ -227,6 +228,212 @@ test('all users can exchange messages in the general chat', function () {
         ->assertJsonPath('activeConversation.title', ChatConversation::GENERAL_CHAT_TITLE)
         ->assertJsonPath('activeConversation.messages.0.body', 'Сообщение для всех')
         ->assertJsonPath('unreadCount', 0);
+});
+
+test('opening a general chat only clears the notification for that user and records exact viewers', function () {
+    $author = User::factory()->create([
+        'name' => 'Author',
+        'last_name' => 'User',
+    ]);
+    $firstViewer = User::factory()->create([
+        'name' => 'First',
+        'last_name' => 'Viewer',
+    ]);
+    $secondViewer = User::factory()->create([
+        'name' => 'Second',
+        'last_name' => 'Viewer',
+    ]);
+
+    $generalConversationId = $this->actingAs($author)
+        ->get(route('chats.sidebar'))
+        ->assertSuccessful()
+        ->json('conversations.0.id');
+
+    $this->actingAs($author)
+        ->post(route('chats.messages.store', $generalConversationId), [
+            'body' => 'Общее сообщение с отдельными уведомлениями',
+        ])
+        ->assertSuccessful();
+
+    $message = ChatMessage::query()->latest('id')->firstOrFail();
+
+    $this->actingAs($firstViewer)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 1));
+
+    $this->actingAs($secondViewer)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 1));
+
+    $this->actingAs($firstViewer)
+        ->get(route('chats.sidebar', ['conversation' => $generalConversationId]))
+        ->assertSuccessful()
+        ->assertJsonPath('unreadCount', 0);
+
+    $this->actingAs($firstViewer)
+        ->get(route('chats.sidebar', ['conversation' => $generalConversationId]))
+        ->assertSuccessful();
+
+    $this->actingAs($firstViewer)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 0));
+
+    $this->actingAs($secondViewer)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 1));
+
+    $this->actingAs($author)
+        ->get(route('chats.sidebar', ['conversation' => $generalConversationId]))
+        ->assertSuccessful()
+        ->assertJsonPath('activeConversation.messages.0.readCount', 1)
+        ->assertJsonPath('activeConversation.messages.0.readBy.0.id', $firstViewer->id)
+        ->assertJsonPath('activeConversation.messages.0.readBy.0.name', 'First Viewer');
+
+    expect(ChatMessageRead::query()
+        ->where('chat_message_id', $message->id)
+        ->where('user_id', $firstViewer->id)
+        ->count())->toBe(1)
+        ->and(ChatMessageRead::query()
+            ->where('chat_message_id', $message->id)
+            ->where('user_id', $secondViewer->id)
+            ->exists())->toBeFalse();
+
+    $this->actingAs($secondViewer)
+        ->get(route('chats.sidebar', ['conversation' => $generalConversationId]))
+        ->assertSuccessful();
+
+    $this->actingAs($author)
+        ->get(route('chats.sidebar', ['conversation' => $generalConversationId]))
+        ->assertSuccessful()
+        ->assertJsonPath('activeConversation.messages.0.readCount', 2)
+        ->assertJsonPath('activeConversation.messages.0.readBy.1.id', $secondViewer->id)
+        ->assertJsonPath('activeConversation.messages.0.readBy.1.name', 'Second Viewer');
+});
+
+test('general chat unread notifications remain for every user who has not opened the conversation', function () {
+    $author = User::factory()->create();
+    $recipients = User::factory()->count(9)->create();
+
+    $generalConversationId = $this->actingAs($author)
+        ->get(route('chats.sidebar'))
+        ->assertSuccessful()
+        ->json('conversations.0.id');
+
+    foreach ($recipients as $recipient) {
+        $this->actingAs($recipient)
+            ->get(route('dashboard'))
+            ->assertSuccessful()
+            ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 0));
+    }
+
+    $this->actingAs($author)
+        ->post(route('chats.messages.store', $generalConversationId), [
+            'body' => 'Сообщение для всех пользователей',
+        ])
+        ->assertSuccessful();
+
+    $message = ChatMessage::query()->latest('id')->firstOrFail();
+
+    foreach ($recipients as $recipient) {
+        $this->actingAs($recipient)
+            ->get(route('dashboard'))
+            ->assertSuccessful()
+            ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 1));
+    }
+
+    $readers = $recipients->take(5);
+    $unreadRecipients = $recipients->skip(5);
+
+    foreach ($readers as $reader) {
+        $this->actingAs($reader)
+            ->get(route('chats.sidebar', ['conversation' => $generalConversationId]))
+            ->assertSuccessful()
+            ->assertJsonPath('unreadCount', 0);
+    }
+
+    foreach ($readers as $reader) {
+        $this->actingAs($reader)
+            ->get(route('dashboard'))
+            ->assertSuccessful()
+            ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 0));
+    }
+
+    foreach ($unreadRecipients as $unreadRecipient) {
+        $this->actingAs($unreadRecipient)
+            ->get(route('dashboard'))
+            ->assertSuccessful()
+            ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 1));
+
+        $this->actingAs($unreadRecipient)
+            ->getJson(route('mobile.notifications.feed'))
+            ->assertSuccessful()
+            ->assertJsonPath('meta.chat_unread_count', 1)
+            ->assertJsonPath('data.chats.0.conversation_id', $generalConversationId)
+            ->assertJsonPath('data.chats.0.latest_message_id', $message->id);
+    }
+
+    expect(ChatMessageRead::query()
+        ->where('chat_message_id', $message->id)
+        ->pluck('user_id')
+        ->sort()
+        ->values()
+        ->all())->toBe($readers->pluck('id')->sort()->values()->all());
+});
+
+test('direct chat messages expose a read check after the recipient opens the conversation', function () {
+    $author = User::factory()->create();
+    $recipient = User::factory()->create([
+        'name' => 'Direct',
+        'last_name' => 'Recipient',
+    ]);
+
+    $conversation = ChatConversation::query()->create([
+        'type' => ChatConversation::TYPE_DIRECT,
+        'created_by_user_id' => $author->id,
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $author->id,
+        'last_read_at' => now(),
+    ]);
+
+    ChatConversationParticipant::query()->create([
+        'chat_conversation_id' => $conversation->id,
+        'user_id' => $recipient->id,
+    ]);
+
+    $this->actingAs($author)
+        ->post(route('chats.messages.store', $conversation), [
+            'body' => 'Сообщение с галочкой прочтения',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('message.isRead', false)
+        ->assertJsonPath('message.readCount', 0)
+        ->assertJsonPath('message.readBy', []);
+
+    $message = ChatMessage::query()->latest('id')->firstOrFail();
+
+    $this->actingAs($recipient)
+        ->get(route('chats.sidebar', ['conversation' => $conversation->id]))
+        ->assertSuccessful();
+
+    $this->actingAs($author)
+        ->get(route('chats.sidebar', ['conversation' => $conversation->id]))
+        ->assertSuccessful()
+        ->assertJsonPath('activeConversation.messages.0.isRead', true)
+        ->assertJsonPath('activeConversation.messages.0.readCount', 1)
+        ->assertJsonPath('activeConversation.messages.0.readBy.0.id', $recipient->id)
+        ->assertJsonPath('activeConversation.messages.0.readBy.0.name', 'Direct Recipient');
+
+    expect(ChatMessageRead::query()
+        ->where('chat_message_id', $message->id)
+        ->where('user_id', $recipient->id)
+        ->count())->toBe(1);
 });
 
 test('general chat can be created before the system key migration is applied', function () {
@@ -977,6 +1184,14 @@ test('chat ui renders header trigger, sidebar dock, and sheet targeting hooks', 
         ->and($dock)->toContain("openChatCenter('chats'")
         ->and($dock)->toContain('entry.conversationId')
         ->and($dock)->toContain('entry.contactId')
+        ->and($dock)->toContain("conversation.type === 'general'")
+        ->and($dock)->toContain('page.props.portal.logoUrl')
+        ->and($dock)->toContain("'bg-white object-contain p-1'")
+        ->and($dock)->toContain('shouldShowAvatar(entry)')
+        ->and($dock)->toContain('@error="markAvatarFailed(entry)"')
+        ->and($dock)->toContain(':aria-hidden="shouldShowAvatar(entry)"')
+        ->and($dock)->toContain('absolute inset-0 z-10 aspect-square size-full')
+        ->and($dock)->toContain('absolute -top-1 -right-1 z-20 inline-flex')
         ->and($dock)->toContain('group-hover/dock:pointer-events-auto')
         ->and($dock)->toContain('group-focus-within/dock:opacity-100')
         ->and($dock)->toContain('absolute right-0 bottom-full h-5 w-20')
@@ -1034,6 +1249,12 @@ test('chat ui renders header trigger, sidebar dock, and sheet targeting hooks', 
         ->and($panel)->toContain('@scroll.passive="handleMessagesScroll"')
         ->and($panel)->toContain('t.chat.scroll_to_latest')
         ->and($panel)->toContain('<ArrowDown class="size-4" />')
+        ->and($panel)->toContain('<Check class="size-3.5" />')
+        ->and($panel)->toContain('<Eye class="size-3.5" />')
+        ->and($panel)->toContain('entry.message.readCount')
+        ->and($panel)->toContain('entry.message.readBy')
+        ->and($panel)->toContain('group-hover/readers:visible')
+        ->and($panel)->toContain('t.chat.seen_by')
         ->and($panel)->toContain('class="min-w-0 flex-1 text-left"')
         ->and($panel)->toContain('@click="openConversation(conversation.id)"')
         ->and($panel)->toContain('$event.stopPropagation();')

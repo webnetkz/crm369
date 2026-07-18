@@ -33,6 +33,7 @@ return [
     'modules' => 'Modules',
     'business_processes' => 'Business processes',
     'integrations' => 'Integrations',
+    'one_c' => '1C integration',
     'logs' => 'Logs',
     'api' => 'API',
     'api_documentation' => 'API docs',

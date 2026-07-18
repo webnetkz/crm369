@@ -18,6 +18,9 @@ use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
+    /** @var list<string>|null */
+    private ?array $tableNames = null;
+
     /**
      * The root template that's loaded on the first page visit.
      *
@@ -47,6 +50,7 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $impersonator = $this->impersonator($request);
+        $currentLocale = App::currentLocale();
 
         return [
             ...parent::share($request),
@@ -73,6 +77,9 @@ class HandleInertiaRequests extends Middleware
                     : false,
                 'canAccessConferences' => $this->moduleEnabled('conferences')
                     ? ($request->user()?->canAccessConferences() ?? false)
+                    : false,
+                'canAccessCalendar' => $this->moduleEnabled('calendar')
+                    ? ($request->user()?->canAccessCalendar() ?? false)
                     : false,
                 'canAccessKnowledgeBases' => $this->moduleEnabled('knowledge-bases')
                     ? ($request->user()?->canAccessKnowledgeBases() ?? false)
@@ -160,11 +167,8 @@ class HandleInertiaRequests extends Middleware
             'chat' => fn (): array => $this->chatProps($request),
             'notifications' => fn (): array => $this->notificationProps($request),
             'locale' => [
-                'current' => App::currentLocale(),
-                'messages' => [
-                    'ru' => Lang::get('ui', [], 'ru'),
-                    'en' => Lang::get('ui', [], 'en'),
-                ],
+                'current' => $currentLocale,
+                'messages' => Lang::get('ui', [], $currentLocale),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
@@ -181,9 +185,9 @@ class HandleInertiaRequests extends Middleware
             ! $this->moduleEnabled('chats')
             || ! ($user?->canAccessChats() ?? false)
             || ! $user
-            || ! Schema::hasTable('chat_conversations')
-            || ! Schema::hasTable('chat_conversation_participants')
-            || ! Schema::hasTable('chat_messages')
+            || ! $this->hasTable('chat_conversations')
+            || ! $this->hasTable('chat_conversation_participants')
+            || ! $this->hasTable('chat_messages')
         ) {
             return [
                 'unreadCount' => 0,
@@ -198,7 +202,7 @@ class HandleInertiaRequests extends Middleware
      */
     private function serializeAuthUser(User $user): array
     {
-        $group = $user->relationLoaded('group') ? $user->group : $user->group()->first();
+        $group = $user->loadMissing('group')->group;
 
         return [
             'id' => $user->id,
@@ -240,7 +244,7 @@ class HandleInertiaRequests extends Middleware
      */
     private function serializeAuthUserIssuedEquipment(User $user): array
     {
-        if (! $this->moduleEnabled('equipment') || ! Schema::hasTable('equipment_items')) {
+        if (! $this->moduleEnabled('equipment') || ! $this->hasTable('equipment_items')) {
             return [];
         }
 
@@ -264,7 +268,7 @@ class HandleInertiaRequests extends Middleware
     {
         $user = request()->user();
 
-        if (! Schema::hasTable('menu_items') || ! $user) {
+        if (! $this->hasTable('menu_items') || ! $user) {
             return [
                 'hiddenItems' => [],
                 'customItems' => [],
@@ -298,9 +302,9 @@ class HandleInertiaRequests extends Middleware
         if (
             ! $this->moduleEnabled('knowledge-bases')
             || ! $user->canAccessKnowledgeBases()
-            || ! Schema::hasTable('knowledge_bases')
-            || ! Schema::hasTable('knowledge_base_group')
-            || ! Schema::hasTable('user_groups')
+            || ! $this->hasTable('knowledge_bases')
+            || ! $this->hasTable('knowledge_base_group')
+            || ! $this->hasTable('user_groups')
         ) {
             return [];
         }
@@ -335,7 +339,7 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
 
-        if (! $user || ! Schema::hasTable('notifications')) {
+        if (! $user || ! $this->hasTable('notifications')) {
             return [
                 'unreadCount' => 0,
                 'items' => [],
@@ -360,8 +364,8 @@ class HandleInertiaRequests extends Middleware
 
     private function crmFunnelsEnabled(): bool
     {
-        return Schema::hasTable('crm_funnels')
-            && Schema::hasTable('crm_funnel_user_group');
+        return $this->hasTable('crm_funnels')
+            && $this->hasTable('crm_funnel_user_group');
     }
 
     private function moduleEnabled(string $module): bool
@@ -372,5 +376,12 @@ class HandleInertiaRequests extends Middleware
     private function portalSettings(): PortalSetting
     {
         return once(fn (): PortalSetting => PortalSetting::current());
+    }
+
+    private function hasTable(string $table): bool
+    {
+        $this->tableNames ??= array_values(Schema::getTableListing(null, false));
+
+        return in_array($table, $this->tableNames, true);
     }
 }

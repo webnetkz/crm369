@@ -1,0 +1,41 @@
+name: CRM369iOS
+options:
+  bundleIdPrefix: com.appswebnetkz
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: minimal
+targets:
+  CRM369iOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: CRM369iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.appswebnetkz.crm369.ios
+        PRODUCT_NAME: CRM369
+        PRODUCT_MODULE_NAME: CRM369iOS
+        INFOPLIST_FILE: CRM369iOS/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: false
+        CODE_SIGN_STYLE: Automatic
+    scheme:
+      testTargets:
+        - CRM369iOSTests
+  CRM369iOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: CRM369iOSTests
+    dependencies:
+      - target: CRM369iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.appswebnetkz.crm369.ios.tests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/CRM369.app/CRM369"
+        BUNDLE_LOADER: "$(TEST_HOST)"

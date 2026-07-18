@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\CalendarController;
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\CompanyStructureController as ApiCompanyStructureController;
 use App\Http\Controllers\Api\V1\ContactController;
@@ -61,6 +62,12 @@ Route::prefix('v1')->middleware(['module.enabled:api', 'auth:api', ResolveApiSub
         Route::delete('chats/{chatConversation}/messages/{chatMessage}', [ChatController::class, 'destroyMessage'])
             ->middleware('api.token:chat.write')
             ->name('api.v1.chats.messages.destroy');
+    });
+
+    Route::middleware('module.enabled:calendar')->group(function (): void {
+        Route::get('calendar/events', [CalendarController::class, 'index'])
+            ->middleware('api.token:calendar.read')
+            ->name('api.v1.calendar.events.index');
     });
 
     Route::middleware('module.enabled:company-structure')->group(function (): void {

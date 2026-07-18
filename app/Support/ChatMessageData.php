@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\ChatMessage;
 use App\Models\ChatMessageAttachment;
+use App\Models\ChatMessageRead;
 use App\Models\User;
 
 class ChatMessageData
@@ -21,9 +22,19 @@ class ChatMessageData
         $message->loadMissing([
             'user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
             'attachments',
+            'reads.user:id,name,last_name,email',
         ]);
 
         $isDeleted = $message->wasDeleted();
+        $readBy = $message->reads
+            ->filter(fn (ChatMessageRead $read): bool => $read->user_id !== $message->user_id)
+            ->unique('user_id')
+            ->map(fn (ChatMessageRead $read): array => [
+                'id' => $read->user_id,
+                'name' => $this->displayName($read->user),
+            ])
+            ->values()
+            ->all();
 
         return [
             'id' => $message->id,
@@ -36,6 +47,9 @@ class ChatMessageData
             'isDeleted' => $isDeleted,
             'isPinned' => ! $isDeleted && $message->isPinned(),
             'isOwn' => $message->user_id === $viewer->id,
+            'isRead' => $readBy !== [],
+            'readCount' => count($readBy),
+            'readBy' => $readBy,
             'user' => $this->serializeUserSummary($message->user),
             'attachments' => $isDeleted
                 ? []
@@ -143,5 +157,12 @@ class ChatMessageData
             'avatar' => $user->avatar,
             'avatarScale' => $user->avatar_scale,
         ];
+    }
+
+    private function displayName(User $user): string
+    {
+        $fullName = trim($user->name.' '.($user->last_name ?? ''));
+
+        return $fullName !== '' ? $fullName : $user->email;
     }
 }

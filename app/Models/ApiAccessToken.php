@@ -79,6 +79,8 @@ class ApiAccessToken extends Model
 
     public const string PERMISSION_TASKS_WRITE = 'tasks.write';
 
+    public const string PERMISSION_CALENDAR_READ = 'calendar.read';
+
     public const string PERMISSION_USERS_READ = 'users.read';
 
     public const string PERMISSION_USERS_WRITE = 'users.write';
@@ -210,6 +212,10 @@ class ApiAccessToken extends Model
             self::PERMISSION_TASKS_WRITE => [
                 'label_key' => 'ui.api.permission_tasks_write',
                 'description_key' => 'ui.api.permission_tasks_write_description',
+            ],
+            self::PERMISSION_CALENDAR_READ => [
+                'label_key' => 'ui.api.permission_calendar_read',
+                'description_key' => 'ui.api.permission_calendar_read_description',
             ],
             self::PERMISSION_USERS_READ => [
                 'label_key' => 'ui.api.permission_users_read',

@@ -71,6 +71,8 @@ return [
     'permission_access_tsd_description' => 'Разрешить открывать модуль ТСД и сохранять QR-сканирования.',
     'permission_access_equipment' => 'Доступ к оборудованию',
     'permission_access_equipment_description' => 'Разрешить открывать модуль оборудования и работать с карточками оборудования.',
+    'permission_access_calendar' => 'Доступ к календарю',
+    'permission_access_calendar_description' => 'Разрешить открывать календарь доступных задач и назначенных конференций.',
     'permission_access_directories' => 'Доступ к справочникам',
     'permission_access_directories_description' => 'Разрешить открывать модуль справочников и просматривать доступные схемы и записи.',
     'permission_manage_directories' => 'Управление справочниками',

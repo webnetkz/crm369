@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\ChatConversation;
 use App\Models\ChatConversationParticipant;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 
 class GeneralChatManager
 {
@@ -63,5 +64,40 @@ class GeneralChatManager
                 'last_read_at' => $conversation->last_message_at,
             ],
         );
+    }
+
+    public function ensureActiveParticipants(ChatConversation $conversation): void
+    {
+        if (! $conversation->isGeneralConversation()) {
+            return;
+        }
+
+        $createdAt = now();
+
+        User::query()
+            ->select('id')
+            ->where('is_active', true)
+            ->whereNotNull('email_verified_at')
+            ->whereNotIn(
+                'id',
+                ChatConversationParticipant::query()
+                    ->select('user_id')
+                    ->where('chat_conversation_id', $conversation->id),
+            )
+            ->chunkById(500, function (Collection $users) use ($conversation, $createdAt): void {
+                ChatConversationParticipant::query()->insertOrIgnore(
+                    $users
+                        ->map(fn (User $user): array => [
+                            'chat_conversation_id' => $conversation->id,
+                            'user_id' => $user->id,
+                            'last_read_at' => $conversation->last_message_at,
+                            'created_at' => $createdAt,
+                            'updated_at' => $createdAt,
+                        ])
+                        ->all(),
+                );
+            });
+
+        $conversation->unsetRelation('participants');
     }
 }

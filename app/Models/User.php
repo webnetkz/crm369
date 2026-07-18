@@ -41,6 +41,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property array<int, string>|null $hidden_menu_item_keys
  * @property array<int, int>|null $hidden_menu_item_ids
  * @property array<int, string>|null $menu_item_order
+ * @property array<string, mixed>|null $dashboard_configuration
  * @property string $task_display_mode
  * @property array<int, string>|null $visible_user_table_columns
  * @property string|null $avatar_path
@@ -57,7 +58,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'last_name', 'middle_name', 'email', 'phone', 'position', 'manager_id', 'password', 'appearance', 'language', 'has_selected_language', 'background_color', 'background_image_path', 'background_blur', 'hidden_menu_item_keys', 'hidden_menu_item_ids', 'menu_item_order', 'task_display_mode', 'visible_user_table_columns', 'avatar_path', 'avatar_position_x', 'avatar_position_y', 'avatar_scale', 'user_group_id', 'is_active', 'deactivated_at'])]
+#[Fillable(['name', 'last_name', 'middle_name', 'email', 'phone', 'position', 'manager_id', 'password', 'appearance', 'language', 'has_selected_language', 'background_color', 'background_image_path', 'background_blur', 'hidden_menu_item_keys', 'hidden_menu_item_ids', 'menu_item_order', 'dashboard_configuration', 'task_display_mode', 'visible_user_table_columns', 'avatar_path', 'avatar_position_x', 'avatar_position_y', 'avatar_scale', 'user_group_id', 'is_active', 'deactivated_at'])]
 #[Hidden(['password', 'avatar_path', 'background_image_path', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
@@ -91,6 +92,7 @@ class User extends Authenticatable implements PasskeyUser
             'hidden_menu_item_keys' => 'array',
             'hidden_menu_item_ids' => 'array',
             'menu_item_order' => 'array',
+            'dashboard_configuration' => 'array',
             'visible_user_table_columns' => 'array',
             'avatar_position_x' => 'integer',
             'avatar_position_y' => 'integer',
@@ -288,6 +290,13 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->canAccessConfiguredModule('conferences', [
             UserGroup::PERMISSION_ACCESS_CONFERENCES,
+        ]);
+    }
+
+    public function canAccessCalendar(): bool
+    {
+        return $this->canAccessConfiguredModule('calendar', [
+            UserGroup::PERMISSION_ACCESS_CALENDAR,
         ]);
     }
 
@@ -608,10 +617,6 @@ class User extends Authenticatable implements PasskeyUser
 
     private function resolvedGroup(): ?UserGroup
     {
-        if ($this->relationLoaded('group')) {
-            return $this->group;
-        }
-
-        return $this->group()->first();
+        return $this->loadMissing('group')->group;
     }
 }

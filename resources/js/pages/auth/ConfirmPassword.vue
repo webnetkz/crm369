@@ -14,8 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useCsrfToken } from '@/composables/useCsrfToken';
 import { useLanguage } from '@/composables/useLanguage';
-import { edit as editProfile } from '@/routes/profile';
 import { store } from '@/routes/password/confirm';
+import { edit as editProfile } from '@/routes/profile';
 
 const { t } = useLanguage();
 const csrfToken = useCsrfToken();

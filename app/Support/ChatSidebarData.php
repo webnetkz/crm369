@@ -13,6 +13,7 @@ class ChatSidebarData
 {
     public function __construct(
         private readonly ChatMessageData $chatMessageData,
+        private readonly ChatConversationReadMarker $chatConversationReadMarker,
         private readonly ChatRuntimeCache $chatRuntimeCache,
         private readonly GeneralChatManager $generalChatManager,
     ) {}
@@ -106,12 +107,7 @@ class ChatSidebarData
             $this->generalChatManager->ensureParticipant($conversation, $user);
         }
 
-        ChatConversationParticipant::query()
-            ->where('chat_conversation_id', $conversation->id)
-            ->where('user_id', $user->id)
-            ->update(['last_read_at' => now()]);
-
-        $this->chatRuntimeCache->forgetUser($user);
+        $this->chatConversationReadMarker->mark($conversation, $user);
     }
 
     /**
@@ -278,6 +274,7 @@ class ChatSidebarData
             ->with([
                 'user:id,name,last_name,email,phone,avatar_path,avatar_scale,user_group_id',
                 'attachments',
+                'reads.user:id,name,last_name,email',
             ])
             ->oldest('id')
             ->get()

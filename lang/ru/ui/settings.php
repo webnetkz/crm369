@@ -33,6 +33,7 @@ return [
     'modules' => 'Модули',
     'business_processes' => 'Бизнес-процессы',
     'integrations' => 'Интеграции',
+    'one_c' => 'Интеграция с 1С',
     'logs' => 'Логи',
     'api' => 'API',
     'api_documentation' => 'Документация API',

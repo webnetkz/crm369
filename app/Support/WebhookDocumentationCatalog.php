@@ -17,6 +17,7 @@ class WebhookDocumentationCatalog
             'users_show_url' => url('/portal-webhooks').'/{webhook_id}/users/{user_id}',
             'company_structure_index_url' => url('/portal-webhooks').'/{webhook_id}/company-structure',
             'company_structure_show_url' => url('/portal-webhooks').'/{webhook_id}/company-structure/users/{user_id}',
+            'calendar_events_url' => url('/portal-webhooks').'/{webhook_id}/calendar/events',
             'contacts_index_url' => url('/portal-webhooks').'/{webhook_id}/contacts',
             'contacts_show_url' => url('/portal-webhooks').'/{webhook_id}/contacts/{contact_id}',
             'contacts_store_url' => url('/portal-webhooks').'/{webhook_id}/contacts',

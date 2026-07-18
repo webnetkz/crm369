@@ -27,6 +27,7 @@ return [
     'phone' => 'Phone number',
     'previous' => 'Previous',
     'register' => 'Register',
+    'retry' => 'Try again',
     'save' => 'Save',
     'settings' => 'Settings',
     'showing_results' => 'Showing results',

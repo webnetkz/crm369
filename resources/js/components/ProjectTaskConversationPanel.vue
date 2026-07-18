@@ -48,6 +48,8 @@ const messagesContainer = ref<HTMLElement | null>(null);
 const isScrolledNearBottom = ref(true);
 const scrollThresholdPx = 96;
 let pollInterval: ReturnType<typeof setInterval> | null = null;
+let conversationRequestSequence = 0;
+let conversationAbortController: AbortController | null = null;
 
 const participants = computed<ChatUserSummary[]>(() => {
     return conversation.value?.participants ?? [];
@@ -179,8 +181,12 @@ const loadConversation = async (options?: {
         return;
     }
 
+    const requestSequence = ++conversationRequestSequence;
     const shouldStickToBottom =
         options?.forceScrollToBottom ?? isMessagesScrolledNearBottom();
+
+    conversationAbortController?.abort();
+    conversationAbortController = new AbortController();
 
     loading.value = conversation.value === null;
     loadError.value = null;
@@ -190,7 +196,12 @@ const loadConversation = async (options?: {
             conversation: ChatActiveConversation;
         }>(showTaskConversation.url(props.taskId), {
             method: 'GET',
+            signal: conversationAbortController.signal,
         });
+
+        if (requestSequence !== conversationRequestSequence) {
+            return;
+        }
 
         conversation.value = response.conversation;
         await syncMessagesViewport(
@@ -198,13 +209,24 @@ const loadConversation = async (options?: {
             options?.scrollBehavior,
         );
     } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            return;
+        }
+
+        if (requestSequence !== conversationRequestSequence) {
+            return;
+        }
+
         console.error(error);
 
         if (!options?.suppressErrors) {
             loadError.value = t.value.common.error;
         }
     } finally {
-        loading.value = false;
+        if (requestSequence === conversationRequestSequence) {
+            conversationAbortController = null;
+            loading.value = false;
+        }
     }
 };
 
@@ -214,7 +236,9 @@ const cancelEditingMessage = (): void => {
     selectedAttachments.value = [];
 };
 
-const startEditingMessage = (message: ChatActiveConversation['messages'][number]): void => {
+const startEditingMessage = (
+    message: ChatActiveConversation['messages'][number],
+): void => {
     if (sending.value || message.isDeleted) {
         return;
     }
@@ -227,11 +251,7 @@ const startEditingMessage = (message: ChatActiveConversation['messages'][number]
 const removeMessage = async (
     message: ChatActiveConversation['messages'][number],
 ): Promise<void> => {
-    if (
-        sending.value ||
-        !conversationId.value ||
-        message.isDeleted
-    ) {
+    if (sending.value || !conversationId.value || message.isDeleted) {
         return;
     }
 
@@ -264,11 +284,7 @@ const removeMessage = async (
 const togglePinnedMessage = async (
     message: ChatActiveConversation['messages'][number],
 ): Promise<void> => {
-    if (
-        sending.value ||
-        !conversationId.value ||
-        message.isDeleted
-    ) {
+    if (sending.value || !conversationId.value || message.isDeleted) {
         return;
     }
 
@@ -277,9 +293,10 @@ const togglePinnedMessage = async (
 
     try {
         await fetchSameOriginJson(
-            (
-                message.isPinned ? unpinMessage : pinMessage
-            ).url([conversationId.value, message.id]),
+            (message.isPinned ? unpinMessage : pinMessage).url([
+                conversationId.value,
+                message.id,
+            ]),
             {
                 method: message.isPinned ? 'DELETE' : 'PATCH',
             },
@@ -315,11 +332,9 @@ const submitMessage = async (): Promise<void> => {
 
     if (
         !conversationId.value ||
-        (
-            draft.value.trim() === '' &&
+        (draft.value.trim() === '' &&
             selectedAttachments.value.length === 0 &&
-            !canSubmitEmptyEdit
-        ) ||
+            !canSubmitEmptyEdit) ||
         sending.value
     ) {
         return;
@@ -331,7 +346,10 @@ const submitMessage = async (): Promise<void> => {
     try {
         if (editingMessageId.value !== null) {
             await fetchSameOriginJson(
-                updateMessage.url([conversationId.value, editingMessageId.value]),
+                updateMessage.url([
+                    conversationId.value,
+                    editingMessageId.value,
+                ]),
                 {
                     method: 'PATCH',
                     body: JSON.stringify({
@@ -382,7 +400,11 @@ const startPolling = (): void => {
     }
 
     pollInterval = setInterval(() => {
-        if (!props.active) {
+        if (
+            !props.active ||
+            document.hidden ||
+            conversationAbortController !== null
+        ) {
             return;
         }
 
@@ -406,6 +428,7 @@ watch(
 
         if (!isActive) {
             stopPolling();
+            conversationAbortController?.abort();
 
             return;
         }
@@ -426,6 +449,7 @@ watch(
 
 onBeforeUnmount(() => {
     stopPolling();
+    conversationAbortController?.abort();
 });
 </script>
 
@@ -569,10 +593,10 @@ onBeforeUnmount(() => {
                                 class="rounded-3xl px-4 py-3 text-sm break-words whitespace-pre-wrap shadow-sm"
                                 :class="
                                     entry.message.isDeleted
-                                        ? 'border border-dashed border-border bg-muted/20 italic text-muted-foreground'
+                                        ? 'border border-dashed border-border bg-muted/20 text-muted-foreground italic'
                                         : entry.message.isOwn
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'border border-border bg-background text-foreground'
+                                          ? 'bg-primary text-primary-foreground'
+                                          : 'border border-border bg-background text-foreground'
                                 "
                             >
                                 <div
@@ -609,9 +633,7 @@ onBeforeUnmount(() => {
                                 <template v-if="entry.message.isDeleted">
                                     · {{ t.chat.deleted }}
                                 </template>
-                                <template
-                                    v-else-if="entry.message.isEdited"
-                                >
+                                <template v-else-if="entry.message.isEdited">
                                     · {{ t.chat.edited }}
                                 </template>
                                 <button

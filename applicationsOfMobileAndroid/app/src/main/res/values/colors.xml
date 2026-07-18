@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="seed">#0A6C74</color>
+    <color name="launcher_background">#D9F2F4</color>
+    <color name="portal_screen_background">#F4F6F7</color>
+    <color name="portal_surface">#FFFFFF</color>
+    <color name="portal_text_primary">#141414</color>
+    <color name="portal_text_secondary">#66717A</color>
+    <color name="portal_border">#DCE2E6</color>
+</resources>

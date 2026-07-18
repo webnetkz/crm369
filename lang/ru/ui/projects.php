@@ -40,6 +40,7 @@ return [
     'export_tasks_csv' => 'Экспорт CSV',
     'download_tasks_csv_template' => 'Скачать шаблон',
     'import_tasks_csv' => 'Импорт CSV',
+    'csv_file' => 'CSV-файл',
     'csv_import_help' => 'Используйте экспортированный CSV как шаблон для импорта задач и подзадач.',
     'csv_delimiter' => 'Разделитель CSV',
     'csv_delimiter_placeholder' => 'Например, ;',

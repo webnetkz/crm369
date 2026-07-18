@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ChatMessageController;
 use App\Http\Controllers\ChatPageController;
 use App\Http\Controllers\ChatSidebarController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\ConferenceInvitationController;
 use App\Http\Controllers\ContactCommentController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CrmFunnelController;
+use App\Http\Controllers\DashboardConfigurationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentationController;
 use App\Http\Controllers\EdoDocumentController;
@@ -21,6 +23,7 @@ use App\Http\Controllers\NewsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationPageController;
 use App\Http\Controllers\PortalFormController;
+use App\Http\Controllers\PortalWebhookCalendarController;
 use App\Http\Controllers\PortalWebhookCompanyStructureController;
 use App\Http\Controllers\PortalWebhookContactController;
 use App\Http\Controllers\PortalWebhookEdoController;
@@ -34,6 +37,7 @@ use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectTaskConversationController;
 use App\Http\Controllers\PublicConferenceController;
+use App\Http\Controllers\PublicConferenceRoomController;
 use App\Http\Controllers\PublicEdoSigningController;
 use App\Http\Controllers\PublicPortalFormController;
 use App\Http\Controllers\ReferenceDirectoryController;
@@ -64,6 +68,9 @@ Route::get('portal-webhooks/{portalWebhook}/company-structure', [PortalWebhookCo
 Route::get('portal-webhooks/{portalWebhook}/company-structure/users/{user}', [PortalWebhookCompanyStructureController::class, 'show'])
     ->middleware(['module.enabled:webhooks', 'module.enabled:company-structure', 'throttle:30,1', 'portal.webhook:company-structure.read'])
     ->name('portal-webhooks.company-structure.show');
+Route::get('portal-webhooks/{portalWebhook}/calendar/events', [PortalWebhookCalendarController::class, 'index'])
+    ->middleware(['module.enabled:webhooks', 'module.enabled:calendar', 'throttle:30,1', 'portal.webhook:calendar.read'])
+    ->name('portal-webhooks.calendar.events.index');
 Route::get('portal-webhooks/{portalWebhook}/contacts', [PortalWebhookContactController::class, 'index'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:contacts.read', 'module.enabled:contacts'])
     ->name('portal-webhooks.contacts.index');
@@ -173,6 +180,26 @@ Route::post('forms/public/{portalForm:public_token}', [PublicPortalFormControlle
 Route::get('conferences/public/{conference}', [PublicConferenceController::class, 'show'])
     ->middleware('module.enabled:conferences')
     ->name('conferences.public.show');
+Route::prefix('conferences/public/{conference}/room')
+    ->name('conferences.public.room.')
+    ->middleware('module.enabled:conferences')
+    ->group(function (): void {
+        Route::post('join', [PublicConferenceRoomController::class, 'join'])
+            ->middleware('throttle:20,1,conference-room-join')
+            ->name('join');
+        Route::post('sync', [PublicConferenceRoomController::class, 'sync'])
+            ->middleware('throttle:1200,1,conference-room-realtime')
+            ->name('sync');
+        Route::post('signals', [PublicConferenceRoomController::class, 'signal'])
+            ->middleware('throttle:1200,1,conference-room-realtime')
+            ->name('signals.store');
+        Route::post('messages', [PublicConferenceRoomController::class, 'message'])
+            ->middleware('throttle:120,1,conference-room-message')
+            ->name('messages.store');
+        Route::post('leave', [PublicConferenceRoomController::class, 'leave'])
+            ->middleware('throttle:120,1,conference-room-leave')
+            ->name('leave');
+    });
 Route::get('edo/public/{edoDocument:public_token}', [PublicEdoSigningController::class, 'show'])
     ->middleware('module.enabled:edo')
     ->name('edo.public.show');
@@ -193,7 +220,12 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::patch('dashboard/configuration', [DashboardConfigurationController::class, 'update'])
+        ->name('dashboard.configuration.update');
     Route::get('documentation', DocumentationController::class)->name('documentation.index');
+    Route::get('calendar', [CalendarController::class, 'index'])
+        ->middleware(['module.enabled:calendar', 'can:access-calendar'])
+        ->name('calendar.index');
     Route::middleware(['module.enabled:company-structure', 'can:access-company-structure'])->group(function () {
         Route::get('company-structure', CompanyStructureController::class)->name('company-structure.index');
     });
@@ -358,6 +390,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['module.enabled:warehouses', 'can:access-warehouses'])->group(function () {
         Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
         Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show'])->name('warehouses.show');
+        Route::get('warehouses/{warehouse}/floors/{warehouseFloor}', [WarehouseController::class, 'floor'])->name('warehouses.floors.show');
         Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
         Route::post('warehouses/scan', [WarehouseController::class, 'scan'])->name('warehouses.scan');
     });

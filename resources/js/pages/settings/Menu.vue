@@ -99,6 +99,7 @@ const sidebarBuiltInKeys = [
     'company-structure',
     'projects',
     'chats',
+    'conferences',
     'knowledge-bases',
     'funnels',
     'forms',

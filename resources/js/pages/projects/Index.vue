@@ -41,6 +41,7 @@ import {
     updateTaskStage,
     updateWorkspaceTask,
 } from '@/actions/App/Http/Controllers/ProjectController';
+import CsvExchangeSheet from '@/components/CsvExchangeSheet.vue';
 import InputError from '@/components/InputError.vue';
 import ProjectTaskConversationPanel from '@/components/ProjectTaskConversationPanel.vue';
 import ProjectTaskTreeItem from '@/components/ProjectTaskTreeItem.vue';
@@ -92,6 +93,7 @@ type TaskFormData = {
 
 type TaskSaveState = 'idle' | 'saving' | 'saved' | 'error';
 type TaskCsvImportContext = number | 'standalone' | null;
+type CsvPanelMode = 'import' | 'export';
 
 type Props = {
     pageMode: ProjectPageMode;
@@ -205,8 +207,8 @@ const taskCsvImportForm = useForm({
 const activeProjectOwnerId = computed(
     () => props.activeProject?.owner?.id ?? null,
 );
-const taskCsvImportInput = ref<HTMLInputElement | null>(null);
 const taskCsvImportContext = ref<TaskCsvImportContext>(null);
+const taskCsvPanelMode = ref<CsvPanelMode | null>(null);
 
 watchEffect(() => {
     const breadcrumbs: Array<{
@@ -391,19 +393,6 @@ const standaloneTaskGroup = computed(() => {
 });
 
 const taskStages = computed(() => props.taskOptions.statuses);
-const standaloneTaskImportError = computed(() => {
-    return taskCsvImportContext.value === 'standalone'
-        ? taskCsvImportForm.errors.file
-        : '';
-});
-
-const activeProjectTaskImportError = computed(() => {
-    return props.activeProject !== null &&
-        taskCsvImportContext.value === props.activeProject.id
-        ? taskCsvImportForm.errors.file
-        : '';
-});
-
 const flattenedStandaloneTasks = computed<FlattenedTaskItem[]>(() => {
     return flattenTaskTree(standaloneTaskGroup.value?.tasks ?? []);
 });
@@ -789,6 +778,8 @@ const submitProject = (): void => {
 };
 
 const downloadTaskCsv = (projectId: number | null): void => {
+    closeTaskCsvPanel();
+
     window.location.assign(
         projectId === null
             ? exportStandaloneTasks.url({
@@ -820,21 +811,53 @@ const downloadTaskCsvTemplate = (projectId: number | null): void => {
     );
 };
 
-const openTaskCsvImport = (projectId: number | null): void => {
+const openTaskCsvPanel = (
+    mode: CsvPanelMode,
+    projectId: number | null,
+): void => {
     taskCsvImportContext.value = projectId === null ? 'standalone' : projectId;
     taskCsvImportForm.clearErrors();
     taskCsvImportForm.file = null;
-
-    if (taskCsvImportInput.value) {
-        taskCsvImportInput.value.value = '';
-        taskCsvImportInput.value.click();
-    }
+    taskCsvPanelMode.value = mode;
 };
 
-const submitTaskCsvImport = (projectId: number | null): void => {
-    if (taskCsvImportForm.file === null) {
+const closeTaskCsvPanel = (): void => {
+    taskCsvPanelMode.value = null;
+    taskCsvImportContext.value = null;
+    taskCsvImportForm.clearErrors();
+};
+
+const taskCsvProjectId = (): number | null => {
+    return taskCsvImportContext.value === 'standalone'
+        ? null
+        : taskCsvImportContext.value;
+};
+
+const downloadSelectedTaskCsv = (): void => {
+    if (taskCsvImportContext.value === null) {
         return;
     }
+
+    downloadTaskCsv(taskCsvProjectId());
+};
+
+const downloadSelectedTaskCsvTemplate = (): void => {
+    if (taskCsvImportContext.value === null) {
+        return;
+    }
+
+    downloadTaskCsvTemplate(taskCsvProjectId());
+};
+
+const submitTaskCsvImport = (): void => {
+    if (
+        taskCsvImportForm.file === null ||
+        taskCsvImportContext.value === null
+    ) {
+        return;
+    }
+
+    const projectId = taskCsvProjectId();
 
     taskCsvImportForm.post(
         projectId === null
@@ -844,32 +867,15 @@ const submitTaskCsvImport = (projectId: number | null): void => {
             preserveScroll: true,
             onSuccess: () => {
                 taskCsvImportForm.reset();
-                taskCsvImportContext.value = null;
-            },
-            onFinish: () => {
-                if (taskCsvImportInput.value) {
-                    taskCsvImportInput.value.value = '';
-                }
+                closeTaskCsvPanel();
             },
         },
     );
 };
 
-const handleTaskCsvFileChange = (event: Event): void => {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0] ?? null;
-
-    if (file === null || taskCsvImportContext.value === null) {
-        return;
-    }
-
+const selectTaskCsvFile = (file: File | null): void => {
     taskCsvImportForm.file = file;
-
-    submitTaskCsvImport(
-        taskCsvImportContext.value === 'standalone'
-            ? null
-            : taskCsvImportContext.value,
-    );
+    taskCsvImportForm.clearErrors('file');
 };
 
 const deleteCurrentProject = (): void => {
@@ -1164,25 +1170,22 @@ const submitActiveTaskUpdate = (): void => {
         );
 };
 
-watch(
-    selectedTaskProjectId,
-    () => {
-        const allowedMemberIds = new Set(
-            taskMemberOptions.value.map((member) => member.id),
-        );
+watch(selectedTaskProjectId, () => {
+    const allowedMemberIds = new Set(
+        taskMemberOptions.value.map((member) => member.id),
+    );
 
-        if (
-            taskForm.assignee_user_id !== '' &&
-            !allowedMemberIds.has(Number(taskForm.assignee_user_id))
-        ) {
-            taskForm.assignee_user_id = '';
-        }
+    if (
+        taskForm.assignee_user_id !== '' &&
+        !allowedMemberIds.has(Number(taskForm.assignee_user_id))
+    ) {
+        taskForm.assignee_user_id = '';
+    }
 
-        taskForm.co_assignee_user_ids = taskForm.co_assignee_user_ids.filter(
-            (userId) => allowedMemberIds.has(userId),
-        );
-    },
-);
+    taskForm.co_assignee_user_ids = taskForm.co_assignee_user_ids.filter(
+        (userId) => allowedMemberIds.has(userId),
+    );
+});
 
 watch(
     () => taskForm.assignee_user_id,
@@ -1442,12 +1445,34 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
 <template>
     <Head :title="isTasksPage ? t.projects.tasks : t.projects.title" />
 
-    <input
-        ref="taskCsvImportInput"
-        type="file"
-        accept=".csv,text/csv"
-        class="hidden"
-        @change="handleTaskCsvFileChange"
+    <CsvExchangeSheet
+        :open="taskCsvPanelMode !== null"
+        :mode="taskCsvPanelMode ?? 'export'"
+        :title="
+            taskCsvPanelMode === 'import'
+                ? t.projects.import_tasks_csv
+                : t.projects.export_tasks_csv
+        "
+        :description="t.projects.csv_import_help"
+        :delimiter="taskCsvImportForm.delimiter"
+        :delimiter-label="t.projects.csv_delimiter"
+        :delimiter-placeholder="t.projects.csv_delimiter_placeholder"
+        :delimiter-hint="t.projects.csv_delimiter_hint"
+        :file-label="t.projects.csv_file"
+        :export-label="t.projects.export_tasks_csv"
+        :import-label="t.projects.import_tasks_csv"
+        :template-label="t.projects.download_tasks_csv_template"
+        :selected-file="taskCsvImportForm.file"
+        :processing="taskCsvImportForm.processing"
+        :progress="taskCsvImportForm.progress?.percentage ?? null"
+        :delimiter-error="taskCsvImportForm.errors.delimiter"
+        :file-error="taskCsvImportForm.errors.file"
+        @update:open="(isOpen) => !isOpen && closeTaskCsvPanel()"
+        @update:delimiter="taskCsvImportForm.delimiter = $event"
+        @file-selected="selectTaskCsvFile"
+        @download-template="downloadSelectedTaskCsvTemplate"
+        @import="submitTaskCsvImport"
+        @export="downloadSelectedTaskCsv"
     />
 
     <div
@@ -1811,7 +1836,7 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 size="sm"
                                 variant="outline"
                                 :disabled="taskCsvImportForm.processing"
-                                @click="downloadTaskCsv(null)"
+                                @click="openTaskCsvPanel('export', null)"
                             >
                                 <Download class="size-4" />
                                 {{ t.projects.export_tasks_csv }}
@@ -1821,17 +1846,7 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 size="sm"
                                 variant="outline"
                                 :disabled="taskCsvImportForm.processing"
-                                @click="downloadTaskCsvTemplate(null)"
-                            >
-                                <Download class="size-4" />
-                                {{ t.projects.download_tasks_csv_template }}
-                            </Button>
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                :disabled="taskCsvImportForm.processing"
-                                @click="openTaskCsvImport(null)"
+                                @click="openTaskCsvPanel('import', null)"
                             >
                                 <Upload class="size-4" />
                                 {{ t.projects.import_tasks_csv }}
@@ -1846,36 +1861,6 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                             </Button>
                         </div>
                     </div>
-
-                    <div class="mt-4 grid gap-2 rounded-2xl border border-dashed border-border p-4">
-                        <div class="flex flex-col gap-2 md:flex-row md:items-end">
-                            <div class="grid gap-2">
-                                <Label for="standalone-tasks-csv-delimiter">
-                                    {{ t.projects.csv_delimiter }}
-                                </Label>
-                                <Input
-                                    id="standalone-tasks-csv-delimiter"
-                                    v-model="taskCsvImportForm.delimiter"
-                                    :placeholder="t.projects.csv_delimiter_placeholder"
-                                    class="w-28"
-                                />
-                            </div>
-                            <Button
-                                type="button"
-                                :disabled="taskCsvImportForm.processing || taskCsvImportForm.file === null"
-                                @click="submitTaskCsvImport(null)"
-                            >
-                                <Upload class="size-4" />
-                                {{ t.projects.import_tasks_csv }}
-                            </Button>
-                        </div>
-                        <p class="text-xs text-muted-foreground">
-                            {{ t.projects.csv_delimiter_hint }}
-                        </p>
-                        <InputError :message="taskCsvImportForm.errors.delimiter" />
-                    </div>
-
-                    <InputError :message="standaloneTaskImportError" />
                 </div>
 
                 <div
@@ -2354,7 +2339,12 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 size="sm"
                                 variant="outline"
                                 :disabled="taskCsvImportForm.processing"
-                                @click="downloadTaskCsv(props.activeProject.id)"
+                                @click="
+                                    openTaskCsvPanel(
+                                        'export',
+                                        props.activeProject.id,
+                                    )
+                                "
                             >
                                 <Download class="size-4" />
                                 {{ t.projects.export_tasks_csv }}
@@ -2365,19 +2355,11 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                 size="sm"
                                 variant="outline"
                                 :disabled="taskCsvImportForm.processing"
-                                @click="downloadTaskCsvTemplate(props.activeProject.id)"
-                            >
-                                <Download class="size-4" />
-                                {{ t.projects.download_tasks_csv_template }}
-                            </Button>
-                            <Button
-                                v-if="props.can.workOnActiveProject"
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                :disabled="taskCsvImportForm.processing"
                                 @click="
-                                    openTaskCsvImport(props.activeProject.id)
+                                    openTaskCsvPanel(
+                                        'import',
+                                        props.activeProject.id,
+                                    )
                                 "
                             >
                                 <Upload class="size-4" />
@@ -2414,8 +2396,6 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                             </Button>
                         </div>
                     </div>
-
-                    <InputError :message="activeProjectTaskImportError" />
                 </div>
 
                 <div
@@ -2444,41 +2424,10 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                             @click="openCreateTask()"
                         >
                             <Plus class="size-4" />
-                                {{ t.projects.create_task }}
-                            </Button>
-                        </div>
-
-                        <div
-                            v-if="props.can.workOnActiveProject"
-                            class="mt-4 grid gap-2 rounded-2xl border border-dashed border-border p-4"
-                        >
-                            <div class="flex flex-col gap-2 md:flex-row md:items-end">
-                                <div class="grid gap-2">
-                                    <Label for="project-tasks-csv-delimiter">
-                                        {{ t.projects.csv_delimiter }}
-                                    </Label>
-                                    <Input
-                                        id="project-tasks-csv-delimiter"
-                                        v-model="taskCsvImportForm.delimiter"
-                                        :placeholder="t.projects.csv_delimiter_placeholder"
-                                        class="w-28"
-                                    />
-                                </div>
-                                <Button
-                                    type="button"
-                                    :disabled="taskCsvImportForm.processing || taskCsvImportForm.file === null"
-                                    @click="submitTaskCsvImport(props.activeProject.id)"
-                                >
-                                    <Upload class="size-4" />
-                                    {{ t.projects.import_tasks_csv }}
-                                </Button>
-                            </div>
-                            <p class="text-xs text-muted-foreground">
-                                {{ t.projects.csv_delimiter_hint }}
-                            </p>
-                            <InputError :message="taskCsvImportForm.errors.delimiter" />
-                        </div>
+                            {{ t.projects.create_task }}
+                        </Button>
                     </div>
+                </div>
 
                 <div class="space-y-4">
                     <div
@@ -3000,7 +2949,11 @@ const handleTaskStageSheetOpenChange = (open: boolean): void => {
                                     :exclude-user-ids="
                                         taskForm.assignee_user_id === ''
                                             ? []
-                                            : [Number(taskForm.assignee_user_id)]
+                                            : [
+                                                  Number(
+                                                      taskForm.assignee_user_id,
+                                                  ),
+                                              ]
                                     "
                                 />
                                 <InputError

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Carbon;
 
 /**
@@ -23,9 +24,9 @@ use Illuminate\Support\Carbon;
 #[Fillable(['warehouse_column_id', 'name', 'qr_code', 'sort_order'])]
 class WarehouseFloor extends Model
 {
-    /** @use HasFactory<WarehouseFloorFactory> */
     use AssignsQrCode;
 
+    /** @use HasFactory<WarehouseFloorFactory> */
     use HasFactory;
 
     /**
@@ -60,6 +61,19 @@ class WarehouseFloor extends Model
         return $this->hasMany(WarehousePlace::class)
             ->orderBy('sort_order')
             ->orderBy('id');
+    }
+
+    /**
+     * @return HasManyThrough<WarehouseItem, WarehousePlace, $this>
+     */
+    public function items(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            WarehouseItem::class,
+            WarehousePlace::class,
+            'warehouse_floor_id',
+            'warehouse_place_id',
+        );
     }
 
     public function placeCount(): int

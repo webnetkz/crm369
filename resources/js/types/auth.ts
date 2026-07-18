@@ -47,6 +47,7 @@ export type Auth = {
     canAccessProjects: boolean;
     canAccessChats: boolean;
     canAccessConferences: boolean;
+    canAccessCalendar: boolean;
     canAccessKnowledgeBases: boolean;
     canAccessForms: boolean;
     canAccessEdo: boolean;

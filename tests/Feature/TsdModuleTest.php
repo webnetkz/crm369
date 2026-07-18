@@ -35,6 +35,7 @@ test('authenticated users can open tsd module and save a qr scan', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('tsd/Index')
             ->where('autoStartScanner', false)
+            ->where('initialQrCode', '')
             ->where('stats.total', 0)
             ->where('recentScans', [])
         );
@@ -67,6 +68,20 @@ test('authenticated users can open the qr menu entry with scanner autostart enab
         ->assertInertia(fn (Assert $page) => $page
             ->component('tsd/Index')
             ->where('autoStartScanner', true)
+            ->where('initialQrCode', '')
+        );
+});
+
+test('native mobile qr scanners can prefill the quick scan form', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('qr.index', ['qr_code' => 'EQ-NATIVE-001']))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('tsd/Index')
+            ->where('autoStartScanner', true)
+            ->where('initialQrCode', 'EQ-NATIVE-001')
         );
 });
 

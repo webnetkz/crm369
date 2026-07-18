@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property string $body
  * @property string|null $original_body
  * @property Collection<int, ChatMessageAttachment> $attachments
+ * @property Collection<int, ChatMessageRead> $reads
  * @property Carbon|null $edited_at
  * @property Carbon|null $deleted_at
  * @property Carbon|null $pinned_at
@@ -73,6 +74,14 @@ class ChatMessage extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(ChatMessageAttachment::class);
+    }
+
+    /**
+     * @return HasMany<ChatMessageRead, $this>
+     */
+    public function reads(): HasMany
+    {
+        return $this->hasMany(ChatMessageRead::class);
     }
 
     public function wasEdited(): bool

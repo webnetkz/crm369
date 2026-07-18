@@ -2,6 +2,8 @@
 
 use App\Models\PortalSetting;
 use App\Models\User;
+use App\Models\UserGroup;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('users can update their language preference', function () {
@@ -52,35 +54,65 @@ test('language preference is shared with inertia pages', function () {
         'has_selected_language' => true,
     ]);
 
-    $this
+    $response = $this
         ->actingAs($user)
         ->get(route('appearance.edit'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('locale.current', 'en')
-            ->where('locale.messages.en.common.settings', 'Settings')
-            ->where('locale.messages.en.common.choose_file', 'Choose file')
-            ->where('locale.messages.en.common.last_name', 'Last name')
-            ->where('locale.messages.en.common.middle_name', 'Middle name')
-            ->where('locale.messages.en.common.no_file_selected', 'No file selected')
-            ->where('locale.messages.en.common.not_specified', 'Not specified')
-            ->where('locale.messages.en.common.phone', 'Phone number')
-            ->where('locale.messages.en.admin.profile_description', 'Full information about the selected user.')
-            ->where('locale.messages.en.settings.rights', 'Rights')
-            ->where('locale.messages.en.admin.permission_impersonate_users', 'Sign in as users')
-            ->where('locale.messages.en.notifications.panel_title', 'Notifications')
-            ->where('locale.messages.en.notifications.mark_all_as_read', 'Mark all as read')
-            ->where('locale.messages.en.documentation.title', 'Documentation')
-            ->where('locale.messages.en.profile.update_profile', 'Profile')
-            ->where('locale.messages.en.profile.phone_placeholder', '+7 777 123 45 67')
-            ->where('locale.messages.en.profile.update_profile_description', 'Update your name and email address')
-            ->where('locale.messages.en.common.name', 'Name')
-            ->where('locale.messages.en.common.email', 'Email')
-            ->where('locale.messages.en.security.current_password', 'Current password')
-            ->where('locale.messages.en.passkeys.title', 'Passkeys')
-            ->where('locale.messages.en.two_factor.title', 'Two-factor authentication')
-            ->where('locale.messages.ru.common.settings', 'Настройки'),
+            ->where('locale.messages.common.settings', 'Settings')
+            ->where('locale.messages.common.choose_file', 'Choose file')
+            ->where('locale.messages.common.last_name', 'Last name')
+            ->where('locale.messages.common.middle_name', 'Middle name')
+            ->where('locale.messages.common.no_file_selected', 'No file selected')
+            ->where('locale.messages.common.not_specified', 'Not specified')
+            ->where('locale.messages.common.phone', 'Phone number')
+            ->where('locale.messages.admin.profile_description', 'Full information about the selected user.')
+            ->where('locale.messages.settings.rights', 'Rights')
+            ->where('locale.messages.admin.permission_impersonate_users', 'Sign in as users')
+            ->where('locale.messages.notifications.panel_title', 'Notifications')
+            ->where('locale.messages.notifications.mark_all_as_read', 'Mark all as read')
+            ->where('locale.messages.documentation.title', 'Documentation')
+            ->where('locale.messages.profile.update_profile', 'Profile')
+            ->where('locale.messages.profile.phone_placeholder', '+7 777 123 45 67')
+            ->where('locale.messages.profile.update_profile_description', 'Update your name and email address')
+            ->where('locale.messages.common.name', 'Name')
+            ->where('locale.messages.common.email', 'Email')
+            ->where('locale.messages.security.current_password', 'Current password')
+            ->where('locale.messages.passkeys.title', 'Passkeys')
+            ->where('locale.messages.two_factor.title', 'Two-factor authentication'),
         );
+
+    $serializedMessages = json_encode(
+        $response->inertiaProps('locale.messages'),
+        JSON_THROW_ON_ERROR,
+    );
+
+    expect(strlen($serializedMessages))->toBeLessThan(200_000);
+});
+
+test('shared authorization data resolves the user group once per request', function () {
+    $group = UserGroup::factory()->create();
+    $user = User::factory()->create([
+        'user_group_id' => $group->id,
+    ]);
+
+    DB::connection()->flushQueryLog();
+    DB::enableQueryLog();
+
+    $this->actingAs($user)
+        ->get(route('appearance.edit'))
+        ->assertSuccessful();
+
+    $groupQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_starts_with(
+            $query['query'],
+            'select * from "user_groups" where',
+        ));
+
+    DB::disableQueryLog();
+
+    expect($groupQueries)->toHaveCount(1);
 });
 
 test('portal default language is used for guests without a language cookie', function () {
@@ -94,7 +126,7 @@ test('portal default language is used for guests without a language cookie', fun
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('locale.current', 'en')
-            ->where('locale.messages.en.auth.login_title', 'Log in to your account'),
+            ->where('locale.messages.auth.login_title', 'Log in to your account'),
         );
 });
 
@@ -159,21 +191,21 @@ test('russian appearance settings translations are shared with inertia pages', f
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('locale.current', 'ru')
-            ->where('locale.messages.ru.settings.appearance_settings', 'Настройки внешнего вида')
-            ->where('locale.messages.ru.common.choose_file', 'Выберите файл')
-            ->where('locale.messages.ru.common.last_name', 'Фамилия')
-            ->where('locale.messages.ru.common.middle_name', 'Отчество')
-            ->where('locale.messages.ru.common.not_specified', 'Не указано')
-            ->where('locale.messages.ru.common.phone', 'Номер телефона')
-            ->where('locale.messages.ru.admin.profile_description', 'Полная информация о выбранном пользователе.')
-            ->where('locale.messages.ru.settings.rights', 'Права')
-            ->where('locale.messages.ru.admin.permission_impersonate_users', 'Авторизация от имени пользователей')
-            ->where('locale.messages.ru.notifications.panel_title', 'Уведомления')
-            ->where('locale.messages.ru.notifications.mark_all_as_read', 'Отметить все как прочитанные')
-            ->where('locale.messages.ru.documentation.title', 'Документация')
-            ->where('locale.messages.ru.settings.light', 'Светлая')
-            ->where('locale.messages.ru.settings.dark', 'Темная')
-            ->where('locale.messages.ru.settings.system', 'Системная'),
+            ->where('locale.messages.settings.appearance_settings', 'Настройки внешнего вида')
+            ->where('locale.messages.common.choose_file', 'Выберите файл')
+            ->where('locale.messages.common.last_name', 'Фамилия')
+            ->where('locale.messages.common.middle_name', 'Отчество')
+            ->where('locale.messages.common.not_specified', 'Не указано')
+            ->where('locale.messages.common.phone', 'Номер телефона')
+            ->where('locale.messages.admin.profile_description', 'Полная информация о выбранном пользователе.')
+            ->where('locale.messages.settings.rights', 'Права')
+            ->where('locale.messages.admin.permission_impersonate_users', 'Авторизация от имени пользователей')
+            ->where('locale.messages.notifications.panel_title', 'Уведомления')
+            ->where('locale.messages.notifications.mark_all_as_read', 'Отметить все как прочитанные')
+            ->where('locale.messages.documentation.title', 'Документация')
+            ->where('locale.messages.settings.light', 'Светлая')
+            ->where('locale.messages.settings.dark', 'Темная')
+            ->where('locale.messages.settings.system', 'Системная'),
         );
 });
 
@@ -214,7 +246,7 @@ test('guest language cookie is shared with inertia pages', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('locale.current', 'en')
-            ->where('locale.messages.en.auth.login_title', 'Log in to your account'),
+            ->where('locale.messages.auth.login_title', 'Log in to your account'),
         );
 });
 

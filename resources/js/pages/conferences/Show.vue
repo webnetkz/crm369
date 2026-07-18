@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { Head, Link, router, setLayoutProps, useForm } from '@inertiajs/vue3';
+import {
+    Head,
+    Link,
+    router,
+    setLayoutProps,
+    useForm,
+    usePage,
+} from '@inertiajs/vue3';
 import {
     Copy,
-    ExternalLink,
     MessageSquareText,
     MonitorUp,
-    PencilRuler,
+    Plus,
     SquareTerminal,
     Users,
     Video,
@@ -14,6 +20,7 @@ import { useClipboard } from '@vueuse/core';
 import { computed, ref, watchEffect } from 'vue';
 import { end as endConference } from '@/actions/App/Http/Controllers/ConferenceController';
 import { store as storeConferenceInvitation } from '@/actions/App/Http/Controllers/ConferenceInvitationController';
+import ConferenceRoom from '@/components/conferences/ConferenceRoom.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import TaskUserPicker from '@/components/TaskUserPicker.vue';
@@ -29,6 +36,12 @@ type ConferenceListItem = {
     status: 'live' | 'scheduled' | 'ended';
 };
 
+type ConferenceGroups = {
+    current: ConferenceListItem[];
+    upcoming: ConferenceListItem[];
+    past: ConferenceListItem[];
+};
+
 type ConferenceDetail = {
     id: number;
     title: string;
@@ -40,8 +53,7 @@ type ConferenceDetail = {
     external_join_url: string | null;
     room_name: string;
     provider_label: string;
-    embed_url: string;
-    meeting_url: string;
+    room_key: string;
     creator: {
         id: number;
         name: string;
@@ -64,6 +76,7 @@ type ConferenceDetail = {
 const props = defineProps<{
     conference: ConferenceDetail;
     conferences: ConferenceListItem[];
+    conferenceGroups: ConferenceGroups;
     availableUsers: ProjectUserSummary[];
     provider: {
         label: string;
@@ -72,6 +85,7 @@ const props = defineProps<{
 
 const { copy } = useClipboard();
 const { language, t } = useLanguage();
+const page = usePage();
 const copiedPublicLink = ref(false);
 
 const inviteForm = useForm({
@@ -130,6 +144,24 @@ const conferenceStatusClass = computed(() => {
     return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
 });
 
+const conferenceNavigationSections = computed(() => [
+    {
+        key: 'current',
+        title: t.value.conferences.group_current,
+        conferences: props.conferenceGroups.current,
+    },
+    {
+        key: 'upcoming',
+        title: t.value.conferences.group_upcoming,
+        conferences: props.conferenceGroups.upcoming,
+    },
+    {
+        key: 'past',
+        title: t.value.conferences.group_past,
+        conferences: props.conferenceGroups.past,
+    },
+]);
+
 const invitedUserIds = computed(() => {
     return props.conference.invited_users
         .map((invitation) => invitation.user?.id)
@@ -145,6 +177,12 @@ const excludedUserIds = computed(() => {
     ];
 });
 
+const viewerDisplayName = computed(() => {
+    return [page.props.auth.user.name, page.props.auth.user.last_name]
+        .filter(Boolean)
+        .join(' ');
+});
+
 const submitInvitations = (): void => {
     inviteForm.post(storeConferenceInvitation.url(props.conference.id), {
         preserveScroll: true,
@@ -156,7 +194,11 @@ const submitInvitations = (): void => {
 };
 
 const endMeeting = (): void => {
-    router.patch(endConference(props.conference.id), {}, { preserveScroll: true });
+    router.patch(
+        endConference(props.conference.id),
+        {},
+        { preserveScroll: true },
+    );
 };
 
 const copyPublicLink = async (): Promise<void> => {
@@ -185,7 +227,23 @@ const copyPublicLink = async (): Promise<void> => {
 
         <div class="grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
             <aside class="space-y-4">
-                <section class="rounded-2xl border border-border bg-card p-5 shadow-xs">
+                <section
+                    class="rounded-2xl border border-primary/20 bg-primary/5 p-5 shadow-xs"
+                >
+                    <Button as-child class="w-full">
+                        <Link :href="index()">
+                            <Plus class="size-4" />
+                            {{ t.conferences.create_another }}
+                        </Link>
+                    </Button>
+                    <p class="mt-3 text-xs leading-5 text-muted-foreground">
+                        {{ t.conferences.create_anytime_description }}
+                    </p>
+                </section>
+
+                <section
+                    class="rounded-2xl border border-border bg-card p-5 shadow-xs"
+                >
                     <div class="flex items-start justify-between gap-3">
                         <div class="space-y-2">
                             <div class="text-base font-semibold">
@@ -210,7 +268,10 @@ const copyPublicLink = async (): Promise<void> => {
                                 {{ t.conferences.host }}:
                             </span>
                             {{
-                                [conference.creator?.name, conference.creator?.last_name]
+                                [
+                                    conference.creator?.name,
+                                    conference.creator?.last_name,
+                                ]
                                     .filter(Boolean)
                                     .join(' ') || t.common.not_specified
                             }}
@@ -225,7 +286,9 @@ const copyPublicLink = async (): Promise<void> => {
                             <span class="font-medium text-foreground">
                                 {{ t.conferences.room_code }}:
                             </span>
-                            <span class="break-all">{{ conference.room_name }}</span>
+                            <span class="break-all">{{
+                                conference.room_name
+                            }}</span>
                         </div>
                     </div>
 
@@ -243,24 +306,17 @@ const copyPublicLink = async (): Promise<void> => {
                                     : t.conferences.copy_public_link
                             }}
                         </Button>
-
-                        <a
-                            v-if="conference.status !== 'ended'"
-                            :href="conference.meeting_url"
-                            target="_blank"
-                            rel="noreferrer"
-                            class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition hover:bg-accent hover:text-accent-foreground"
-                        >
-                            <ExternalLink class="size-4" />
-                            {{ t.conferences.open_in_new_tab }}
-                        </a>
                     </div>
 
-                    <div class="mt-5 rounded-2xl border border-border/70 bg-background/70 p-4">
+                    <div
+                        class="mt-5 rounded-2xl border border-border/70 bg-background/70 p-4"
+                    >
                         <div class="text-sm font-medium">
                             {{ t.conferences.meeting_capabilities }}
                         </div>
-                        <div class="mt-4 grid gap-3 text-sm text-muted-foreground">
+                        <div
+                            class="mt-4 grid gap-3 text-sm text-muted-foreground"
+                        >
                             <div class="flex items-center gap-2">
                                 <Video class="size-4" />
                                 {{ t.conferences.capability_video }}
@@ -273,21 +329,24 @@ const copyPublicLink = async (): Promise<void> => {
                                 <MonitorUp class="size-4" />
                                 {{ t.conferences.capability_screen }}
                             </div>
-                            <div class="flex items-center gap-2">
-                                <PencilRuler class="size-4" />
-                                {{ t.conferences.capability_whiteboard }}
-                            </div>
                         </div>
                     </div>
                 </section>
 
-                <section class="rounded-2xl border border-border bg-card p-5 shadow-xs">
-                    <div class="flex items-center gap-2 text-base font-semibold">
+                <section
+                    class="rounded-2xl border border-border bg-card p-5 shadow-xs"
+                >
+                    <div
+                        class="flex items-center gap-2 text-base font-semibold"
+                    >
                         <Users class="size-4 text-primary" />
                         {{ t.conferences.participants }}
                     </div>
 
-                    <div v-if="conference.invited_users.length === 0" class="mt-4 text-sm text-muted-foreground">
+                    <div
+                        v-if="conference.invited_users.length === 0"
+                        class="mt-4 text-sm text-muted-foreground"
+                    >
                         {{ t.conferences.no_invited_users }}
                     </div>
 
@@ -299,7 +358,10 @@ const copyPublicLink = async (): Promise<void> => {
                         >
                             <div class="font-medium">
                                 {{
-                                    [invitation.user?.name, invitation.user?.last_name]
+                                    [
+                                        invitation.user?.name,
+                                        invitation.user?.last_name,
+                                    ]
                                         .filter(Boolean)
                                         .join(' ')
                                 }}
@@ -324,7 +386,10 @@ const copyPublicLink = async (): Promise<void> => {
                         </p>
                     </div>
 
-                    <form class="mt-5 space-y-4" @submit.prevent="submitInvitations">
+                    <form
+                        class="mt-5 space-y-4"
+                        @submit.prevent="submitInvitations"
+                    >
                         <div class="space-y-2">
                             <Label>
                                 {{ t.conferences.field_invited_users }}
@@ -336,17 +401,26 @@ const copyPublicLink = async (): Promise<void> => {
                                 :exclude-user-ids="excludedUserIds"
                                 multiple
                             />
-                            <InputError :message="inviteForm.errors.invited_user_ids" />
+                            <InputError
+                                :message="inviteForm.errors.invited_user_ids"
+                            />
                         </div>
 
-                        <Button type="submit" :disabled="inviteForm.processing" class="w-full">
+                        <Button
+                            type="submit"
+                            :disabled="inviteForm.processing"
+                            class="w-full"
+                        >
                             <Users class="size-4" />
                             {{ t.conferences.invite_button }}
                         </Button>
                     </form>
                 </section>
 
-                <section v-if="conference.can.manage" class="rounded-2xl border border-border bg-card p-5 shadow-xs">
+                <section
+                    v-if="conference.can.manage"
+                    class="rounded-2xl border border-border bg-card p-5 shadow-xs"
+                >
                     <Button
                         type="button"
                         variant="outline"
@@ -359,31 +433,48 @@ const copyPublicLink = async (): Promise<void> => {
                     </Button>
                 </section>
 
-                <section class="rounded-2xl border border-border bg-card p-5 shadow-xs">
+                <section
+                    class="rounded-2xl border border-border bg-card p-5 shadow-xs"
+                >
                     <div class="text-base font-semibold">
                         {{ t.conferences.title }}
                     </div>
 
-                    <div class="mt-4 space-y-2">
-                        <Link
-                            v-for="item in conferences"
-                            :key="item.id"
-                            :href="showConference(item.id)"
-                            class="block rounded-xl border px-3 py-2 text-sm transition"
-                            :class="
-                                item.id === conference.id
-                                    ? 'border-primary/30 bg-primary/5 text-foreground'
-                                    : 'border-border bg-background text-muted-foreground hover:text-foreground'
-                            "
+                    <div class="mt-4 space-y-5">
+                        <section
+                            v-for="section in conferenceNavigationSections"
+                            v-show="section.conferences.length > 0"
+                            :key="section.key"
+                            class="space-y-2"
                         >
-                            {{ item.title }}
-                        </Link>
+                            <div
+                                class="flex items-center justify-between gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                            >
+                                <span>{{ section.title }}</span>
+                                <span>{{ section.conferences.length }}</span>
+                            </div>
+                            <Link
+                                v-for="item in section.conferences"
+                                :key="item.id"
+                                :href="showConference(item.id)"
+                                class="block rounded-xl border px-3 py-2 text-sm transition"
+                                :class="
+                                    item.id === conference.id
+                                        ? 'border-primary/30 bg-primary/5 text-foreground'
+                                        : 'border-border bg-background text-muted-foreground hover:text-foreground'
+                                "
+                            >
+                                {{ item.title }}
+                            </Link>
+                        </section>
                     </div>
                 </section>
             </aside>
 
             <section class="space-y-4">
-                <div class="rounded-2xl border border-border bg-card p-5 shadow-xs">
+                <div
+                    class="rounded-2xl border border-border bg-card p-5 shadow-xs"
+                >
                     <div class="space-y-1">
                         <div class="text-base font-semibold">
                             {{ t.conferences.meeting_title }}
@@ -401,12 +492,12 @@ const copyPublicLink = async (): Promise<void> => {
                     {{ t.conferences.ended_notice }}
                 </div>
 
-                <iframe
+                <ConferenceRoom
                     v-else
-                    :src="conference.embed_url"
-                    class="h-[calc(100vh-12rem)] min-h-[42rem] w-full rounded-2xl border border-border bg-black shadow-sm"
-                    allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write"
-                ></iframe>
+                    :room-key="conference.room_key"
+                    :conference-title="conference.title"
+                    :initial-display-name="viewerDisplayName"
+                />
             </section>
         </div>
     </div>

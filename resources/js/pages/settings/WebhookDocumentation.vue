@@ -14,6 +14,7 @@ type WebhookDocumentation = {
     users_show_url: string;
     company_structure_index_url: string;
     company_structure_show_url: string;
+    calendar_events_url: string;
     contacts_index_url: string;
     contacts_show_url: string;
     contacts_store_url: string;
@@ -68,6 +69,7 @@ const overviewSectionId = 'webhook-docs-overview';
 const endpointsSectionId = 'webhook-docs-endpoints';
 const PortalWebhookUsersReadPermission = 'users.read';
 const PortalWebhookCompanyStructureReadPermission = 'company-structure.read';
+const PortalWebhookCalendarReadPermission = 'calendar.read';
 const PortalWebhookContactsReadPermission = 'contacts.read';
 const PortalWebhookContactsWritePermission = 'contacts.write';
 const PortalWebhookDirectoriesReadPermission = 'directories.read';
@@ -125,261 +127,333 @@ const endpointExamples = computed<EndpointExample[]>(() => [
     },
     {
         method: 'GET',
+        path: `${props.documentation.calendar_events_url}?from={Y-m-d}&to={Y-m-d}&types[]=task&types[]=conference&token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_calendar_events_title,
+        description:
+            t.value.webhooks.documentation_endpoint_calendar_events_description,
+        permission: PortalWebhookCalendarReadPermission,
+    },
+    {
+        method: 'GET',
         path: `${props.documentation.users_index_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_users_index_title,
-        description: t.value.webhooks.documentation_endpoint_users_index_description,
+        description:
+            t.value.webhooks.documentation_endpoint_users_index_description,
         permission: PortalWebhookUsersReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.users_show_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_users_show_title,
-        description: t.value.webhooks.documentation_endpoint_users_show_description,
+        description:
+            t.value.webhooks.documentation_endpoint_users_show_description,
         permission: PortalWebhookUsersReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.company_structure_index_url}?token=${tokenQueryValue}`,
-        title: t.value.webhooks.documentation_endpoint_company_structure_index_title,
-        description: t.value.webhooks.documentation_endpoint_company_structure_index_description,
+        title: t.value.webhooks
+            .documentation_endpoint_company_structure_index_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_company_structure_index_description,
         permission: PortalWebhookCompanyStructureReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.company_structure_show_url}?token=${tokenQueryValue}`,
-        title: t.value.webhooks.documentation_endpoint_company_structure_show_title,
-        description: t.value.webhooks.documentation_endpoint_company_structure_show_description,
+        title: t.value.webhooks
+            .documentation_endpoint_company_structure_show_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_company_structure_show_description,
         permission: PortalWebhookCompanyStructureReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.contacts_index_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_contacts_index_title,
-        description: t.value.webhooks.documentation_endpoint_contacts_index_description,
+        description:
+            t.value.webhooks.documentation_endpoint_contacts_index_description,
         permission: PortalWebhookContactsReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.contacts_show_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_contacts_show_title,
-        description: t.value.webhooks.documentation_endpoint_contacts_show_description,
+        description:
+            t.value.webhooks.documentation_endpoint_contacts_show_description,
         permission: PortalWebhookContactsReadPermission,
     },
     {
         method: 'POST',
         path: `${props.documentation.contacts_store_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_contacts_store_title,
-        description: t.value.webhooks.documentation_endpoint_contacts_store_description,
+        description:
+            t.value.webhooks.documentation_endpoint_contacts_store_description,
         permission: PortalWebhookContactsWritePermission,
     },
     {
         method: 'PATCH',
         path: `${props.documentation.contacts_update_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_contacts_update_title,
-        description: t.value.webhooks.documentation_endpoint_contacts_update_description,
+        description:
+            t.value.webhooks.documentation_endpoint_contacts_update_description,
         permission: PortalWebhookContactsWritePermission,
     },
     {
         method: 'DELETE',
         path: `${props.documentation.contacts_destroy_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_contacts_destroy_title,
-        description: t.value.webhooks.documentation_endpoint_contacts_destroy_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_contacts_destroy_description,
         permission: PortalWebhookContactsWritePermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.directories_index_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_directories_index_title,
-        description: t.value.webhooks.documentation_endpoint_directories_index_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_directories_index_description,
         permission: PortalWebhookDirectoriesReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.directories_show_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_directories_show_title,
-        description: t.value.webhooks.documentation_endpoint_directories_show_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_directories_show_description,
         permission: PortalWebhookDirectoriesReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.directories_export_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_directories_export_title,
-        description: t.value.webhooks.documentation_endpoint_directories_export_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_directories_export_description,
         permission: PortalWebhookDirectoriesReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.directories_template_url}?token=${tokenQueryValue}`,
-        title: t.value.webhooks.documentation_endpoint_directories_template_title,
-        description: t.value.webhooks.documentation_endpoint_directories_template_description,
+        title: t.value.webhooks
+            .documentation_endpoint_directories_template_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_directories_template_description,
         permission: PortalWebhookDirectoriesReadPermission,
     },
     {
         method: 'POST',
         path: `${props.documentation.directories_store_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_directories_store_title,
-        description: t.value.webhooks.documentation_endpoint_directories_store_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_directories_store_description,
         permission: PortalWebhookDirectoriesWritePermission,
     },
     {
         method: 'PATCH',
         path: `${props.documentation.directories_update_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_directories_update_title,
-        description: t.value.webhooks.documentation_endpoint_directories_update_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_directories_update_description,
         permission: PortalWebhookDirectoriesWritePermission,
     },
     {
         method: 'DELETE',
         path: `${props.documentation.directories_destroy_url}?token=${tokenQueryValue}`,
-        title: t.value.webhooks.documentation_endpoint_directories_destroy_title,
-        description: t.value.webhooks.documentation_endpoint_directories_destroy_description,
+        title: t.value.webhooks
+            .documentation_endpoint_directories_destroy_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_directories_destroy_description,
         permission: PortalWebhookDirectoriesWritePermission,
     },
     {
         method: 'POST',
         path: `${props.documentation.directories_import_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_directories_import_title,
-        description: t.value.webhooks.documentation_endpoint_directories_import_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_directories_import_description,
         permission: PortalWebhookDirectoriesWritePermission,
     },
     {
         method: 'POST',
         path: `${props.documentation.directory_records_store_url}?token=${tokenQueryValue}`,
-        title: t.value.webhooks.documentation_endpoint_directory_records_store_title,
-        description: t.value.webhooks.documentation_endpoint_directory_records_store_description,
+        title: t.value.webhooks
+            .documentation_endpoint_directory_records_store_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_directory_records_store_description,
         permission: PortalWebhookDirectoriesWritePermission,
     },
     {
         method: 'PATCH',
         path: `${props.documentation.directory_records_update_url}?token=${tokenQueryValue}`,
-        title: t.value.webhooks.documentation_endpoint_directory_records_update_title,
-        description: t.value.webhooks.documentation_endpoint_directory_records_update_description,
+        title: t.value.webhooks
+            .documentation_endpoint_directory_records_update_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_directory_records_update_description,
         permission: PortalWebhookDirectoriesWritePermission,
     },
     {
         method: 'DELETE',
         path: `${props.documentation.directory_records_destroy_url}?token=${tokenQueryValue}`,
-        title: t.value.webhooks.documentation_endpoint_directory_records_destroy_title,
-        description: t.value.webhooks.documentation_endpoint_directory_records_destroy_description,
+        title: t.value.webhooks
+            .documentation_endpoint_directory_records_destroy_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_directory_records_destroy_description,
         permission: PortalWebhookDirectoriesWritePermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.equipment_index_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_equipment_index_title,
-        description: t.value.webhooks.documentation_endpoint_equipment_index_description,
+        description:
+            t.value.webhooks.documentation_endpoint_equipment_index_description,
         permission: PortalWebhookEquipmentReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.equipment_show_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_equipment_show_title,
-        description: t.value.webhooks.documentation_endpoint_equipment_show_description,
+        description:
+            t.value.webhooks.documentation_endpoint_equipment_show_description,
         permission: PortalWebhookEquipmentReadPermission,
     },
     {
         method: 'POST',
         path: `${props.documentation.equipment_store_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_equipment_store_title,
-        description: t.value.webhooks.documentation_endpoint_equipment_store_description,
+        description:
+            t.value.webhooks.documentation_endpoint_equipment_store_description,
         permission: PortalWebhookEquipmentWritePermission,
     },
     {
         method: 'PATCH',
         path: `${props.documentation.equipment_update_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_equipment_update_title,
-        description: t.value.webhooks.documentation_endpoint_equipment_update_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_equipment_update_description,
         permission: PortalWebhookEquipmentWritePermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.edo_index_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_edo_index_title,
-        description: t.value.webhooks.documentation_endpoint_edo_index_description,
+        description:
+            t.value.webhooks.documentation_endpoint_edo_index_description,
         permission: PortalWebhookEdoReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.edo_show_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_edo_show_title,
-        description: t.value.webhooks.documentation_endpoint_edo_show_description,
+        description:
+            t.value.webhooks.documentation_endpoint_edo_show_description,
         permission: PortalWebhookEdoReadPermission,
     },
     {
         method: 'POST',
         path: `${props.documentation.edo_store_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_edo_store_title,
-        description: t.value.webhooks.documentation_endpoint_edo_store_description,
+        description:
+            t.value.webhooks.documentation_endpoint_edo_store_description,
         permission: PortalWebhookEdoWritePermission,
     },
     {
         method: 'PATCH',
         path: `${props.documentation.edo_update_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_edo_update_title,
-        description: t.value.webhooks.documentation_endpoint_edo_update_description,
+        description:
+            t.value.webhooks.documentation_endpoint_edo_update_description,
         permission: PortalWebhookEdoWritePermission,
     },
     {
         method: 'POST',
         path: `${props.documentation.edo_public_link_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_edo_public_link_title,
-        description: t.value.webhooks.documentation_endpoint_edo_public_link_description,
+        description:
+            t.value.webhooks.documentation_endpoint_edo_public_link_description,
         permission: PortalWebhookEdoWritePermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.tsd_index_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_tsd_index_title,
-        description: t.value.webhooks.documentation_endpoint_tsd_index_description,
+        description:
+            t.value.webhooks.documentation_endpoint_tsd_index_description,
         permission: PortalWebhookTsdReadPermission,
     },
     {
         method: 'POST',
         path: `${props.documentation.tsd_store_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_tsd_store_title,
-        description: t.value.webhooks.documentation_endpoint_tsd_store_description,
+        description:
+            t.value.webhooks.documentation_endpoint_tsd_store_description,
         permission: PortalWebhookTsdWritePermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.warehouses_index_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_warehouses_index_title,
-        description: t.value.webhooks.documentation_endpoint_warehouses_index_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_warehouses_index_description,
         permission: PortalWebhookWarehousesReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.warehouses_show_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_warehouses_show_title,
-        description: t.value.webhooks.documentation_endpoint_warehouses_show_description,
+        description:
+            t.value.webhooks.documentation_endpoint_warehouses_show_description,
         permission: PortalWebhookWarehousesReadPermission,
     },
     {
         method: 'GET',
         path: `${props.documentation.warehouses_items_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_warehouses_items_title,
-        description: t.value.webhooks.documentation_endpoint_warehouses_items_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_warehouses_items_description,
         permission: PortalWebhookWarehousesReadPermission,
     },
     {
         method: 'POST',
         path: `${props.documentation.warehouses_store_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_warehouses_store_title,
-        description: t.value.webhooks.documentation_endpoint_warehouses_store_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_warehouses_store_description,
         permission: PortalWebhookWarehousesWritePermission,
     },
     {
         method: 'PATCH',
         path: `${props.documentation.warehouses_update_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_warehouses_update_title,
-        description: t.value.webhooks.documentation_endpoint_warehouses_update_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_warehouses_update_description,
         permission: PortalWebhookWarehousesWritePermission,
     },
     {
         method: 'DELETE',
         path: `${props.documentation.warehouses_destroy_url}?token=${tokenQueryValue}`,
         title: t.value.webhooks.documentation_endpoint_warehouses_destroy_title,
-        description: t.value.webhooks.documentation_endpoint_warehouses_destroy_description,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_warehouses_destroy_description,
         permission: PortalWebhookWarehousesWritePermission,
     },
 ]);
@@ -408,25 +482,36 @@ const documentationSections = computed(() => [
             :description="t.webhooks.documentation_description"
         />
 
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start">
+        <div
+            class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start"
+        >
             <div class="space-y-6">
                 <section
                     :id="overviewSectionId"
                     class="scroll-mt-24 space-y-5 rounded-2xl border border-border bg-card p-5"
                 >
-                    <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+                    <div
+                        class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]"
+                    >
                         <div class="space-y-4">
-                            <div class="flex items-center gap-2 text-base font-medium">
+                            <div
+                                class="flex items-center gap-2 text-base font-medium"
+                            >
                                 <BookText class="size-5" />
                                 {{ t.webhooks.documentation_overview_title }}
                             </div>
 
                             <p class="text-sm text-muted-foreground">
-                                {{ t.webhooks.documentation_overview_description }}
+                                {{
+                                    t.webhooks
+                                        .documentation_overview_description
+                                }}
                             </p>
 
                             <div class="grid gap-2">
-                                <Label>{{ t.webhooks.documentation_base_url }}</Label>
+                                <Label>{{
+                                    t.webhooks.documentation_base_url
+                                }}</Label>
                                 <Input
                                     :model-value="props.documentation.base_url"
                                     readonly
@@ -440,7 +525,10 @@ const documentationSections = computed(() => [
                                     {{ t.webhooks.documentation_auth_title }}
                                 </div>
                                 <p class="mt-2 text-sm text-muted-foreground">
-                                    {{ t.webhooks.documentation_auth_description }}
+                                    {{
+                                        t.webhooks
+                                            .documentation_auth_description
+                                    }}
                                 </p>
 
                                 <div class="mt-4 space-y-3">
@@ -472,14 +560,18 @@ const documentationSections = computed(() => [
                                 class="flex items-start gap-2 text-sm text-muted-foreground"
                             >
                                 <ChevronRight class="mt-0.5 size-4 shrink-0" />
-                                <span>{{ t.webhooks.documentation_note_token }}</span>
+                                <span>{{
+                                    t.webhooks.documentation_note_token
+                                }}</span>
                             </div>
 
                             <div
                                 class="flex items-start gap-2 text-sm text-muted-foreground"
                             >
                                 <ChevronRight class="mt-0.5 size-4 shrink-0" />
-                                <span>{{ t.webhooks.documentation_note_base }}</span>
+                                <span>{{
+                                    t.webhooks.documentation_note_base
+                                }}</span>
                             </div>
 
                             <div
@@ -513,7 +605,7 @@ const documentationSections = computed(() => [
                             >
                                 {{ endpoint.method }}
                             </span>
-                            <span class="break-all font-mono text-xs">
+                            <span class="font-mono text-xs break-all">
                                 {{ endpoint.path }}
                             </span>
                         </div>
@@ -527,7 +619,9 @@ const documentationSections = computed(() => [
 
                         <p class="text-sm text-muted-foreground">
                             {{ t.webhooks.documentation_permission_label }}:
-                            <span class="font-mono">{{ endpoint.permission }}</span>
+                            <span class="font-mono">{{
+                                endpoint.permission
+                            }}</span>
                         </p>
                     </article>
                 </section>

@@ -64,6 +64,10 @@ class PortalSetting extends Model
                 'title_key' => 'ui.conferences.title',
                 'description_key' => 'ui.conferences.description',
             ],
+            'calendar' => [
+                'title_key' => 'ui.calendar.title',
+                'description_key' => 'ui.calendar.description',
+            ],
             'company-structure' => [
                 'title_key' => 'ui.company_structure.title',
                 'description_key' => 'ui.company_structure.description',
@@ -123,6 +127,10 @@ class PortalSetting extends Model
             'integrations' => [
                 'title_key' => 'ui.integrations.title',
                 'description_key' => 'ui.integrations.description',
+            ],
+            'one-c' => [
+                'title_key' => 'ui.one_c.title',
+                'description_key' => 'ui.one_c.module_description',
             ],
             'business-processes' => [
                 'title_key' => 'ui.business_processes.title',

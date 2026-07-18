@@ -9,6 +9,41 @@ use Illuminate\Support\Collection;
 class ManagedUserProfileData
 {
     /**
+     * @return array<string, mixed>
+     */
+    public function serializeListItem(User $user): array
+    {
+        $group = $user->relationLoaded('group') ? $user->group : null;
+        $manager = $user->relationLoaded('manager') ? $user->manager : null;
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'last_name' => $user->last_name,
+            'middle_name' => $user->middle_name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'position' => $user->position,
+            'email_verified_at' => $user->email_verified_at?->toISOString(),
+            'avatar' => $user->avatar,
+            'avatar_scale' => $user->avatar_scale,
+            'created_at' => $user->created_at?->toISOString(),
+            'is_super_admin' => $user->isSuperAdmin(),
+            'is_active' => $user->is_active,
+            'deactivated_at' => $user->deactivated_at?->toISOString(),
+            'group' => $group
+                ? [
+                    'id' => $group->id,
+                    'name' => $group->name,
+                    'display_name' => $group->displayName(),
+                ]
+                : null,
+            'manager_id' => $manager?->id,
+            'manager' => $manager ? $this->serializeStructureUser($manager) : null,
+        ];
+    }
+
+    /**
      * @return array<int, array{id: int, name: string, last_name: string|null, middle_name: string|null, full_name: string, email: string, position: string|null, avatar: string|null, avatar_scale: float, is_active: bool}>
      */
     public function managerOptions(?User $viewer): array

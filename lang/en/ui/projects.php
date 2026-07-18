@@ -40,6 +40,7 @@ return [
     'export_tasks_csv' => 'Export CSV',
     'download_tasks_csv_template' => 'Download template',
     'import_tasks_csv' => 'Import CSV',
+    'csv_file' => 'CSV file',
     'csv_import_help' => 'Use the exported CSV as the import template for tasks and subtasks.',
     'csv_delimiter' => 'CSV delimiter',
     'csv_delimiter_placeholder' => 'For example, ;',

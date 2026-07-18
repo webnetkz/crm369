@@ -74,6 +74,12 @@ class PortalWebhookInvokeController extends Controller
             ];
         }
 
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_CALENDAR_READ)) {
+            $endpoints['calendar'] = [
+                'events' => route('portal-webhooks.calendar.events.index', $portalWebhook).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
         if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_CONTACTS_READ) && $this->contactsTableExists()) {
             $endpoints['contacts'] = [
                 'index' => route('portal-webhooks.contacts.index', $portalWebhook).'?token='.urlencode($plainTextToken),

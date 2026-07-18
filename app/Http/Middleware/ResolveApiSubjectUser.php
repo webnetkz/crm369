@@ -23,6 +23,7 @@ class ResolveApiSubjectUser
         'api.v1.knowledge-bases.articles.show',
         'api.v1.projects.',
         'api.v1.tasks.',
+        'api.v1.calendar.',
         'api.v1.menu.',
         'api.v1.equipment.',
     ];

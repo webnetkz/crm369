@@ -36,7 +36,7 @@ const { t } = useLanguage();
 const pickerOpen = ref(false);
 const userSearchQuery = ref('');
 const pickerRef = ref<HTMLElement | null>(null);
-const searchInputRef = ref<HTMLInputElement | null>(null);
+const searchInputRef = ref<InstanceType<typeof Input> | null>(null);
 
 const availableOptions = computed(() => {
     return props.options.filter((option) => {
@@ -78,9 +78,7 @@ const filteredOptions = computed(() => {
         ].map((part) => part.toLocaleLowerCase());
 
         return searchParts.some((part) => {
-            return part
-                .split(/\s+/)
-                .some((token) => token.startsWith(query));
+            return part.split(/\s+/).some((token) => token.startsWith(query));
         });
     });
 });
@@ -107,7 +105,9 @@ const triggerLabel = computed(() => {
         : t.value.projects.unassigned;
 });
 
-const optionAvatarStyle = (option: ProjectUserSummary): Record<string, string> => ({
+const optionAvatarStyle = (
+    option: ProjectUserSummary,
+): Record<string, string> => ({
     objectPosition: 'center',
     transform: `scale(${option.avatar_scale ?? 1})`,
 });
@@ -134,7 +134,7 @@ const openPicker = async (): Promise<void> => {
     userSearchQuery.value = '';
 
     await nextTick();
-    searchInputRef.value?.focus();
+    searchInputRef.value?.$el?.focus();
 };
 
 const togglePicker = (): void => {
@@ -164,7 +164,9 @@ const toggleOption = (option: ProjectUserSummary): void => {
 
     if (isSelected(option.id)) {
         updateValue(
-            model.value.filter((selectedUserId) => selectedUserId !== option.id),
+            model.value.filter(
+                (selectedUserId) => selectedUserId !== option.id,
+            ),
         );
 
         return;
@@ -233,10 +235,7 @@ onBeforeUnmount(() => {
                             {{ t.projects.unassigned }}
                         </div>
                     </div>
-                    <Check
-                        v-if="model === ''"
-                        class="size-4 text-primary"
-                    />
+                    <Check v-if="model === ''" class="size-4 text-primary" />
                 </button>
 
                 <button

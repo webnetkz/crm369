@@ -3,6 +3,7 @@ import { initializeTheme } from '@/composables/useAppearance';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
 import DocumentationLayout from '@/layouts/documentation/Layout.vue';
+import PublicConferenceLayout from '@/layouts/PublicConferenceLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
 import type { Portal } from '@/types';
@@ -20,6 +21,8 @@ createInertiaApp({
         switch (true) {
             case name.startsWith('auth/'):
                 return AuthLayout;
+            case name.startsWith('public/conferences/'):
+                return PublicConferenceLayout;
             case name.startsWith('public/'):
                 return AuthLayout;
             case name.startsWith('documentation/'):

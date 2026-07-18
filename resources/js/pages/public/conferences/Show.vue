@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { ExternalLink, MessageSquareText, MonitorUp, PencilRuler, Video } from '@lucide/vue';
+import { MessageSquareText, MonitorUp, Video } from '@lucide/vue';
 import { computed } from 'vue';
+import ConferenceRoom from '@/components/conferences/ConferenceRoom.vue';
 import { useLanguage } from '@/composables/useLanguage';
 
 type PublicConference = {
@@ -12,8 +13,7 @@ type PublicConference = {
     ended_at: string | null;
     status: 'live' | 'scheduled' | 'ended';
     provider_label: string;
-    embed_url: string;
-    meeting_url: string;
+    room_key: string;
     creator: {
         id: number;
         name: string;
@@ -22,7 +22,7 @@ type PublicConference = {
     } | null;
 };
 
-const props = defineProps<{
+defineProps<{
     conference: PublicConference;
 }>();
 
@@ -45,12 +45,20 @@ const formatDateTime = (value: string | null): string => {
 <template>
     <Head :title="conference.title" />
 
-    <div class="min-h-screen bg-linear-to-br from-background via-background to-primary/5 px-4 py-10 sm:px-6">
+    <div
+        class="min-h-screen bg-linear-to-br from-background via-background to-primary/5 px-4 py-10 sm:px-6"
+    >
         <div class="mx-auto max-w-7xl space-y-6">
-            <section class="rounded-3xl border border-border bg-card/90 p-6 shadow-sm">
-                <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <section
+                class="rounded-3xl border border-border bg-card/90 p-6 shadow-sm"
+            >
+                <div
+                    class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"
+                >
                     <div class="space-y-3">
-                        <div class="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                        <div
+                            class="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary"
+                        >
                             <Video class="size-4" />
                             {{ t.conferences.public_page_title }}
                         </div>
@@ -59,7 +67,9 @@ const formatDateTime = (value: string | null): string => {
                             <h1 class="text-3xl font-semibold tracking-tight">
                                 {{ conference.title }}
                             </h1>
-                            <p class="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                            <p
+                                class="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground"
+                            >
                                 {{
                                     conference.description ||
                                     t.conferences.public_page_description
@@ -73,7 +83,10 @@ const formatDateTime = (value: string | null): string => {
                                     {{ t.conferences.host }}:
                                 </span>
                                 {{
-                                    [conference.creator?.name, conference.creator?.last_name]
+                                    [
+                                        conference.creator?.name,
+                                        conference.creator?.last_name,
+                                    ]
                                         .filter(Boolean)
                                         .join(' ') || t.common.not_specified
                                 }}
@@ -92,42 +105,37 @@ const formatDateTime = (value: string | null): string => {
                             </div>
                         </div>
                     </div>
-
-                    <a
-                        v-if="conference.status !== 'ended'"
-                        :href="conference.meeting_url"
-                        target="_blank"
-                        rel="noreferrer"
-                        class="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-xs transition hover:bg-accent hover:text-accent-foreground"
-                    >
-                        <ExternalLink class="size-4" />
-                        {{ t.conferences.open_in_new_tab }}
-                    </a>
                 </div>
 
-                <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div class="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
-                        <div class="flex items-center gap-2 font-medium text-foreground">
+                <div class="mt-6 grid gap-3 sm:grid-cols-3">
+                    <div
+                        class="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm text-muted-foreground"
+                    >
+                        <div
+                            class="flex items-center gap-2 font-medium text-foreground"
+                        >
                             <Video class="size-4" />
                             {{ t.conferences.capability_video }}
                         </div>
                     </div>
-                    <div class="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
-                        <div class="flex items-center gap-2 font-medium text-foreground">
+                    <div
+                        class="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm text-muted-foreground"
+                    >
+                        <div
+                            class="flex items-center gap-2 font-medium text-foreground"
+                        >
                             <MessageSquareText class="size-4" />
                             {{ t.conferences.capability_chat }}
                         </div>
                     </div>
-                    <div class="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
-                        <div class="flex items-center gap-2 font-medium text-foreground">
+                    <div
+                        class="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm text-muted-foreground"
+                    >
+                        <div
+                            class="flex items-center gap-2 font-medium text-foreground"
+                        >
                             <MonitorUp class="size-4" />
                             {{ t.conferences.capability_screen }}
-                        </div>
-                    </div>
-                    <div class="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
-                        <div class="flex items-center gap-2 font-medium text-foreground">
-                            <PencilRuler class="size-4" />
-                            {{ t.conferences.capability_whiteboard }}
                         </div>
                     </div>
                 </div>
@@ -140,12 +148,11 @@ const formatDateTime = (value: string | null): string => {
                 {{ t.conferences.ended_notice }}
             </div>
 
-            <iframe
+            <ConferenceRoom
                 v-else
-                :src="conference.embed_url"
-                class="h-[calc(100vh-12rem)] min-h-[44rem] w-full rounded-3xl border border-border bg-black shadow-sm"
-                allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write"
-            ></iframe>
+                :room-key="conference.room_key"
+                :conference-title="conference.title"
+            />
         </div>
     </div>
 </template>

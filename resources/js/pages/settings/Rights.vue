@@ -107,6 +107,7 @@ const setModulePermissions = (
     permissions.forEach((permission) => {
         if (enabled) {
             selected.add(permission.key);
+
             return;
         }
 

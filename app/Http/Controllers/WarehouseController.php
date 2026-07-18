@@ -12,12 +12,13 @@ use App\Models\WarehouseColumn;
 use App\Models\WarehouseFloor;
 use App\Models\WarehouseItem;
 use App\Models\WarehousePlace;
-use App\Models\WarehouseRow;
 use App\Support\PaginationData;
 use App\Support\QrCodeResolver;
 use App\Support\TsdQrScanManager;
 use App\Support\WarehouseHierarchyManager;
+use App\Support\WarehousePageData;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -32,51 +33,13 @@ class WarehouseController extends Controller
 
     private const int DEFAULT_INVENTORY_PER_PAGE = 12;
 
-    public function index(): Response
+    public function index(WarehousePageData $warehousePageData): Response
     {
-        $warehouses = Warehouse::query()
-            ->with([
-                'rows.columns.floors.places',
-            ])
-            ->orderBy('name')
-            ->get();
-
-        $warehouseData = $warehouses
-            ->map(fn (Warehouse $warehouse): array => [
-                'id' => $warehouse->id,
-                'name' => $warehouse->name,
-                'area_sqm' => $warehouse->area_sqm,
-                'qr_code' => $warehouse->qr_code,
-                'row_count' => $warehouse->rowCount(),
-                'column_count' => $warehouse->columnCount(),
-                'floor_count' => $warehouse->floorCount(),
-                'place_count' => $warehouse->placeCount(),
-            ])
-            ->values()
-            ->all();
-
-        return Inertia::render('warehouses/Index', [
-            'warehouses' => $warehouseData,
-            'summary' => [
-                'warehouse_count' => $warehouses->count(),
-                'total_area_sqm' => round($warehouses->sum('area_sqm'), 2),
-                'row_count' => $warehouses->sum(fn (Warehouse $warehouse): int => $warehouse->rowCount()),
-                'column_count' => $warehouses->sum(fn (Warehouse $warehouse): int => $warehouse->columnCount()),
-                'floor_count' => $warehouses->sum(fn (Warehouse $warehouse): int => $warehouse->floorCount()),
-                'place_count' => $warehouses->sum(fn (Warehouse $warehouse): int => $warehouse->placeCount()),
-                'qr_code_count' => $warehouses->sum(fn (Warehouse $warehouse): int => 1 + $warehouse->rowCount() + $warehouse->columnCount() + $warehouse->floorCount() + $warehouse->placeCount()),
-            ],
-        ]);
+        return Inertia::render('warehouses/Index', $warehousePageData->index());
     }
 
-    public function show(Warehouse $warehouse): Response
+    public function show(Warehouse $warehouse, WarehousePageData $warehousePageData): Response
     {
-        $warehouse->load([
-            'creator:id,name,last_name',
-            'updater:id,name,last_name',
-            'rows.columns.floors.places.items',
-        ]);
-
         $inventoryPerPage = $this->resolveInventoryPerPage(request());
         $inventoryQrCodes = $this->warehouseInventoryQuery($warehouse)
             ->paginate($inventoryPerPage, ['*'], 'items_page')
@@ -84,87 +47,22 @@ class WarehouseController extends Controller
             ->through(fn (WarehouseItem $warehouseItem): array => (new ApiWarehouseItemResource($warehouseItem))->resolve());
 
         return Inertia::render('warehouses/Show', [
-            'warehouse' => [
-                'id' => $warehouse->id,
-                'name' => $warehouse->name,
-                'area_sqm' => $warehouse->area_sqm,
-                'qr_code' => $warehouse->qr_code,
-                'row_count' => $warehouse->rowCount(),
-                'column_count' => $warehouse->columnCount(),
-                'floor_count' => $warehouse->floorCount(),
-                'place_count' => $warehouse->placeCount(),
-                'item_count' => $warehouse->itemCount(),
-                'created_at' => $warehouse->created_at?->toISOString(),
-                'updated_at' => $warehouse->updated_at?->toISOString(),
-                'created_by' => $warehouse->creator
-                    ? [
-                        'id' => $warehouse->creator->id,
-                        'name' => $warehouse->creator->name,
-                        'last_name' => $warehouse->creator->last_name,
-                    ]
-                    : null,
-                'updated_by' => $warehouse->updater
-                    ? [
-                        'id' => $warehouse->updater->id,
-                        'name' => $warehouse->updater->name,
-                        'last_name' => $warehouse->updater->last_name,
-                    ]
-                    : null,
-            ],
-            'map' => [
-                'rows' => $warehouse->rows
-                    ->map(fn (WarehouseRow $row): array => [
-                        'id' => $row->id,
-                        'name' => $row->name,
-                        'column_count' => $row->columnCount(),
-                        'floor_count' => $row->floorCount(),
-                        'place_count' => $row->placeCount(),
-                        'item_count' => $row->itemCount(),
-                        'columns' => $row->columns
-                            ->map(fn (WarehouseColumn $column): array => [
-                                'id' => $column->id,
-                                'name' => $column->name,
-                                'floor_count' => $column->floorCount(),
-                                'place_count' => $column->placeCount(),
-                                'item_count' => $column->itemCount(),
-                                'floors' => $column->floors
-                                    ->map(fn (WarehouseFloor $floor): array => [
-                                        'id' => $floor->id,
-                                        'name' => $floor->name,
-                                        'place_count' => $floor->placeCount(),
-                                        'item_count' => $floor->itemCount(),
-                                        'places' => $floor->places
-                                            ->map(fn (WarehousePlace $place): array => [
-                                                'id' => $place->id,
-                                                'name' => $place->name,
-                                                'item_count' => $place->itemCount(),
-                                                'items' => $place->items
-                                                    ->map(fn (WarehouseItem $warehouseItem): array => [
-                                                        'id' => $warehouseItem->id,
-                                                        'name' => $warehouseItem->name,
-                                                        'sku' => $warehouseItem->sku,
-                                                        'quantity' => $warehouseItem->quantity,
-                                                    ])
-                                                    ->values()
-                                                    ->all(),
-                                            ])
-                                            ->values()
-                                            ->all(),
-                                    ])
-                                    ->values()
-                                    ->all(),
-                            ])
-                            ->values()
-                            ->all(),
-                    ])
-                    ->values()
-                    ->all(),
-            ],
+            ...$warehousePageData->show($warehouse),
             'inventoryQrCodes' => PaginationData::from($inventoryQrCodes),
             'inventoryPerPageOptions' => self::INVENTORY_PER_PAGE_OPTIONS,
             'filters' => [
                 'items_per_page' => $inventoryPerPage,
             ],
+        ]);
+    }
+
+    public function floor(
+        Warehouse $warehouse,
+        WarehouseFloor $warehouseFloor,
+        WarehousePageData $warehousePageData,
+    ): JsonResponse {
+        return response()->json([
+            'data' => $warehousePageData->floor($warehouse, $warehouseFloor),
         ]);
     }
 
@@ -234,7 +132,25 @@ class WarehouseController extends Controller
     {
         return WarehouseItem::query()
             ->with('place.floor.column.row.warehouse')
-            ->whereHas('place.floor.column.row', fn ($query) => $query->where('warehouse_id', $warehouse->id))
+            ->whereIn(
+                'warehouse_place_id',
+                WarehousePlace::query()
+                    ->whereIn(
+                        'warehouse_floor_id',
+                        WarehouseFloor::query()
+                            ->whereIn(
+                                'warehouse_column_id',
+                                WarehouseColumn::query()
+                                    ->whereIn(
+                                        'warehouse_row_id',
+                                        $warehouse->rows()->select('id'),
+                                    )
+                                    ->select('id'),
+                            )
+                            ->select('id'),
+                    )
+                    ->select('id'),
+            )
             ->orderBy('name')
             ->orderBy('id');
     }

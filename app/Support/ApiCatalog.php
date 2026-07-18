@@ -132,6 +132,16 @@ class ApiCatalog
                 ],
             ],
             [
+                'title' => __('ui.api.section_calendar'),
+                'description' => __('ui.api.section_calendar_description'),
+                'notes' => [
+                    __('ui.api.section_calendar_note'),
+                ],
+                'endpoints' => [
+                    $this->endpoint('GET', '/api/v1/calendar/events?from={Y-m-d}&to={Y-m-d}&types[]=task&types[]=conference', 'ui.api.endpoint_calendar_events_index', ApiAccessToken::PERMISSION_CALENDAR_READ, 'ui.api.access_scope_based', targetUserKey: 'ui.api.target_user_supported'),
+                ],
+            ],
+            [
                 'title' => __('ui.api.section_equipment'),
                 'description' => __('ui.api.section_equipment_description'),
                 'notes' => [],

@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Head, Link, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { CalendarClock, Plus, Users, Video } from '@lucide/vue';
+import {
+    CalendarClock,
+    CircleDot,
+    History,
+    Plus,
+    Users,
+    Video,
+} from '@lucide/vue';
 import { computed, watchEffect } from 'vue';
 import { store as storeConference } from '@/actions/App/Http/Controllers/ConferenceController';
 import Heading from '@/components/Heading.vue';
@@ -31,8 +38,15 @@ type ConferenceListItem = {
     } | null;
 };
 
+type ConferenceGroups = {
+    current: ConferenceListItem[];
+    upcoming: ConferenceListItem[];
+    past: ConferenceListItem[];
+};
+
 const props = defineProps<{
     conferences: ConferenceListItem[];
+    conferenceGroups: ConferenceGroups;
     availableUsers: ProjectUserSummary[];
     provider: {
         label: string;
@@ -62,6 +76,33 @@ watchEffect(() => {
 
 const locale = computed(() => (language.value === 'ru' ? 'ru-RU' : 'en-US'));
 
+const conferenceSections = computed(() => [
+    {
+        key: 'current',
+        title: t.value.conferences.group_current,
+        description: t.value.conferences.group_current_description,
+        conferences: props.conferenceGroups.current,
+        icon: CircleDot,
+        accentClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    },
+    {
+        key: 'upcoming',
+        title: t.value.conferences.group_upcoming,
+        description: t.value.conferences.group_upcoming_description,
+        conferences: props.conferenceGroups.upcoming,
+        icon: CalendarClock,
+        accentClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    },
+    {
+        key: 'past',
+        title: t.value.conferences.group_past,
+        description: t.value.conferences.group_past_description,
+        conferences: props.conferenceGroups.past,
+        icon: History,
+        accentClass: 'bg-muted text-muted-foreground',
+    },
+]);
+
 const formatDateTime = (value: string | null): string => {
     if (!value) {
         return t.value.common.not_specified;
@@ -73,7 +114,9 @@ const formatDateTime = (value: string | null): string => {
     }).format(new Date(value));
 };
 
-const conferenceStatusLabel = (status: ConferenceListItem['status']): string => {
+const conferenceStatusLabel = (
+    status: ConferenceListItem['status'],
+): string => {
     if (status === 'scheduled') {
         return t.value.conferences.status_scheduled;
     }
@@ -85,7 +128,9 @@ const conferenceStatusLabel = (status: ConferenceListItem['status']): string => 
     return t.value.conferences.status_live;
 };
 
-const conferenceStatusClass = (status: ConferenceListItem['status']): string => {
+const conferenceStatusClass = (
+    status: ConferenceListItem['status'],
+): string => {
     if (status === 'scheduled') {
         return 'bg-amber-500/10 text-amber-700 dark:text-amber-300';
     }
@@ -122,9 +167,13 @@ const submit = (): void => {
         />
 
         <div class="grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
-            <section class="rounded-2xl border border-border bg-card p-5 shadow-xs">
+            <section
+                class="rounded-2xl border border-border bg-card p-5 shadow-xs"
+            >
                 <div class="space-y-2">
-                    <div class="flex items-center gap-2 text-base font-semibold">
+                    <div
+                        class="flex items-center gap-2 text-base font-semibold"
+                    >
                         <Plus class="size-4 text-primary" />
                         {{ t.conferences.create_title }}
                     </div>
@@ -154,7 +203,7 @@ const submit = (): void => {
                             id="conference-description"
                             v-model="form.description"
                             rows="4"
-                            class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                            class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition outline-none placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
                         ></textarea>
                         <InputError :message="form.errors.description" />
                     </div>
@@ -202,7 +251,11 @@ const submit = (): void => {
                         </span>
                     </label>
 
-                    <Button type="submit" :disabled="form.processing" class="w-full">
+                    <Button
+                        type="submit"
+                        :disabled="form.processing"
+                        class="w-full"
+                    >
                         <Video class="size-4" />
                         {{ t.conferences.create_button }}
                     </Button>
@@ -236,49 +289,109 @@ const submit = (): void => {
                     {{ t.conferences.empty }}
                 </div>
 
-                <div v-else class="grid gap-4 lg:grid-cols-2">
-                    <Link
-                        v-for="conference in conferences"
-                        :key="conference.id"
-                        :href="showConference(conference.id)"
-                        class="rounded-2xl border border-border bg-card p-5 shadow-xs transition hover:border-primary/30 hover:bg-primary/5"
+                <div v-else class="space-y-8">
+                    <section
+                        v-for="section in conferenceSections"
+                        :key="section.key"
+                        class="space-y-4"
                     >
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="space-y-2">
-                                <h2 class="text-base font-semibold">
-                                    {{ conference.title }}
-                                </h2>
-                                <p class="text-sm text-muted-foreground">
-                                    {{
-                                        conference.description ||
-                                        t.conferences.meeting_description
-                                    }}
-                                </p>
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex min-w-0 items-start gap-3">
+                                <div
+                                    class="grid size-10 shrink-0 place-items-center rounded-xl"
+                                    :class="section.accentClass"
+                                >
+                                    <component
+                                        :is="section.icon"
+                                        class="size-5"
+                                    />
+                                </div>
+                                <div class="min-w-0 space-y-1">
+                                    <h2 class="font-semibold">
+                                        {{ section.title }}
+                                    </h2>
+                                    <p class="text-sm text-muted-foreground">
+                                        {{ section.description }}
+                                    </p>
+                                </div>
                             </div>
-
                             <span
-                                class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
-                                :class="conferenceStatusClass(conference.status)"
+                                class="inline-flex min-w-8 items-center justify-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
                             >
-                                {{ conferenceStatusLabel(conference.status) }}
+                                {{ section.conferences.length }}
                             </span>
                         </div>
 
-                        <div class="mt-5 grid gap-3 text-sm text-muted-foreground">
-                            <div class="flex items-center gap-2">
-                                <CalendarClock class="size-4" />
-                                {{ formatDateTime(conference.starts_at) }}
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <Users class="size-4" />
-                                {{
-                                    `${t.conferences.participants}: ${
-                                        conference.invited_users_count + 1
-                                    }`
-                                }}
-                            </div>
+                        <div
+                            v-if="section.conferences.length === 0"
+                            class="rounded-2xl border border-dashed border-border bg-muted/20 px-5 py-6 text-center text-sm text-muted-foreground"
+                        >
+                            {{ t.conferences.group_empty }}
                         </div>
-                    </Link>
+
+                        <div v-else class="grid gap-4 lg:grid-cols-2">
+                            <Link
+                                v-for="conference in section.conferences"
+                                :key="conference.id"
+                                :href="showConference(conference.id)"
+                                class="rounded-2xl border border-border bg-card p-5 shadow-xs transition hover:border-primary/30 hover:bg-primary/5"
+                            >
+                                <div
+                                    class="flex items-start justify-between gap-3"
+                                >
+                                    <div class="space-y-2">
+                                        <h3 class="text-base font-semibold">
+                                            {{ conference.title }}
+                                        </h3>
+                                        <p
+                                            class="text-sm text-muted-foreground"
+                                        >
+                                            {{
+                                                conference.description ||
+                                                t.conferences
+                                                    .meeting_description
+                                            }}
+                                        </p>
+                                    </div>
+
+                                    <span
+                                        class="inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-medium"
+                                        :class="
+                                            conferenceStatusClass(
+                                                conference.status,
+                                            )
+                                        "
+                                    >
+                                        {{
+                                            conferenceStatusLabel(
+                                                conference.status,
+                                            )
+                                        }}
+                                    </span>
+                                </div>
+
+                                <div
+                                    class="mt-5 grid gap-3 text-sm text-muted-foreground"
+                                >
+                                    <div class="flex items-center gap-2">
+                                        <CalendarClock class="size-4" />
+                                        {{
+                                            formatDateTime(conference.starts_at)
+                                        }}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <Users class="size-4" />
+                                        {{
+                                            `${t.conferences.participants}: ${
+                                                conference.invited_users_count +
+                                                1
+                                            }`
+                                        }}
+                                    </div>
+                                </div>
+                            </Link>
+                        </div>
+                    </section>
                 </div>
             </section>
         </div>

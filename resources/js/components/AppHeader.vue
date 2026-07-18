@@ -184,9 +184,7 @@ const openChatCenter = (mode: 'chats' | 'search'): void => {
                             size="icon"
                             class="group h-9 w-9 cursor-pointer"
                             :title="
-                                $page.props.locale.messages[
-                                    $page.props.locale.current
-                                ].chat.search_trigger
+                                $page.props.locale.messages.chat.search_trigger
                             "
                             @click="openChatCenter('search')"
                         >
@@ -201,9 +199,7 @@ const openChatCenter = (mode: 'chats' | 'search'): void => {
                         size="icon"
                         class="relative h-9 w-9 cursor-pointer rounded-full"
                         :title="
-                            $page.props.locale.messages[
-                                $page.props.locale.current
-                            ].chat.sidebar_trigger
+                            $page.props.locale.messages.chat.sidebar_trigger
                         "
                         @click="openChatCenter('chats')"
                     >

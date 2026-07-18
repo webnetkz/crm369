@@ -68,6 +68,7 @@ type BarcodeDetectorWindow = Window & {
 
 const props = defineProps<{
     autoStartScanner: boolean;
+    initialQrCode: string;
     stats: {
         total: number;
         today: number;
@@ -91,7 +92,7 @@ let scannerIntervalId: number | null = null;
 let barcodeDetector: BarcodeDetectorLike | null = null;
 
 const form = useForm({
-    qr_code: '',
+    qr_code: props.initialQrCode,
     device_name: '',
     location: '',
     context: '',
@@ -303,6 +304,7 @@ const startScanner = async (): Promise<void> => {
 watchEffect(() => {
     if (
         !props.autoStartScanner ||
+        props.initialQrCode !== '' ||
         autoStartDismissed.value ||
         autoStartAttempted.value ||
         !scannerSupported.value ||

@@ -50,6 +50,8 @@ class PortalWebhook extends Model
 
     public const string PERMISSION_PROJECTS_WRITE = 'projects.write';
 
+    public const string PERMISSION_CALENDAR_READ = 'calendar.read';
+
     public const string PERMISSION_CHAT_READ = 'chat.read';
 
     public const string PERMISSION_CHAT_WRITE = 'chat.write';
@@ -138,6 +140,10 @@ class PortalWebhook extends Model
             self::PERMISSION_PROJECTS_WRITE => [
                 'label_key' => 'ui.webhooks.permission_projects_write',
                 'description_key' => 'ui.webhooks.permission_projects_write_description',
+            ],
+            self::PERMISSION_CALENDAR_READ => [
+                'label_key' => 'ui.webhooks.permission_calendar_read',
+                'description_key' => 'ui.webhooks.permission_calendar_read_description',
             ],
             self::PERMISSION_CHAT_READ => [
                 'label_key' => 'ui.webhooks.permission_chat_read',

@@ -47,12 +47,11 @@ class DatabaseConnectionDataMigrator
 
         $orderedTables = $this->sortTablesByDependencies($sourceConnection, $tables);
 
-        return DB::connection($targetConnection)->transaction(function () use (
+        $copiedRowsByTable = DB::connection($targetConnection)->transaction(function () use (
             $sourceConnection,
             $targetConnection,
             $truncateTarget,
             $orderedTables,
-            $verifyTableCounts,
         ): array {
             if ($truncateTarget) {
                 $this->clearTargetTables($targetConnection, $orderedTables->reverse()->values());
@@ -64,28 +63,36 @@ class DatabaseConnectionDataMigrator
                 $copiedRowsByTable[$table] = $this->copyTable($sourceConnection, $targetConnection, $table);
             }
 
-            $this->resetSequences($targetConnection, $orderedTables);
-            if ($verifyTableCounts) {
-                $this->assertTableCountsMatch($sourceConnection, $targetConnection, $orderedTables, $copiedRowsByTable);
-            }
-
             return $copiedRowsByTable;
         });
+
+        $this->resetSequences($targetConnection, $orderedTables);
+
+        if ($verifyTableCounts) {
+            $this->assertTableCountsMatch($sourceConnection, $targetConnection, $orderedTables, $copiedRowsByTable);
+        }
+
+        return $copiedRowsByTable;
+    }
+
+    public function synchronizeSequences(string $connection): int
+    {
+        return $this->resetSequences($connection, $this->tablesFor($connection));
     }
 
     /**
-     * @return Collection<int, string>
+     * @return Collection<int, non-empty-string>
      */
     private function tablesFor(string $connection): Collection
     {
         return collect(Schema::connection($connection)->getTableListing(schemaQualified: false))
-            ->filter(fn (mixed $table): bool => is_string($table) && $table !== '')
+            ->filter(fn (string $table): bool => $table !== '')
             ->values();
     }
 
     /**
-     * @param  Collection<int, string>  $tables
-     * @return Collection<int, string>
+     * @param  Collection<int, non-empty-string>  $tables
+     * @return Collection<int, non-empty-string>
      */
     private function sortTablesByDependencies(string $connection, Collection $tables): Collection
     {
@@ -134,7 +141,7 @@ class DatabaseConnectionDataMigrator
     }
 
     /**
-     * @param  Collection<int, string>  $tables
+     * @param  Collection<int, non-empty-string>  $tables
      */
     private function clearTargetTables(string $connection, Collection $tables): void
     {
@@ -194,16 +201,31 @@ class DatabaseConnectionDataMigrator
     }
 
     /**
-     * @param  Collection<int, string>  $tables
+     * @param  Collection<int, non-empty-string>  $tables
      */
-    private function resetSequences(string $connection, Collection $tables): void
+    private function resetSequences(string $connection, Collection $tables): int
     {
         if (DB::connection($connection)->getDriverName() !== 'pgsql') {
-            return;
+            return 0;
         }
 
+        $synchronizedSequences = 0;
+        $schema = Schema::connection($connection);
+
         foreach ($tables as $table) {
-            if (! Schema::connection($connection)->hasColumn($table, 'id')) {
+            if (! $schema->hasColumn($table, 'id')) {
+                continue;
+            }
+
+            $sequenceResult = DB::connection($connection)->selectOne(
+                "select pg_get_serial_sequence(?, 'id') as sequence_name",
+                [$table],
+            );
+            $sequenceName = is_object($sequenceResult)
+                ? ($sequenceResult->sequence_name ?? null)
+                : null;
+
+            if (! is_string($sequenceName) || $sequenceName === '') {
                 continue;
             }
 
@@ -215,22 +237,27 @@ class DatabaseConnectionDataMigrator
 
             if (! is_numeric($maxId)) {
                 DB::connection($connection)->select(
-                    "select setval(pg_get_serial_sequence(?, 'id'), 1, false)",
-                    [$table],
+                    'select setval(cast(? as regclass), 1, false)',
+                    [$sequenceName],
                 );
+
+                $synchronizedSequences++;
 
                 continue;
             }
 
             DB::connection($connection)->select(
-                "select setval(pg_get_serial_sequence(?, 'id'), ?, true)",
-                [$table, (int) $maxId],
+                'select setval(cast(? as regclass), ?, true)',
+                [$sequenceName, (int) $maxId],
             );
+            $synchronizedSequences++;
         }
+
+        return $synchronizedSequences;
     }
 
     /**
-     * @param  Collection<int, string>  $tables
+     * @param  Collection<int, non-empty-string>  $tables
      * @param  array<string, int>  $copiedRowsByTable
      */
     private function assertTableCountsMatch(

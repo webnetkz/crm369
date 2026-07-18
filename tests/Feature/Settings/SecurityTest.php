@@ -179,6 +179,7 @@ test('settings layout uses shared settings navigation for all available tabs', f
         ->and($settingsNavigation)->toContain("key: 'settings.portal'")
         ->and($settingsNavigation)->toContain("key: 'settings.modules'")
         ->and($settingsNavigation)->toContain("key: 'settings.integrations'")
+        ->and($settingsNavigation)->toContain("key: 'settings.one-c'")
         ->and($settingsNavigation)->toContain("key: 'settings.logs'")
         ->and($settingsNavigation)->toContain("key: 'settings.webhooks'")
         ->and($settingsNavigation)->not->toContain("key: 'settings.api.documentation'")

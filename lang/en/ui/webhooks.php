@@ -182,4 +182,8 @@ return [
     'permission_tsd_read_description' => 'Allow reading the QR scan journal created through the webhook.',
     'permission_tsd_write' => 'Write TSD scans',
     'permission_tsd_write_description' => 'Allow creating new QR scans from an external handheld terminal.',
+    'permission_calendar_read' => 'Read calendar',
+    'permission_calendar_read_description' => 'Allow reading task deadlines and conferences visible to the webhook creator.',
+    'documentation_endpoint_calendar_events_title' => 'Calendar events',
+    'documentation_endpoint_calendar_events_description' => 'Returns tasks and assigned conferences for the webhook creator. Supports from, to, and types[].',
 ];
