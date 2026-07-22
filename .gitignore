@@ -1,38 +1,79 @@
-/.phpunit.cache
-/bootstrap/ssr
-/node_modules
-/public/build
-/public/fonts-manifest.dev.json
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+/auth.json
+
+# PHP / Composer
+/vendor/
+/composer.phar
+/.phpunit.cache/
+/.phpunit.result.cache
+/.phpstan.cache/
+/.phpstan.result.cache
+/.php-cs-fixer.cache
+/.phpactor.json
+/coverage/
+
+# JavaScript / frontend builds
+/node_modules/
+/public/build/
 /public/hot
 /public/storage
+/public/fonts-manifest.dev.json
+/bootstrap/ssr/
+/.eslintcache
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Generated Laravel / Wayfinder files
+/resources/js/actions/
+/resources/js/routes/
+/resources/js/wayfinder/
 /storage/*.key
-/storage/pail
-/resources/js/actions
-/resources/js/routes
-/resources/js/wayfinder
-/vendor
+/storage/pail/
+
+# Browser test output
+/blob-report/
+/playwright-report/
+/test-results/
+
+# Local databases
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Mobile development caches and legacy local workspace
+/.gradle-local/
+/applicationsOfMobile/
+
+# Local agent and editor configuration
+/.agents/
+/.codex/
+/.fleet/
+/.idea/
+/.nova/
+/.vscode/
+/.zed/
+*.iml
+
+# Operating system and temporary files
 .DS_Store
-.env
-.env.backup
-.env.production
-.gradle-local
-.phpactor.json
-.phpunit.result.cache
-/.agents
-/.codex
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+Desktop.ini
+*.bak
+*.orig
+*.swp
+*.swo
+*~
+
+# Legacy local development environments
 Homestead.json
 Homestead.yaml
-npm-debug.log
-yarn-error.log
-/auth.json
-/.fleet
-/.idea
-/.nova
-/.vscode
-/.zed
-/applicationsOfMobile
-/.agents/skills
-/.codex
-/applicationsOfMobileAndroid
-/applicationsOfMobileIos
-/applicationsOfMobile

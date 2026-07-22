@@ -16,8 +16,6 @@ readonly INSTALL_STATE_FILE='/etc/crm369/installed'
 readonly TTY_DEVICE='/dev/tty'
 
 TEMP_DIR=''
-GITHUB_CURL_CONFIG=''
-GITHUB_TOKEN="${CRM369_GITHUB_TOKEN:-}"
 
 print_info() {
     printf '\033[1;34m[CRM369]\033[0m %s\n' "$*"
@@ -40,13 +38,6 @@ cleanup() {
     local exit_code=$?
 
     set +e
-    GITHUB_TOKEN=''
-    CRM369_GITHUB_TOKEN=''
-
-    if [[ -n "$GITHUB_CURL_CONFIG" && -f "$GITHUB_CURL_CONFIG" ]]; then
-        rm -f -- "$GITHUB_CURL_CONFIG"
-    fi
-
     if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
         rm -rf -- "$TEMP_DIR"
     fi
@@ -75,8 +66,7 @@ CRM369 — установщик production-среды для чистого Ubun
 Установщик интерактивно запросит:
   - домен CRM;
   - имя, email и пароль единственного super-admin;
-  - email для сертификата Let's Encrypt;
-  - GitHub token с read-доступом к приватному репозиторию.
+  - email для сертификата Let's Encrypt.
 
 Будут установлены Nginx, PHP 8.4, PostgreSQL, Redis, Supervisor,
 Node.js 22, Composer и Certbot. Демо-данные и seeders не запускаются.
@@ -138,17 +128,6 @@ prompt_value() {
     printf -v "$variable_name" '%s' "$value"
 }
 
-prompt_secret() {
-    local variable_name="$1"
-    local prompt="$2"
-    local value=''
-
-    printf '%s: ' "$prompt" >"$TTY_DEVICE"
-    IFS= read -r -s value <"$TTY_DEVICE"
-    printf '\n' >"$TTY_DEVICE"
-    printf -v "$variable_name" '%s' "$value"
-}
-
 confirm_installation() {
     local answer=''
 
@@ -207,12 +186,6 @@ while true; do
     print_warning 'Введите корректный email.'
 done
 
-if [[ -z "$GITHUB_TOKEN" ]]; then
-    prompt_secret GITHUB_TOKEN 'GitHub token с read-доступом к репозиторию webnetkz/crm369'
-fi
-
-[[ "$GITHUB_TOKEN" =~ ^[A-Za-z0-9_]+$ ]] || fail 'GitHub token пуст или содержит недопустимые символы.'
-
 printf '\nПараметры установки:\n' >"$TTY_DEVICE"
 printf '  URL:         https://%s\n' "$domain" >"$TTY_DEVICE"
 printf '  Super-admin: %s <%s>\n' "$admin_name" "$admin_email" >"$TTY_DEVICE"
@@ -225,14 +198,6 @@ if ! getent ahosts "$domain" >/dev/null 2>&1; then
 fi
 
 TEMP_DIR="$(mktemp -d /tmp/crm369-install.XXXXXX)"
-GITHUB_CURL_CONFIG="${TEMP_DIR}/github-curl.conf"
-install -m 0600 /dev/null "$GITHUB_CURL_CONFIG"
-
-{
-    printf 'header = "Authorization: Bearer %s"\n' "$GITHUB_TOKEN"
-    printf 'header = "Accept: application/vnd.github+json"\n'
-    printf 'header = "X-GitHub-Api-Version: 2022-11-28"\n'
-} >"$GITHUB_CURL_CONFIG"
 
 print_info 'Обновление Ubuntu и установка системных пакетов...'
 export DEBIAN_FRONTEND=noninteractive
@@ -294,10 +259,10 @@ curl -fsSL https://getcomposer.org/installer -o "$composer_installer"
 printf '%s  %s\n' "$composer_signature" "$composer_installer" | sha384sum --check --status
 /usr/bin/php8.4 "$composer_installer" --quiet --install-dir=/usr/local/bin --filename=composer
 
-print_info 'Скачивание закрытого исходного кода CRM369...'
+print_info 'Скачивание исходного кода CRM369 из публичного репозитория...'
 source_archive="${TEMP_DIR}/crm369.tar.gz"
-curl -fsSL --retry 3 --config "$GITHUB_CURL_CONFIG" \
-    "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_REF}" \
+curl -fsSL --retry 3 \
+    "https://github.com/${GITHUB_REPOSITORY}/archive/refs/heads/${GITHUB_REF}.tar.gz" \
     -o "$source_archive"
 
 mkdir -p "$APP_DIR"
@@ -310,7 +275,6 @@ print_info 'Установка PHP- и frontend-зависимостей...'
 (
     cd "$APP_DIR"
     COMPOSER_ALLOW_SUPERUSER=1 \
-    COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"${GITHUB_TOKEN}\"}}" \
         /usr/local/bin/composer install \
             --no-dev \
             --no-interaction \
@@ -323,10 +287,6 @@ print_info 'Установка PHP- и frontend-зависимостей...'
 )
 
 rm -rf -- "${APP_DIR}/node_modules"
-GITHUB_TOKEN=''
-CRM369_GITHUB_TOKEN=''
-rm -f -- "$GITHUB_CURL_CONFIG"
-GITHUB_CURL_CONFIG=''
 
 print_info 'Создание изолированной базы PostgreSQL...'
 

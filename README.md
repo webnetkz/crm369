@@ -1,85 +1,85 @@
 # CRM369
 
-CRM369 — модульная корпоративная CRM и рабочее пространство для ведения продаж, внутренних процессов и коммуникаций в одном контуре.
+CRM369 is a modular corporate CRM and shared workspace for managing sales, internal operations, and team communications in one system.
 
-Система объединяет:
+The platform includes:
 
-- контакты, публичные формы, CRM-воронки и сделки;
-- проекты, задачи, календарь, новости и структуру компании;
-- чаты, конференции, базу знаний и файловое хранилище;
-- закупки, склады, ТСД, оборудование, производство и ЭДО;
-- справочники, бизнес-процессы, API, webhooks, интеграции с мессенджерами, телефонией и 1С;
-- группы, права доступа, аудит безопасности, двухфакторную аутентификацию и passkeys.
+- contacts, public forms, CRM pipelines, and deals;
+- projects, tasks, calendars, company news, and organizational structure;
+- chats, conferences, a knowledge base, and file storage;
+- procurement, warehouses, handheld terminals, equipment, production, and electronic document management;
+- reference directories, business processes, API access, webhooks, and integrations with messengers, telephony, and 1C;
+- user groups, granular permissions, security audits, two-factor authentication, and passkeys.
 
-Backend построен на Laravel 13 и PostgreSQL, интерфейс — на Inertia.js 3, Vue 3 и Tailwind CSS 4. Redis используется для оперативного кеша и очереди уведомлений.
+The backend uses Laravel 13 and PostgreSQL. The frontend uses Inertia.js 3, Vue 3, and Tailwind CSS 4. Redis provides realtime caches and notification queues.
 
-## Установка на чистый Ubuntu Server
+## Install on a clean Ubuntu server
 
-Автоматическая установка рассчитана на:
+The automated installer supports:
 
-- Ubuntu Server 22.04 или 24.04 LTS, `amd64`;
-- минимум 4 ГБ свободного места;
-- домен с заранее настроенной A-записью на IP сервера;
-- доступ из сервера в интернет по HTTP/HTTPS;
-- GitHub token с доступом `Contents: read` к приватному репозиторию [webnetkz/crm369](https://github.com/webnetkz/crm369).
+- Ubuntu Server 22.04 or 24.04 LTS on `amd64`;
+- at least 4 GB of free space;
+- a domain with an A record pointing to the server before installation;
+- outbound HTTP and HTTPS access;
+- root access, either directly or through `sudo`.
 
-Подключитесь к новому серверу по SSH и выполните одну команду:
+Connect to the new server over SSH and run one command:
 
 ```bash
-bash -c 'read -rsp "GitHub token: " TOKEN </dev/tty; printf "\n" >/dev/tty; curl -fsSL -H "Authorization: Bearer ${TOKEN}" -H "Accept: application/vnd.github.raw+json" "https://api.github.com/repos/webnetkz/crm369/contents/scripts/install-ubuntu.sh?ref=main" | { if [ "$(id -u)" -eq 0 ]; then env CRM369_GITHUB_TOKEN="${TOKEN}" bash; else sudo env CRM369_GITHUB_TOKEN="${TOKEN}" bash; fi; }; unset TOKEN'
+curl -fsSL https://raw.githubusercontent.com/webnetkz/crm369/main/scripts/install-ubuntu.sh | sudo bash
 ```
 
-Команда скрыто запросит GitHub token, скачает [scripts/install-ubuntu.sh](scripts/install-ubuntu.sh) из ветки `main` и запустит его с root-правами. Token нужен только для скачивания закрытого кода и Composer-пакетов; установщик не сохраняет его на сервере.
+The command downloads [scripts/install-ubuntu.sh](scripts/install-ubuntu.sh) from the public [webnetkz/crm369](https://github.com/webnetkz/crm369) repository and starts the interactive installer.
 
-Далее установщик интерактивно запросит:
+The installer asks for:
 
-1. Домен CRM369 без `https://`.
-2. Имя и email единственного super-admin.
-3. Email для сертификата Let's Encrypt.
-4. Пароль super-admin и его подтверждение. Ввод пароля скрыт.
+1. The CRM369 domain without `https://`.
+2. The initial super administrator's name and email address.
+3. An email address for Let's Encrypt certificate notifications.
+4. The super administrator's password and confirmation. Password input is hidden.
 
-Production-пароль должен содержать не менее 12 символов, строчные и прописные буквы, цифру и специальный символ. Laravel также проверяет, что пароль не находится в известных утечках.
+Production passwords must contain at least 12 characters, uppercase and lowercase letters, a number, and a symbol. Laravel also checks that the password has not appeared in a known data breach.
 
-## Что установит скрипт
+## What the installer configures
 
-Установщик автоматически настроит:
+The installer automatically provisions:
 
-- Nginx и бесплатный TLS-сертификат Let's Encrypt с HTTP → HTTPS редиректом;
-- PHP 8.4 FPM и необходимые PHP-расширения;
-- PostgreSQL с отдельными базой и ролью, защищёнными случайным паролем;
-- Redis, Supervisor и два queue worker — для основной и notification-очередей;
-- Laravel scheduler через системный cron;
-- Node.js 22, production-сборку Vite и Composer;
-- production `.env`, права на файлы, кеши Laravel и ротацию логов.
+- Nginx and a free Let's Encrypt TLS certificate with an HTTP-to-HTTPS redirect;
+- PHP 8.4 FPM and the required PHP extensions;
+- PostgreSQL with a dedicated database, role, and randomly generated password;
+- Redis, Supervisor, and separate workers for the default and notification queues;
+- the Laravel scheduler through system cron;
+- Node.js 22, Composer, and a production Vite build;
+- a production `.env`, secure file permissions, Laravel caches, and log rotation.
 
-Приложение размещается в `/var/www/crm369`. Состояние успешной установки записывается в `/etc/crm369/installed`, без GitHub token и без пароля super-admin.
+The application is installed in `/var/www/crm369`. Successful installation metadata is written to `/etc/crm369/installed`. Administrator and database passwords are never written to shell history or installation metadata.
 
-## Чистая база после установки
+## Clean database state
 
-Скрипт выполняет только `php artisan migrate --force` и **не запускает** `db:seed` или `migrate --seed`.
+The installer runs only `php artisan migrate --force`. It does **not** run `db:seed` or `migrate --seed`.
 
-После установки:
+After installation:
 
-- в таблице пользователей находится только указанный super-admin;
-- отсутствуют тестовые пользователи, сделки, контакты, задачи, файлы и прочие демонстрационные данные;
-- присутствуют только обязательные системные записи, создаваемые миграциями: базовая группа администраторов, системные этапы и выключенные по умолчанию интеграции.
+- the users table contains only the super administrator entered during installation;
+- no demo users, deals, contacts, tasks, files, or other sample business data are created;
+- only mandatory system records created by migrations remain, such as the Administrators group, default system stages, and disabled integration definitions.
 
-После завершения CRM доступна по адресу `https://ваш-домен`.
+When installation finishes, CRM369 is available at `https://your-domain`.
 
-## Почта
+## Email delivery
 
-Начальная установка использует `MAIL_MAILER=log`: исходящие письма записываются в Laravel log и не отправляются наружу. Для восстановления пароля и реальной доставки уведомлений укажите SMTP-параметры в `/var/www/crm369/.env`, затем выполните:
+The initial installation uses `MAIL_MAILER=log`. Outbound messages are written to the Laravel log and are not delivered externally. To enable password recovery and notification delivery, add SMTP settings to `/var/www/crm369/.env`, then rebuild the application cache:
 
 ```bash
 cd /var/www/crm369 && sudo -u www-data php8.4 artisan optimize
 ```
 
-## Ручной запуск установщика
+## Run an already downloaded installer
 
-Если репозиторий уже скачан на сервер, установщик можно запустить напрямую:
+If the repository is already present on the server, run:
 
 ```bash
 sudo ./scripts/install-ubuntu.sh
 ```
 
-Скрипт не перезаписывает существующий `/var/www/crm369`, PostgreSQL-базу или роль с именем `crm369`.
+The installer does not overwrite an existing `/var/www/crm369` directory or an existing PostgreSQL database or role named `crm369`.
