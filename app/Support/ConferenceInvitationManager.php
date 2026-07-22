@@ -6,6 +6,7 @@ use App\Models\Conference;
 use App\Models\ConferenceInvitation;
 use App\Models\User;
 use App\Notifications\SystemNotification;
+use Illuminate\Support\Facades\Lang;
 
 class ConferenceInvitationManager
 {
@@ -40,7 +41,7 @@ class ConferenceInvitationManager
 
         $users = User::query()
             ->whereIn('id', $newUserIds)
-            ->get(['id', 'name', 'last_name', 'email']);
+            ->get(['id', 'name', 'last_name', 'email', 'language', 'has_selected_language']);
 
         $timestamp = now();
 
@@ -57,15 +58,18 @@ class ConferenceInvitationManager
         );
 
         $actionUrl = route('conferences.show', $conference);
-        $actionLabel = __('ui.conferences.open_conference');
-        $title = __('ui.conferences.invitation_notification_title');
+        $users->each(function (User $user) use ($conference, $actionUrl): void {
+            $locale = $user->resolvedLanguage();
 
-        $users->each(fn (User $user) => $user->notify(new SystemNotification(
-            title: $title,
-            message: __('ui.conferences.invitation_notification_message', ['title' => $conference->title]),
-            actionUrl: $actionUrl,
-            actionLabel: $actionLabel,
-        )));
+            $user->notify(new SystemNotification(
+                title: Lang::get('ui.conferences.invitation_notification_title', [], $locale),
+                message: Lang::get('ui.conferences.invitation_notification_message', [
+                    'title' => $conference->title,
+                ], $locale),
+                actionUrl: $actionUrl,
+                actionLabel: Lang::get('ui.conferences.open_conference', [], $locale),
+            ));
+        });
 
         return $users->count();
     }

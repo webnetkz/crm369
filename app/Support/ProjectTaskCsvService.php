@@ -36,6 +36,7 @@ class ProjectTaskCsvService
 
     public function __construct(
         private readonly TaskConversationManager $taskConversationManager,
+        private readonly ProjectTaskAssignmentNotifier $taskAssignmentNotifier,
     ) {}
 
     /**
@@ -150,6 +151,7 @@ class ProjectTaskCsvService
 
                 $task->coAssignees()->sync($row['co_assignee_user_ids']);
                 $this->taskConversationManager->ensureForTask($task, $actor);
+                $this->taskAssignmentNotifier->sendForAssignmentChanges($task, $actor);
 
                 $createdTasks[$row['task_key']] = $task;
             }

@@ -629,6 +629,9 @@ test('api task creation preserves the exact due time', function () {
     $assignee = User::factory()->create([
         'email_verified_at' => now(),
     ]);
+    $coAssignee = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
     $dueAt = now()->addDays(3)->setTime(16, 45);
 
     $token = issueApiTokenFor($admin, [
@@ -647,14 +650,16 @@ test('api task creation preserves the exact due time', function () {
             'due_at' => $dueAt->toISOString(),
             'sort_order' => 2,
             'assignee_user_id' => $assignee->id,
-            'co_assignee_user_ids' => [],
+            'co_assignee_user_ids' => [$coAssignee->id],
         ])
         ->assertCreated();
 
     $task = ProjectTask::query()->where('title', 'API deadline check')->firstOrFail();
 
     expect($task->due_at?->toISOString())->toBe($dueAt->toISOString())
-        ->and($response->json('data.due_at'))->toBe($dueAt->toISOString());
+        ->and($response->json('data.due_at'))->toBe($dueAt->toISOString())
+        ->and($assignee->notifications()->count())->toBe(1)
+        ->and($coAssignee->notifications()->count())->toBe(1);
 });
 
 test('super admin token can read and update user-scoped api data via the user_id query parameter', function () {

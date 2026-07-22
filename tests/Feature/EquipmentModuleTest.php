@@ -4,8 +4,13 @@ use App\Models\EquipmentItem;
 use App\Models\EquipmentItemHistory;
 use App\Models\TsdQrScan;
 use App\Models\User;
+use App\Notifications\SystemNotification;
+use App\Support\EquipmentAssignmentNotifier;
+use App\Support\EquipmentCsvService;
+use App\Support\EquipmentHistoryRecorder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -19,6 +24,8 @@ test('authenticated users can open equipment page and manage equipment items', f
         'name' => 'Issued',
         'last_name' => 'Employee',
     ]);
+
+    Notification::fake();
 
     $this->actingAs($user)
         ->get(route('equipment.index'))
@@ -55,6 +62,20 @@ test('authenticated users can open equipment page and manage equipment items', f
         ->and(EquipmentItemHistory::query()->where('equipment_item_id', $equipmentItem->id)->value('event_type'))
         ->toBe(EquipmentItemHistory::EVENT_CREATED);
 
+    Notification::assertSentTo(
+        $responsibleUser,
+        SystemNotification::class,
+        fn (SystemNotification $notification): bool => $notification->toArray($responsibleUser)['message']
+            === __('ui.notifications.equipment_responsible_message', [
+                'name' => $equipmentItem->name,
+                'qr_code' => $equipmentItem->qr_code,
+            ], $responsibleUser->resolvedLanguage()),
+    );
+    Notification::assertNotSentTo($issuedUser, SystemNotification::class);
+    Notification::assertCount(1);
+
+    Notification::fake();
+
     $this->actingAs($user)
         ->patch(route('equipment.update', $equipmentItem), [
             'name' => 'Lenovo ThinkPad X1 Carbon',
@@ -75,6 +96,18 @@ test('authenticated users can open equipment page and manage equipment items', f
                 ->latest('id')
                 ->value('event_type')
         )->toBe(EquipmentItemHistory::EVENT_UPDATED);
+
+    Notification::assertSentTo(
+        $issuedUser,
+        SystemNotification::class,
+        fn (SystemNotification $notification): bool => $notification->toArray($issuedUser)['action_url']
+            === route('equipment.index', [
+                'equipment' => $equipmentItem->id,
+                'dialog' => 'details',
+            ]),
+    );
+    Notification::assertNotSentTo($responsibleUser, SystemNotification::class);
+    Notification::assertCount(1);
 
     $this->actingAs($user)
         ->get(route('equipment.index'))
@@ -461,5 +494,44 @@ CSV;
             EquipmentItemHistory::query()
                 ->where('equipment_item_id', $importedItem->id)
                 ->value('source')
-        )->toBe(EquipmentItemHistory::SOURCE_CSV);
+        )->toBe(EquipmentItemHistory::SOURCE_CSV)
+        ->and($responsibleUser->notifications()->count())->toBe(1)
+        ->and($issuedUser->notifications()->count())->toBe(1);
+});
+
+test('equipment csv import rolls back every row when processing fails', function () {
+    $actor = User::factory()->create();
+    $csv = <<<'CSV'
+name;qr_code;status;responsible_user_email;issued_to_user_email
+First item;EQ-ROLLBACK-001;on_balance;;
+Second item;EQ-ROLLBACK-002;on_balance;;
+CSV;
+    $recordedItems = 0;
+    $historyRecorder = Mockery::mock(EquipmentHistoryRecorder::class);
+
+    $historyRecorder
+        ->shouldReceive('recordCreated')
+        ->twice()
+        ->andReturnUsing(function () use (&$recordedItems): EquipmentItemHistory {
+            $recordedItems++;
+
+            if ($recordedItems === 2) {
+                throw new RuntimeException('Simulated history failure.');
+            }
+
+            return new EquipmentItemHistory;
+        });
+
+    $service = new EquipmentCsvService(new EquipmentAssignmentNotifier);
+
+    expect(fn (): int => $service->import(
+        UploadedFile::fake()->createWithContent('equipment.csv', $csv),
+        $actor,
+        ';',
+        $historyRecorder,
+    ))->toThrow(RuntimeException::class, 'Simulated history failure.');
+
+    expect(EquipmentItem::query()
+        ->whereIn('qr_code', ['EQ-ROLLBACK-001', 'EQ-ROLLBACK-002'])
+        ->count())->toBe(0);
 });

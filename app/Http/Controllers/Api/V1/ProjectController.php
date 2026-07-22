@@ -14,6 +14,7 @@ use App\Models\ProjectTask;
 use App\Models\ProjectTaskStage;
 use App\Support\ApiRequestContext;
 use App\Support\ProjectPageData;
+use App\Support\ProjectTaskAssignmentNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -98,8 +99,10 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function storeTask(StoreProjectTaskRequest $request): JsonResponse
-    {
+    public function storeTask(
+        StoreProjectTaskRequest $request,
+        ProjectTaskAssignmentNotifier $taskAssignmentNotifier,
+    ): JsonResponse {
         $user = ApiRequestContext::subject($request);
         $project = $request->project();
 
@@ -110,6 +113,7 @@ class ProjectController extends Controller
 
         $task = $this->createTask($request, $project);
         $task->coAssignees()->sync($request->coAssigneeUserIds());
+        $taskAssignmentNotifier->sendForAssignmentChanges($task, $user);
 
         return response()->json([
             'message' => __('ui.projects.task_created_success'),
@@ -130,8 +134,11 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function updateTask(UpdateProjectTaskRequest $request, ProjectTask $projectTask): JsonResponse
-    {
+    public function updateTask(
+        UpdateProjectTaskRequest $request,
+        ProjectTask $projectTask,
+        ProjectTaskAssignmentNotifier $taskAssignmentNotifier,
+    ): JsonResponse {
         $visibleTask = $this->visibleTask($request, $projectTask);
         $user = ApiRequestContext::subject($request);
         abort_unless($user->canManageTask($visibleTask), 403);
@@ -143,8 +150,17 @@ class ProjectController extends Controller
             abort_unless($user->canWorkOnProject($targetProject), 403);
         }
 
+        $previousAssigneeUserId = $visibleTask->assignee_user_id;
+        $previousCoAssigneeUserIds = $visibleTask->coAssignees->pluck('id')->all();
+
         $this->fillTask($visibleTask, $request, $targetProject);
         $visibleTask->coAssignees()->sync($request->coAssigneeUserIds());
+        $taskAssignmentNotifier->sendForAssignmentChanges(
+            $visibleTask,
+            $user,
+            $previousAssigneeUserId,
+            $previousCoAssigneeUserIds,
+        );
 
         return response()->json([
             'message' => __('ui.projects.task_updated_success'),

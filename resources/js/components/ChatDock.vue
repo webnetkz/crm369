@@ -190,6 +190,10 @@ const fetchDockData = async (): Promise<void> => {
     }
 };
 
+const refreshDockData = (): void => {
+    void fetchDockData();
+};
+
 const startPolling = (): void => {
     if (pollInterval) {
         return;
@@ -250,6 +254,8 @@ onBeforeUnmount(() => {
     >
         <div
             class="group/dock pointer-events-auto relative flex flex-col items-end gap-3"
+            @pointerenter="refreshDockData"
+            @focusin="refreshDockData"
         >
             <div
                 aria-hidden="true"
@@ -257,33 +263,31 @@ onBeforeUnmount(() => {
             />
 
             <div
-                class="pointer-events-none absolute right-0 bottom-full mb-3 flex max-h-[min(32rem,calc(100vh-7rem))] w-72 translate-y-2 flex-col items-stretch gap-2 overflow-y-auto rounded-3xl border border-border/70 bg-background/88 p-2 opacity-0 shadow-2xl backdrop-blur-xl transition-all duration-200 group-focus-within/dock:pointer-events-auto group-focus-within/dock:translate-y-0 group-focus-within/dock:opacity-100 group-hover/dock:pointer-events-auto group-hover/dock:translate-y-0 group-hover/dock:opacity-100 supports-[backdrop-filter]:bg-background/70"
+                v-if="visibleDockEntries.length > 0"
+                class="pointer-events-none absolute right-0 bottom-full mb-3 flex max-w-[min(22rem,calc(100vw-1.5rem))] translate-y-2 flex-wrap items-center justify-end gap-2 overflow-visible rounded-3xl border border-border/70 bg-background/88 p-2 opacity-0 shadow-2xl backdrop-blur-xl transition-all duration-200 group-focus-within/dock:pointer-events-auto group-focus-within/dock:translate-y-0 group-focus-within/dock:opacity-100 group-hover/dock:pointer-events-auto group-hover/dock:translate-y-0 group-hover/dock:opacity-100 supports-[backdrop-filter]:bg-background/70"
             >
-                <div
-                    v-if="visibleDockEntries.length > 0"
-                    class="flex flex-col gap-1"
+                <button
+                    v-for="entry in visibleDockEntries"
+                    :key="entry.key"
+                    type="button"
+                    class="group/avatar relative shrink-0 rounded-2xl transition outline-none hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring"
+                    :title="
+                        entry.subtitle
+                            ? `${entry.title} · ${entry.subtitle}`
+                            : entry.title
+                    "
+                    :aria-label="entryAriaLabel(entry)"
+                    @click="
+                        openChatCenter(
+                            'chats',
+                            entry.conversationId,
+                            entry.contactId,
+                        )
+                    "
                 >
-                    <button
-                        v-for="entry in visibleDockEntries"
-                        :key="entry.key"
-                        type="button"
-                        class="group flex w-full items-center gap-3 rounded-2xl p-2 text-left transition outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-                        :title="
-                            entry.subtitle
-                                ? `${entry.title} · ${entry.subtitle}`
-                                : entry.title
-                        "
-                        :aria-label="entryAriaLabel(entry)"
-                        @click="
-                            openChatCenter(
-                                'chats',
-                                entry.conversationId,
-                                entry.contactId,
-                            )
-                        "
-                    >
+                    <span class="relative block overflow-visible">
                         <Avatar
-                            class="size-11 shrink-0 rounded-2xl border border-border bg-background shadow-sm transition group-hover:border-primary/40"
+                            class="size-11 rounded-2xl border border-border bg-background shadow-sm transition group-hover/avatar:border-primary/40"
                         >
                             <img
                                 v-if="shouldShowAvatar(entry)"
@@ -305,36 +309,17 @@ onBeforeUnmount(() => {
                                 {{ getInitials(entry.title) }}
                             </AvatarFallback>
                         </Avatar>
-                        <span class="min-w-0 flex-1">
-                            <span
-                                class="block truncate text-sm font-semibold text-foreground"
-                            >
-                                {{ entry.title }}
-                            </span>
-                            <span
-                                v-if="entry.unreadCount > 0"
-                                class="block truncate text-xs font-medium text-primary"
-                            >
-                                {{ t.chat.unread }}: {{ entry.unreadCount }}
-                            </span>
-                            <span
-                                v-else-if="entry.subtitle"
-                                class="block truncate text-xs text-muted-foreground"
-                            >
-                                {{ entry.subtitle }}
-                            </span>
-                        </span>
                         <span
                             v-if="entry.unreadCount > 0"
                             aria-hidden="true"
-                            class="inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
+                            class="absolute -top-2 -right-2 z-30 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground ring-2 ring-background"
                         >
                             {{
                                 entry.unreadCount > 9 ? '9+' : entry.unreadCount
                             }}
                         </span>
-                    </button>
-                </div>
+                    </span>
+                </button>
             </div>
 
             <div

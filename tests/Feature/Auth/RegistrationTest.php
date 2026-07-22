@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\User;
+use App\Models\UserGroup;
+use App\Notifications\SystemNotification;
+use Illuminate\Support\Facades\Notification;
 use Laravel\Fortify\Features;
 
 beforeEach(function () {
@@ -14,6 +17,36 @@ test('registration screen can be rendered', function () {
 });
 
 test('new users can register and remain pending administrator approval', function () {
+    config(['admin.super_admin_email' => 'super@example.com']);
+
+    $administrators = UserGroup::query()->firstOrCreate([
+        'name' => UserGroup::ADMINISTRATORS_NAME,
+    ]);
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+        'language' => 'ru',
+        'has_selected_language' => true,
+    ]);
+    $administrator = User::factory()->create([
+        'user_group_id' => $administrators->id,
+    ]);
+    $secondAdministrator = User::factory()->create([
+        'user_group_id' => $administrators->id,
+    ]);
+    $inactiveAdministrator = User::factory()->create([
+        'user_group_id' => $administrators->id,
+        'is_active' => false,
+    ]);
+    $restrictedGroup = UserGroup::factory()->create([
+        'permissions' => [UserGroup::PERMISSION_VIEW_USERS],
+    ]);
+    $restrictedAdministrator = User::factory()->create([
+        'user_group_id' => $restrictedGroup->id,
+    ]);
+    $regularUser = User::factory()->create();
+
+    Notification::fake();
+
     $response = $this->post(route('register.store'), [
         'name' => 'Test User',
         'email' => 'test@example.com',
@@ -31,6 +64,31 @@ test('new users can register and remain pending administrator approval', functio
     expect($user->name)->toBe('Test User')
         ->and($user->is_active)->toBeFalse()
         ->and($user->deactivated_at)->toBeNull();
+
+    Notification::assertSentTo(
+        [$superAdmin, $administrator, $secondAdministrator],
+        SystemNotification::class,
+    );
+    Notification::assertNotSentTo(
+        [$inactiveAdministrator, $restrictedAdministrator, $regularUser, $user],
+        SystemNotification::class,
+    );
+    Notification::assertCount(3);
+    Notification::assertSentTo(
+        $superAdmin,
+        SystemNotification::class,
+        function (SystemNotification $notification, array $channels) use ($superAdmin, $user): bool {
+            $data = $notification->toArray($superAdmin);
+
+            return $channels === ['database']
+                && $data['title'] === 'Новая самостоятельная регистрация'
+                && $data['message'] === 'Пользователь Test User (test@example.com) самостоятельно зарегистрировался и ожидает активации.'
+                && $data['action_url'] === route('settings.users.index', [
+                    'search' => $user->email,
+                    'status' => 'inactive',
+                ]);
+        },
+    );
 });
 
 test('registration screen includes password generator support', function () {

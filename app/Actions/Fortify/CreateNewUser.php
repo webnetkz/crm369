@@ -13,6 +13,10 @@ class CreateNewUser implements CreatesNewUsers
 {
     use PasswordValidationRules, ProfileValidationRules;
 
+    public function __construct(
+        private readonly NotifyAdministratorsOfNewRegistration $notifyAdministrators,
+    ) {}
+
     /**
      * Validate and create a newly registered user.
      *
@@ -25,7 +29,7 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $this->passwordRules(),
         ])->validate();
 
-        return User::create([
+        $user = User::create([
             'name' => $input['name'],
             'email' => $input['email'],
             'password' => $input['password'],
@@ -33,5 +37,9 @@ class CreateNewUser implements CreatesNewUsers
             'has_selected_language' => false,
             'is_active' => false,
         ]);
+
+        ($this->notifyAdministrators)($user);
+
+        return $user;
     }
 }

@@ -8,6 +8,7 @@ use App\Http\Resources\ApiEquipmentResource;
 use App\Models\EquipmentItem;
 use App\Models\EquipmentItemHistory;
 use App\Models\PortalWebhook;
+use App\Support\EquipmentAssignmentNotifier;
 use App\Support\EquipmentHistoryRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,6 +44,7 @@ class PortalWebhookEquipmentController extends Controller
         StoreEquipmentItemRequest $request,
         PortalWebhook $portalWebhook,
         EquipmentHistoryRecorder $historyRecorder,
+        EquipmentAssignmentNotifier $assignmentNotifier,
     ): JsonResponse {
         $actorId = $portalWebhook->created_by_user_id;
         abort_unless($actorId !== null, 422, 'Webhook creator is required.');
@@ -54,6 +56,7 @@ class PortalWebhookEquipmentController extends Controller
         ]);
 
         $historyRecorder->recordCreated($equipmentItem, EquipmentItemHistory::SOURCE_WEBHOOK, $actorId);
+        $assignmentNotifier->sendForAssignmentChanges($equipmentItem);
 
         return response()->json([
             'webhook' => $this->webhookPayload($portalWebhook),
@@ -67,10 +70,13 @@ class PortalWebhookEquipmentController extends Controller
         PortalWebhook $portalWebhook,
         EquipmentItem $equipmentItem,
         EquipmentHistoryRecorder $historyRecorder,
+        EquipmentAssignmentNotifier $assignmentNotifier,
     ): JsonResponse {
         $actorId = $portalWebhook->created_by_user_id;
         abort_unless($actorId !== null, 422, 'Webhook creator is required.');
 
+        $previousIssuedToUserId = $equipmentItem->issued_to_user_id;
+        $previousResponsibleUserId = $equipmentItem->responsible_user_id;
         $before = $historyRecorder->snapshot($equipmentItem);
 
         $equipmentItem->update([
@@ -85,6 +91,11 @@ class PortalWebhookEquipmentController extends Controller
             $before,
             EquipmentItemHistory::SOURCE_WEBHOOK,
             $actorId,
+        );
+        $assignmentNotifier->sendForAssignmentChanges(
+            $equipmentItem,
+            $previousIssuedToUserId,
+            $previousResponsibleUserId,
         );
 
         return response()->json([

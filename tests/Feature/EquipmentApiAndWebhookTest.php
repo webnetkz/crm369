@@ -110,6 +110,9 @@ test('equipment api endpoints list show create and update items', function () {
                 ->where('source', EquipmentItemHistory::SOURCE_API)
                 ->count()
         )->toBe(2);
+
+    expect($responsibleUser->notifications()->count())->toBe(1)
+        ->and($issuedUser->notifications()->count())->toBe(1);
 });
 
 test('equipment api endpoints enforce permissions and disabled module state', function () {
@@ -238,6 +241,9 @@ test('equipment webhook write endpoints can create update and enforce permission
             ->where('source', EquipmentItemHistory::SOURCE_WEBHOOK)
             ->count()
     )->toBe(2);
+
+    expect($responsibleUser->notifications()->count())->toBe(1)
+        ->and($issuedUser->notifications()->count())->toBe(1);
 
     $forbiddenWebhook = PortalWebhook::factory()->create([
         'permissions' => [PortalWebhook::PERMISSION_CONTACTS_READ],

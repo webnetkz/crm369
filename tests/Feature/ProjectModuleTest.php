@@ -5,7 +5,9 @@ use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\ProjectTaskStage;
 use App\Models\User;
+use App\Notifications\SystemNotification;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -295,7 +297,9 @@ CSV;
         ->and($parentTask->coAssignees()->pluck('users.id')->all())->toBe([$coAssignee->id])
         ->and($parentTask->chatConversation()->exists())->toBeTrue()
         ->and($childTask->parent_task_id)->toBe($parentTask->id)
-        ->and($childTask->project_id)->toBeNull();
+        ->and($childTask->project_id)->toBeNull()
+        ->and($assignee->notifications()->count())->toBe(1)
+        ->and($coAssignee->notifications()->count())->toBe(1);
 
     $response->assertSessionHasNoErrors();
 });
@@ -632,6 +636,79 @@ test('project member can create task with assignee and co assignees from project
             ], $assignee->resolvedLanguage()),
         )
         ->and($notification?->data['action_url'])->toBe(route('projects.workspace.tasks.show', $task));
+});
+
+test('new task assignees and co assignees receive notifications without repeats on update', function () {
+    $creator = User::factory()->create();
+    $assignee = User::factory()->create();
+    $coAssignee = User::factory()->create();
+    $newAssignee = User::factory()->create();
+    $newCoAssignee = User::factory()->create();
+
+    Notification::fake();
+
+    $this->actingAs($creator)
+        ->post(route('projects.workspace.tasks.store'), [
+            'project_id' => null,
+            'parent_task_id' => null,
+            'title' => 'Coordinate launch',
+            'description' => 'Prepare all teams.',
+            'status' => ProjectTask::STATUS_TODO,
+            'importance' => ProjectTask::IMPORTANCE_HIGH,
+            'complexity' => 5,
+            'due_at' => null,
+            'sort_order' => 0,
+            'assignee_user_id' => $assignee->id,
+            'co_assignee_user_ids' => [$coAssignee->id],
+        ])
+        ->assertRedirect();
+
+    $task = ProjectTask::query()->where('title', 'Coordinate launch')->firstOrFail();
+
+    Notification::assertSentTo(
+        $assignee,
+        SystemNotification::class,
+        fn (SystemNotification $notification): bool => $notification->toArray($assignee)['title']
+            === __('ui.notifications.task_assigned_title', [], $assignee->resolvedLanguage()),
+    );
+    Notification::assertSentTo(
+        $coAssignee,
+        SystemNotification::class,
+        fn (SystemNotification $notification): bool => $notification->toArray($coAssignee)['title']
+            === __('ui.notifications.task_co_assignee_added_title', [], $coAssignee->resolvedLanguage()),
+    );
+    Notification::assertCount(2);
+
+    Notification::fake();
+
+    $this->actingAs($creator)
+        ->patch(route('projects.workspace.tasks.update', $task), [
+            'project_id' => null,
+            'parent_task_id' => null,
+            'title' => $task->title,
+            'description' => $task->description,
+            'status' => $task->status,
+            'importance' => $task->importance,
+            'complexity' => $task->complexity,
+            'due_at' => null,
+            'sort_order' => $task->sort_order,
+            'assignee_user_id' => $newAssignee->id,
+            'co_assignee_user_ids' => [$coAssignee->id, $newCoAssignee->id],
+        ])
+        ->assertRedirect();
+
+    Notification::assertSentTo($newAssignee, SystemNotification::class);
+    Notification::assertSentTo(
+        $newCoAssignee,
+        SystemNotification::class,
+        fn (SystemNotification $notification): bool => $notification->toArray($newCoAssignee)['message']
+            === __('ui.notifications.task_co_assignee_added_message', [
+                'title' => $task->title,
+                'user' => trim($creator->name.' '.($creator->last_name ?? '')),
+            ], $newCoAssignee->resolvedLanguage()),
+    );
+    Notification::assertNotSentTo([$creator, $assignee, $coAssignee], SystemNotification::class);
+    Notification::assertCount(2);
 });
 
 test('user can create a standalone task directly in the workspace', function () {

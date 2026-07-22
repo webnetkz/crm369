@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateEquipmentItemRequest;
 use App\Models\EquipmentItem;
 use App\Models\EquipmentItemHistory;
 use App\Support\CsvDelimiter;
+use App\Support\EquipmentAssignmentNotifier;
 use App\Support\EquipmentCsvService;
 use App\Support\EquipmentHistoryRecorder;
 use App\Support\EquipmentPageData;
@@ -39,6 +40,7 @@ class EquipmentController extends Controller
     public function store(
         StoreEquipmentItemRequest $request,
         EquipmentHistoryRecorder $historyRecorder,
+        EquipmentAssignmentNotifier $assignmentNotifier,
     ): RedirectResponse {
         $equipmentItem = EquipmentItem::query()->create([
             ...$request->payload(),
@@ -51,6 +53,7 @@ class EquipmentController extends Controller
             source: EquipmentItemHistory::SOURCE_WEB,
             actorUserId: $request->user()->id,
         );
+        $assignmentNotifier->sendForAssignmentChanges($equipmentItem);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.equipment.created_success')]);
 
@@ -61,7 +64,10 @@ class EquipmentController extends Controller
         UpdateEquipmentItemRequest $request,
         EquipmentItem $equipmentItem,
         EquipmentHistoryRecorder $historyRecorder,
+        EquipmentAssignmentNotifier $assignmentNotifier,
     ): RedirectResponse {
+        $previousIssuedToUserId = $equipmentItem->issued_to_user_id;
+        $previousResponsibleUserId = $equipmentItem->responsible_user_id;
         $before = $historyRecorder->snapshot($equipmentItem);
 
         $equipmentItem->update([
@@ -76,6 +82,11 @@ class EquipmentController extends Controller
             before: $before,
             source: EquipmentItemHistory::SOURCE_WEB,
             actorUserId: $request->user()->id,
+        );
+        $assignmentNotifier->sendForAssignmentChanges(
+            $equipmentItem,
+            $previousIssuedToUserId,
+            $previousResponsibleUserId,
         );
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.equipment.updated_success')]);

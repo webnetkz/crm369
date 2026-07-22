@@ -211,7 +211,18 @@ test('conference owners can invite more users and end conferences', function () 
 
     expect(ConferenceInvitation::query()
         ->where('conference_id', $conference->id)
-        ->count())->toBe(2);
+        ->count())->toBe(2)
+        ->and($firstInvitee->notifications()->count())->toBe(1)
+        ->and($secondInvitee->notifications()->count())->toBe(1);
+
+    $this->actingAs($creator)
+        ->post(route('conferences.invitations.store', $conference), [
+            'invited_user_ids' => [$firstInvitee->id, $secondInvitee->id],
+        ])
+        ->assertRedirect();
+
+    expect($firstInvitee->notifications()->count())->toBe(1)
+        ->and($secondInvitee->notifications()->count())->toBe(1);
 
     $this->actingAs($creator)
         ->patch(route('conferences.end', $conference))

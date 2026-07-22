@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateEquipmentItemRequest;
 use App\Http\Resources\ApiEquipmentResource;
 use App\Models\EquipmentItem;
 use App\Models\EquipmentItemHistory;
+use App\Support\EquipmentAssignmentNotifier;
 use App\Support\EquipmentHistoryRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -46,6 +47,7 @@ class EquipmentController extends Controller
     public function store(
         StoreEquipmentItemRequest $request,
         EquipmentHistoryRecorder $historyRecorder,
+        EquipmentAssignmentNotifier $assignmentNotifier,
     ): JsonResponse {
         $user = $request->user();
         abort_unless($user !== null, 403);
@@ -57,6 +59,7 @@ class EquipmentController extends Controller
         ]);
 
         $historyRecorder->recordCreated($equipmentItem, EquipmentItemHistory::SOURCE_API, $user->id);
+        $assignmentNotifier->sendForAssignmentChanges($equipmentItem);
 
         return response()->json([
             'message' => __('ui.equipment.created_success'),
@@ -68,10 +71,13 @@ class EquipmentController extends Controller
         UpdateEquipmentItemRequest $request,
         EquipmentItem $equipmentItem,
         EquipmentHistoryRecorder $historyRecorder,
+        EquipmentAssignmentNotifier $assignmentNotifier,
     ): JsonResponse {
         $user = $request->user();
         abort_unless($user !== null, 403);
 
+        $previousIssuedToUserId = $equipmentItem->issued_to_user_id;
+        $previousResponsibleUserId = $equipmentItem->responsible_user_id;
         $before = $historyRecorder->snapshot($equipmentItem);
 
         $equipmentItem->update([
@@ -82,6 +88,11 @@ class EquipmentController extends Controller
         $equipmentItem->refresh();
 
         $historyRecorder->recordUpdated($equipmentItem, $before, EquipmentItemHistory::SOURCE_API, $user->id);
+        $assignmentNotifier->sendForAssignmentChanges(
+            $equipmentItem,
+            $previousIssuedToUserId,
+            $previousResponsibleUserId,
+        );
 
         return response()->json([
             'message' => __('ui.equipment.updated_success'),

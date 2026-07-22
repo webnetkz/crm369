@@ -7,6 +7,7 @@ use App\Models\EquipmentItemHistory;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -23,6 +24,10 @@ class EquipmentCsvService
         'responsible_user_email',
         'issued_to_user_email',
     ];
+
+    public function __construct(
+        private readonly EquipmentAssignmentNotifier $assignmentNotifier,
+    ) {}
 
     /**
      * @param  Collection<int, EquipmentItem>  $items
@@ -87,37 +92,43 @@ class EquipmentCsvService
     ): int {
         $rows = $this->parseRows($file, $delimiter);
 
-        foreach ($rows as $row) {
-            $equipmentItem = $row['qr_code'] !== null
-                ? EquipmentItem::query()->firstOrNew(['qr_code' => $row['qr_code']])
-                : new EquipmentItem;
-            $exists = $equipmentItem->exists;
-            $before = $exists ? $historyRecorder->snapshot($equipmentItem) : null;
+        return DB::transaction(function () use ($rows, $actor, $historyRecorder): int {
+            foreach ($rows as $row) {
+                $equipmentItem = $row['qr_code'] !== null
+                    ? EquipmentItem::query()->firstOrNew(['qr_code' => $row['qr_code']])
+                    : new EquipmentItem;
+                $exists = $equipmentItem->exists;
+                $previousIssuedToUserId = $equipmentItem->issued_to_user_id;
+                $previousResponsibleUserId = $equipmentItem->responsible_user_id;
+                $before = $exists ? $historyRecorder->snapshot($equipmentItem) : null;
 
-            $equipmentItem->forceFill([
-                'name' => $row['name'],
-                'qr_code' => $row['qr_code'] ?? EquipmentItem::generateQrCode(),
-                'status' => $row['status'],
-                'responsible_user_id' => $row['responsible_user_id'],
-                'issued_to_user_id' => $row['issued_to_user_id'],
-                'created_by_user_id' => $equipmentItem->exists ? $equipmentItem->created_by_user_id : $actor->id,
-                'updated_by_user_id' => $actor->id,
-            ])->save();
+                $equipmentItem->forceFill([
+                    'name' => $row['name'],
+                    'qr_code' => $row['qr_code'] ?? EquipmentItem::generateQrCode(),
+                    'status' => $row['status'],
+                    'responsible_user_id' => $row['responsible_user_id'],
+                    'issued_to_user_id' => $row['issued_to_user_id'],
+                    'created_by_user_id' => $equipmentItem->exists ? $equipmentItem->created_by_user_id : $actor->id,
+                    'updated_by_user_id' => $actor->id,
+                ])->save();
 
-            $equipmentItem->refresh();
+                $equipmentItem->refresh();
 
-            if (! $exists) {
-                $historyRecorder->recordCreated($equipmentItem, EquipmentItemHistory::SOURCE_CSV, $actor->id);
+                if (! $exists) {
+                    $historyRecorder->recordCreated($equipmentItem, EquipmentItemHistory::SOURCE_CSV, $actor->id);
+                } elseif ($before !== null) {
+                    $historyRecorder->recordUpdated($equipmentItem, $before, EquipmentItemHistory::SOURCE_CSV, $actor->id);
+                }
 
-                continue;
+                $this->assignmentNotifier->sendForAssignmentChanges(
+                    $equipmentItem,
+                    $previousIssuedToUserId,
+                    $previousResponsibleUserId,
+                );
             }
 
-            if ($before !== null) {
-                $historyRecorder->recordUpdated($equipmentItem, $before, EquipmentItemHistory::SOURCE_CSV, $actor->id);
-            }
-        }
-
-        return count($rows);
+            return count($rows);
+        });
     }
 
     /**
