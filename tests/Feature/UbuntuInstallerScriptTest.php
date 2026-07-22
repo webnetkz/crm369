@@ -60,21 +60,24 @@ test('ubuntu installer identifies its release and verifies the Laravel health ro
     $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
 
     expect($installer)->toBeString()
-        ->toContain("readonly INSTALLER_VERSION='2026.07.22.3'")
+        ->toContain("readonly INSTALLER_VERSION='2026.07.22.4'")
         ->toContain('Версия установщика: ${INSTALLER_VERSION}')
         ->toContain('installer_version=%s')
-        ->toContain("'2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'")
+        ->toContain("'2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4'")
         ->toContain('sudo bash -s -- --resume')
         ->toContain('Версия частичной установки')
         ->toContain('"http://${domain}/up"')
         ->toContain('"https://${domain}/up"')
         ->toContain("[[ \"\$pre_tls_health_status\" == '200' ]]")
+        ->toContain("[[ \"\$pre_tls_application_status\" == '200' ]]")
         ->toContain("[[ \"\$public_http_health_status\" == '200' ]]")
         ->toContain("[[ \"\$local_https_health_status\" == '200' ]]")
+        ->toContain("[[ \"\$local_https_application_status\" == '200' ]]")
         ->toContain("[[ \"\$public_https_health_status\" == '200' ]]")
+        ->toContain("[[ \"\$public_https_application_status\" == '200' ]]")
         ->toContain('--retry-connrefused')
         ->toContain("--write-out '%{http_code}'")
-        ->toContain('HTTPS-проверка Laravel успешно завершена');
+        ->toContain('HTTPS-проверка Laravel и страницы входа успешно завершена');
 });
 
 test('ubuntu installer applies every required parent migration before the general PostgreSQL pass', function () {
@@ -145,6 +148,8 @@ test('ubuntu installer creates a domain-specific nginx site and enables https', 
         ->toContain('ln -sfn "$nginx_available_path" "$nginx_enabled_path"')
         ->toContain('server_name ${domain};')
         ->toContain('root ${APP_DIR}/public;')
+        ->toContain('fastcgi_buffer_size 16k;')
+        ->toContain('fastcgi_buffers 8 16k;')
         ->toContain('access_log /var/log/nginx/${domain}.access.log;')
         ->toContain('error_log /var/log/nginx/${domain}.error.log;')
         ->toContain("ufw allow 'Nginx Full'")
@@ -176,9 +181,14 @@ test('ubuntu installer verifies every required production service', function () 
         ->toContain('supervisorctl status crm369-default')
         ->toContain('supervisorctl status crm369-notifications')
         ->toContain('pre_tls_health_status="$(curl -sS --max-time 20')
+        ->toContain('pre_tls_application_status="$(curl -sS --max-time 20')
         ->toContain('public_http_health_status="$(curl -sS --max-time 30')
         ->toContain('local_https_health_status="$(curl -sS --max-time 20')
-        ->toContain('public_https_health_status="$(curl -sS --max-time 30');
+        ->toContain('local_https_application_status="$(curl -sS --max-time 20')
+        ->toContain('public_https_health_status="$(curl -sS --max-time 30')
+        ->toContain('public_https_application_status="$(curl -sS --max-time 30')
+        ->toContain('"http://${domain}/login"')
+        ->toContain('"https://${domain}/login"');
 });
 
 test('ubuntu installer keeps queue retry windows above worker timeouts', function () {

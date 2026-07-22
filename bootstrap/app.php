@@ -35,7 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureUserIsActive::class,
             EnsureTwoFactorAuthenticationIsRequired::class,
             HandleInertiaRequests::class,
-            AddLinkHeadersForPreloadedAssets::class,
+            AddLinkHeadersForPreloadedAssets::using(10),
         ]);
 
         $middleware->alias([

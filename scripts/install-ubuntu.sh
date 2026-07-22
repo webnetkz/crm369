@@ -11,7 +11,7 @@ readonly DB_USER='crm369'
 readonly GITHUB_REPOSITORY='webnetkz/crm369'
 readonly GITHUB_REF='main'
 readonly PHP_VERSION='8.4'
-readonly INSTALLER_VERSION='2026.07.22.3'
+readonly INSTALLER_VERSION='2026.07.22.4'
 readonly INSTALL_STATE_DIR='/etc/crm369'
 readonly INSTALL_STATE_FILE='/etc/crm369/installed'
 readonly INSTALL_PROGRESS_FILE='/etc/crm369/installing'
@@ -97,7 +97,7 @@ validate_resume_installation() {
         [[ "$progress_status" == 'installing' && "$progress_domain" == "$resume_domain" && "$progress_app_dir" == "$APP_DIR" ]] \
             || fail 'Файл состояния частичной установки не соответствует существующему приложению.'
         case "$progress_version" in
-            '2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3')
+            '2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4')
                 ;;
             *)
                 fail "Версия частичной установки ${progress_version:-неизвестна} несовместима с установщиком ${INSTALLER_VERSION}."
@@ -714,6 +714,8 @@ server {
         fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
         fastcgi_param DOCUMENT_ROOT \$realpath_root;
         fastcgi_hide_header X-Powered-By;
+        fastcgi_buffer_size 16k;
+        fastcgi_buffers 8 16k;
         fastcgi_read_timeout 120s;
         internal;
     }
@@ -803,6 +805,14 @@ pre_tls_health_status="$(curl -sS --max-time 20 \
 [[ "$pre_tls_health_status" == '200' ]] \
     || fail "Laravel не прошёл HTTP-проверку перед выпуском сертификата; получен статус ${pre_tls_health_status}."
 
+pre_tls_application_status="$(curl -sS --max-time 20 \
+    --resolve "${domain}:80:127.0.0.1" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "http://${domain}/login")"
+[[ "$pre_tls_application_status" == '200' ]] \
+    || fail "Страница входа Laravel не прошла HTTP-проверку перед выпуском сертификата; получен статус ${pre_tls_application_status}."
+
 public_http_health_status="$(curl -sS --max-time 30 \
     --retry 5 \
     --retry-delay 2 \
@@ -862,6 +872,14 @@ local_https_health_status="$(curl -sS --max-time 20 \
 [[ "$local_https_health_status" == '200' ]] \
     || fail "Laravel не прошёл локальную HTTPS-проверку; получен статус ${local_https_health_status}."
 
+local_https_application_status="$(curl -sS --max-time 20 \
+    --resolve "${domain}:443:127.0.0.1" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "https://${domain}/login")"
+[[ "$local_https_application_status" == '200' ]] \
+    || fail "Страница входа Laravel не прошла локальную HTTPS-проверку; получен статус ${local_https_application_status}."
+
 public_https_health_status="$(curl -sS --max-time 30 \
     --retry 5 \
     --retry-delay 2 \
@@ -871,11 +889,21 @@ public_https_health_status="$(curl -sS --max-time 30 \
     "https://${domain}/up")"
 [[ "$public_https_health_status" == '200' ]] \
     || fail "Laravel не прошёл публичную HTTPS-проверку; получен статус ${public_https_health_status}."
+
+public_https_application_status="$(curl -sS --max-time 30 \
+    --retry 5 \
+    --retry-delay 2 \
+    --retry-connrefused \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "https://${domain}/login")"
+[[ "$public_https_application_status" == '200' ]] \
+    || fail "Страница входа Laravel не прошла публичную HTTPS-проверку; получен статус ${public_https_application_status}."
 supervisorctl status crm369-default | grep -q RUNNING
 supervisorctl status crm369-notifications | grep -q RUNNING
 runuser -u "$APP_USER" -- redis-cli ping | grep -q PONG
 
-print_success "HTTPS-проверка Laravel успешно завершена: https://${domain}/up"
+print_success "HTTPS-проверка Laravel и страницы входа успешно завершена: https://${domain}/login"
 
 install -d -m 0700 "$INSTALL_STATE_DIR"
 {

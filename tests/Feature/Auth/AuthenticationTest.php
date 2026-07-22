@@ -16,6 +16,16 @@ test('login screen can be rendered', function () {
         );
 });
 
+test('login screen keeps preload response headers within a standard FastCGI page', function () {
+    $response = $this->get(route('login'));
+    $linkHeader = $response->headers->get('Link');
+
+    $response->assertOk();
+
+    expect($linkHeader)->toBeString()
+        ->and(strlen($linkHeader))->toBeLessThanOrEqual(4096);
+});
+
 test('mobile app login screen uses built vite assets instead of hot server assets', function () {
     $response = $this->withHeaders([
         'User-Agent' => 'Mozilla/5.0 CRM369MobileApp',
