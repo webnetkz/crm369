@@ -11,6 +11,7 @@ readonly DB_USER='crm369'
 readonly GITHUB_REPOSITORY='webnetkz/crm369'
 readonly GITHUB_REF='main'
 readonly PHP_VERSION='8.4'
+readonly INSTALLER_VERSION='2026.07.22.1'
 readonly INSTALL_STATE_DIR='/etc/crm369'
 readonly INSTALL_STATE_FILE='/etc/crm369/installed'
 readonly INSTALL_PROGRESS_FILE='/etc/crm369/installing'
@@ -45,6 +46,10 @@ read_env_value() {
 }
 
 validate_resume_installation() {
+    local progress_app_dir=''
+    local progress_domain=''
+    local progress_status=''
+    local progress_version=''
     local resume_app_url=''
     local resume_database_password=''
 
@@ -79,6 +84,20 @@ validate_resume_installation() {
     resume_admin_email="$(read_env_value SUPER_ADMIN_EMAIL)"
     [[ "$resume_admin_email" =~ ^[A-Za-z0-9.!#%+_=-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$ ]] \
         || fail 'В существующем .env указан некорректный SUPER_ADMIN_EMAIL.'
+
+    if [[ -f "$INSTALL_PROGRESS_FILE" && ! -L "$INSTALL_PROGRESS_FILE" ]]; then
+        progress_status="$(awk -F= '$1 == "status" { print $2; exit }' "$INSTALL_PROGRESS_FILE")"
+        progress_version="$(awk -F= '$1 == "installer_version" { print $2; exit }' "$INSTALL_PROGRESS_FILE")"
+        progress_domain="$(awk -F= '$1 == "domain" { print $2; exit }' "$INSTALL_PROGRESS_FILE")"
+        progress_app_dir="$(awk -F= '$1 == "app_dir" { print $2; exit }' "$INSTALL_PROGRESS_FILE")"
+
+        [[ "$progress_status" == 'installing' && "$progress_domain" == "$resume_domain" && "$progress_app_dir" == "$APP_DIR" ]] \
+            || fail 'Файл состояния частичной установки не соответствует существующему приложению.'
+        [[ "$progress_version" == "$INSTALLER_VERSION" ]] \
+            || fail "Версия частичной установки ${progress_version:-неизвестна} несовместима с установщиком ${INSTALLER_VERSION}."
+    elif [[ -e "$INSTALL_PROGRESS_FILE" || -L "$INSTALL_PROGRESS_FILE" ]]; then
+        fail "Файл состояния ${INSTALL_PROGRESS_FILE} имеет небезопасный тип."
+    fi
 }
 
 cleanup() {
@@ -114,6 +133,7 @@ CRM369 — установщик production-среды для чистого Ubun
 Использование:
   sudo bash scripts/install-ubuntu.sh
   sudo bash scripts/install-ubuntu.sh --resume
+  curl -fsSL https://raw.githubusercontent.com/webnetkz/crm369/main/scripts/install-ubuntu.sh | sudo bash -s -- --resume
 
 Опция --resume продолжает только проверенную частичную установку CRM369,
 не пересоздавая существующие базу PostgreSQL, роль и production .env.
@@ -152,6 +172,8 @@ fi
 
 [[ $EUID -eq 0 ]] || fail 'Запустите установщик от root через sudo.'
 [[ -r "$TTY_DEVICE" && -w "$TTY_DEVICE" ]] || fail 'Для интерактивной установки требуется терминал /dev/tty.'
+
+print_info "Версия установщика: ${INSTALLER_VERSION}"
 
 exec 9>/run/lock/crm369-install.lock
 flock -n 9 || fail 'Другой процесс установки CRM369 уже запущен.'
@@ -527,6 +549,7 @@ fi
 install -d -m 0700 "$INSTALL_STATE_DIR"
 {
     printf 'status=installing\n'
+    printf 'installer_version=%s\n' "$INSTALLER_VERSION"
     printf 'domain=%s\n' "$domain"
     printf 'app_dir=%s\n' "$APP_DIR"
     printf 'mode=%s\n' "$resume_mode"
@@ -700,7 +723,13 @@ systemctl reload nginx
 supervisorctl reread
 supervisorctl update
 
-curl -fsS --max-time 20 --resolve "${domain}:80:127.0.0.1" "http://${domain}/" >/dev/null
+pre_tls_health_status="$(curl -sS --max-time 20 \
+    --resolve "${domain}:80:127.0.0.1" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "http://${domain}/up")"
+[[ "$pre_tls_health_status" == '200' ]] \
+    || fail "Laravel не прошёл HTTP-проверку перед выпуском сертификата; получен статус ${pre_tls_health_status}."
 
 print_info "Получение TLS-сертификата Let's Encrypt для ${domain}..."
 certbot --nginx \
@@ -716,6 +745,14 @@ systemctl reload nginx
 
 systemctl enable --now certbot.timer
 certbot renew --dry-run --non-interactive
+
+http_redirect_status="$(curl -sS --max-time 20 \
+    --resolve "${domain}:80:127.0.0.1" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "http://${domain}/up")"
+[[ "$http_redirect_status" =~ ^30[1278]$ ]] \
+    || fail "HTTP для ${domain} не перенаправляет на HTTPS; получен статус ${http_redirect_status}."
 
 print_info 'Проверка HTTPS и состояния сервисов...'
 [[ -s "/etc/letsencrypt/live/${domain}/fullchain.pem" ]] \
@@ -735,14 +772,33 @@ runuser -u postgres -- pg_isready --quiet || fail 'PostgreSQL не приним�
 /usr/bin/php8.4 -m | grep -qxF redis || fail 'PHP-расширение redis не загружено.'
 redis-cli --raw CONFIG GET appendonly | grep -qx yes || fail 'Redis AOF не включён.'
 redis-cli --raw CONFIG GET maxmemory-policy | grep -qx noeviction || fail 'Redis может удалять задания очереди при нехватке памяти.'
-curl -fsS --max-time 20 --resolve "${domain}:443:127.0.0.1" "https://${domain}/" >/dev/null
+local_https_health_status="$(curl -sS --max-time 20 \
+    --resolve "${domain}:443:127.0.0.1" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "https://${domain}/up")"
+[[ "$local_https_health_status" == '200' ]] \
+    || fail "Laravel не прошёл локальную HTTPS-проверку; получен статус ${local_https_health_status}."
+
+public_https_health_status="$(curl -sS --max-time 30 \
+    --retry 5 \
+    --retry-delay 2 \
+    --retry-connrefused \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "https://${domain}/up")"
+[[ "$public_https_health_status" == '200' ]] \
+    || fail "Laravel не прошёл публичную HTTPS-проверку; получен статус ${public_https_health_status}."
 supervisorctl status crm369-default | grep -q RUNNING
 supervisorctl status crm369-notifications | grep -q RUNNING
 runuser -u "$APP_USER" -- redis-cli ping | grep -q PONG
 
+print_success "HTTPS-проверка Laravel успешно завершена: https://${domain}/up"
+
 install -d -m 0700 "$INSTALL_STATE_DIR"
 {
     printf 'installed_at=%s\n' "$(date --iso-8601=seconds)"
+    printf 'installer_version=%s\n' "$INSTALLER_VERSION"
     printf 'domain=%s\n' "$domain"
     printf 'app_dir=%s\n' "$APP_DIR"
     printf 'repository=%s\n' "$GITHUB_REPOSITORY"

@@ -53,6 +53,25 @@ test('ubuntu installer provisions a production stack without demo data', functio
         ->not->toContain('migrate --seed');
 });
 
+test('ubuntu installer identifies its release and verifies the Laravel health route over https', function () {
+    $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
+
+    expect($installer)->toBeString()
+        ->toContain("readonly INSTALLER_VERSION='2026.07.22.1'")
+        ->toContain('Версия установщика: ${INSTALLER_VERSION}')
+        ->toContain('installer_version=%s')
+        ->toContain('sudo bash -s -- --resume')
+        ->toContain('Версия частичной установки')
+        ->toContain('"http://${domain}/up"')
+        ->toContain('"https://${domain}/up"')
+        ->toContain("[[ \"\$pre_tls_health_status\" == '200' ]]")
+        ->toContain("[[ \"\$local_https_health_status\" == '200' ]]")
+        ->toContain("[[ \"\$public_https_health_status\" == '200' ]]")
+        ->toContain('--retry-connrefused')
+        ->toContain("--write-out '%{http_code}'")
+        ->toContain('HTTPS-проверка Laravel успешно завершена');
+});
+
 test('ubuntu installer creates a domain-specific nginx site and enables https', function () {
     $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
 
@@ -93,7 +112,9 @@ test('ubuntu installer verifies every required production service', function () 
         ->toContain('redis-cli ping')
         ->toContain('supervisorctl status crm369-default')
         ->toContain('supervisorctl status crm369-notifications')
-        ->toContain('curl -fsS --max-time 20 --resolve');
+        ->toContain('pre_tls_health_status="$(curl -sS --max-time 20')
+        ->toContain('local_https_health_status="$(curl -sS --max-time 20')
+        ->toContain('public_https_health_status="$(curl -sS --max-time 30');
 });
 
 test('ubuntu installer keeps queue retry windows above worker timeouts', function () {
