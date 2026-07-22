@@ -57,9 +57,10 @@ test('ubuntu installer identifies its release and verifies the Laravel health ro
     $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
 
     expect($installer)->toBeString()
-        ->toContain("readonly INSTALLER_VERSION='2026.07.22.1'")
+        ->toContain("readonly INSTALLER_VERSION='2026.07.22.2'")
         ->toContain('Версия установщика: ${INSTALLER_VERSION}')
         ->toContain('installer_version=%s')
+        ->toContain("'2026.07.22.1'|'2026.07.22.2'")
         ->toContain('sudo bash -s -- --resume')
         ->toContain('Версия частичной установки')
         ->toContain('"http://${domain}/up"')
@@ -70,6 +71,44 @@ test('ubuntu installer identifies its release and verifies the Laravel health ro
         ->toContain('--retry-connrefused')
         ->toContain("--write-out '%{http_code}'")
         ->toContain('HTTPS-проверка Laravel успешно завершена');
+});
+
+test('ubuntu installer applies chat migrations in PostgreSQL dependency order', function () {
+    $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
+    $usersMigration = '--path=database/migrations/0001_01_01_000000_create_users_table.php';
+    $chatConversationMigration = '--path=database/migrations/2026_06_29_005139_create_chat_conversations_table.php';
+    $usersMigrationPosition = strpos($installer, $usersMigration);
+    $chatConversationMigrationPosition = strpos($installer, $chatConversationMigration);
+    $dependencyMigrationCommandPosition = strpos($installer, '"${chat_dependency_migrations[@]}"');
+    $generalMigrationPosition = strpos(
+        $installer,
+        '"${APP_DIR}/artisan" migrate --force --no-interaction',
+        $dependencyMigrationCommandPosition,
+    );
+
+    expect($usersMigrationPosition)->toBeInt()->toBeLessThan($chatConversationMigrationPosition)
+        ->and($chatConversationMigrationPosition)->toBeInt()->toBeLessThan($dependencyMigrationCommandPosition)
+        ->and($dependencyMigrationCommandPosition)->toBeInt()->toBeLessThan($generalMigrationPosition)
+        ->and(substr_count($installer, $usersMigration))->toBe(1)
+        ->and(substr_count($installer, $chatConversationMigration))->toBe(1)
+        ->and($generalMigrationPosition)->toBeInt()
+        ->and($installer)->toContain('Применение базовых миграций и родительской таблицы чатов');
+});
+
+test('ubuntu installer verifies the optimized Laravel application is in production mode', function () {
+    $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
+    $optimizePosition = strpos($installer, '"${APP_DIR}/artisan" optimize --no-interaction');
+    $environmentCheckPosition = strpos($installer, 'production_environment_report=', $optimizePosition);
+    $installedStatePosition = strpos($installer, '>"$INSTALL_STATE_FILE"', $environmentCheckPosition);
+
+    expect($installer)->toBeString()
+        ->toContain('config:show app.env')
+        ->toContain('config:show app.debug')
+        ->toContain('app\.env[[:space:].]+production')
+        ->toContain('app\.debug[[:space:].]+false')
+        ->and($optimizePosition)->toBeInt()->toBeLessThan($environmentCheckPosition)
+        ->and($environmentCheckPosition)->toBeInt()->toBeLessThan($installedStatePosition)
+        ->and($installedStatePosition)->toBeInt();
 });
 
 test('ubuntu installer creates a domain-specific nginx site and enables https', function () {

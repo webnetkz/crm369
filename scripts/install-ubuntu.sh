@@ -11,7 +11,7 @@ readonly DB_USER='crm369'
 readonly GITHUB_REPOSITORY='webnetkz/crm369'
 readonly GITHUB_REF='main'
 readonly PHP_VERSION='8.4'
-readonly INSTALLER_VERSION='2026.07.22.1'
+readonly INSTALLER_VERSION='2026.07.22.2'
 readonly INSTALL_STATE_DIR='/etc/crm369'
 readonly INSTALL_STATE_FILE='/etc/crm369/installed'
 readonly INSTALL_PROGRESS_FILE='/etc/crm369/installing'
@@ -93,8 +93,13 @@ validate_resume_installation() {
 
         [[ "$progress_status" == 'installing' && "$progress_domain" == "$resume_domain" && "$progress_app_dir" == "$APP_DIR" ]] \
             || fail 'Файл состояния частичной установки не соответствует существующему приложению.'
-        [[ "$progress_version" == "$INSTALLER_VERSION" ]] \
-            || fail "Версия частичной установки ${progress_version:-неизвестна} несовместима с установщиком ${INSTALLER_VERSION}."
+        case "$progress_version" in
+            '2026.07.22.1'|'2026.07.22.2')
+                ;;
+            *)
+                fail "Версия частичной установки ${progress_version:-неизвестна} несовместима с установщиком ${INSTALLER_VERSION}."
+                ;;
+        esac
     elif [[ -e "$INSTALL_PROGRESS_FILE" || -L "$INSTALL_PROGRESS_FILE" ]]; then
         fail "Файл состояния ${INSTALL_PROGRESS_FILE} имеет небезопасный тип."
     fi
@@ -577,6 +582,23 @@ app_key=''
 chown root:"$APP_GROUP" "${APP_DIR}/.env"
 chmod 0640 "${APP_DIR}/.env"
 
+chat_dependency_migrations=(
+    '--path=database/migrations/0001_01_01_000000_create_users_table.php'
+    '--path=database/migrations/2026_06_29_005139_create_chat_conversations_table.php'
+)
+
+for migration_option in "${chat_dependency_migrations[@]}"; do
+    migration_file="${migration_option#--path=database/migrations/}"
+    [[ -f "${APP_DIR}/database/migrations/${migration_file}" ]] \
+        || fail "Не найдена обязательная миграция ${migration_file}."
+done
+
+print_info 'Применение базовых миграций и родительской таблицы чатов...'
+runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_DIR}/artisan" migrate \
+    --force \
+    --no-interaction \
+    "${chat_dependency_migrations[@]}"
+
 runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_DIR}/artisan" migrate --force --no-interaction
 
 user_count="$(runuser -u postgres -- psql --dbname="$DB_NAME" -tAc 'SELECT COUNT(*) FROM users')"
@@ -597,6 +619,20 @@ fi
 
 /usr/bin/php8.4 "${APP_DIR}/artisan" storage:link --force --no-interaction
 runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_DIR}/artisan" optimize --no-interaction
+
+production_environment_report="$(runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_DIR}/artisan" config:show app.env \
+    --no-ansi \
+    --no-interaction)"
+production_debug_report="$(runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_DIR}/artisan" config:show app.debug \
+    --no-ansi \
+    --no-interaction)"
+
+grep -Eq 'app\.env[[:space:].]+production' <<<"$production_environment_report" \
+    || fail 'Laravel запущен не в production-окружении.'
+grep -Eq 'app\.debug[[:space:].]+false' <<<"$production_debug_report" \
+    || fail 'Laravel debug-режим не отключён.'
+
+print_success 'Laravel настроен для production; debug-режим отключён.'
 
 print_info 'Настройка PHP-FPM, Nginx, очередей и планировщика...'
 
