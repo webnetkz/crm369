@@ -16,7 +16,8 @@ test('ubuntu installer has valid bash syntax and exposes usage without root acce
     $help->run();
 
     expect($help->isSuccessful())->toBeTrue($help->getErrorOutput())
-        ->and($help->getOutput())->toContain('CRM369');
+        ->and($help->getOutput())->toContain('CRM369')
+        ->and($help->getOutput())->toContain('--resume');
 });
 
 test('ubuntu installer provisions a production stack without demo data', function () {
@@ -39,8 +40,8 @@ test('ubuntu installer provisions a production stack without demo data', functio
         ->toContain('appendonly yes')
         ->toContain('appendfsync everysec')
         ->toContain('maxmemory-policy noeviction')
-        ->toContain('artisan migrate --force')
-        ->toContain('artisan crm369:install')
+        ->toContain('"${APP_DIR}/artisan" migrate --force')
+        ->toContain('"${APP_DIR}/artisan" crm369:install')
         ->toContain('artisan schedule:run')
         ->toContain('queue:work database')
         ->toContain('queue:work redis')
@@ -104,6 +105,56 @@ test('ubuntu installer keeps queue retry windows above worker timeouts', functio
         ->and(preg_match('~queue:work redis[^\n]+--timeout=(\d+)~', $installer, $redisWorkerTimeout))->toBe(1)
         ->and((int) $databaseRetryAfter[1])->toBeGreaterThan((int) $databaseWorkerTimeout[1])
         ->and((int) $redisRetryAfter[1])->toBeGreaterThan((int) $redisWorkerTimeout[1]);
+});
+
+test('ubuntu installer uses absolute artisan paths across user boundaries', function () {
+    $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
+    $permissionNormalizationPosition = strpos($installer, 'chown -R root:"$APP_GROUP" "$APP_DIR"');
+    $writableEnvironmentPosition = strpos($installer, 'chmod 0660 "${APP_DIR}/.env"');
+    $firstArtisanPosition = strpos($installer, '/usr/bin/php8.4 "${APP_DIR}/artisan" key:generate');
+    $lockedEnvironmentPosition = strpos($installer, 'chmod 0640 "${APP_DIR}/.env"', $firstArtisanPosition);
+
+    expect($installer)->toBeString()
+        ->toContain('/usr/bin/php8.4 "${APP_DIR}/artisan" key:generate')
+        ->toContain('/usr/bin/php8.4 "${APP_DIR}/artisan" migrate')
+        ->toContain('/usr/bin/php8.4 "${APP_DIR}/artisan" crm369:install')
+        ->toContain('/usr/bin/php8.4 "${APP_DIR}/artisan" storage:link')
+        ->toContain('/usr/bin/php8.4 "${APP_DIR}/artisan" optimize')
+        ->not->toContain('runuser -u "$APP_USER" -- /usr/bin/php8.4 artisan')
+        ->and($permissionNormalizationPosition)->toBeInt()->toBeLessThan($firstArtisanPosition)
+        ->and($writableEnvironmentPosition)->toBeInt()->toBeLessThan($firstArtisanPosition)
+        ->and($lockedEnvironmentPosition)->toBeInt()->toBeGreaterThan($firstArtisanPosition);
+});
+
+test('ubuntu installer can safely resume its validated partial installation', function () {
+    $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
+
+    expect($installer)->toBeString()
+        ->toContain("resume_mode='false'")
+        ->toContain('--resume)')
+        ->toContain('read_env_value APP_URL')
+        ->toContain('read_env_value SUPER_ADMIN_EMAIL')
+        ->toContain('validate_resume_installation')
+        ->toContain('database_exists')
+        ->toContain('database_role_exists')
+        ->toContain('database_owner')
+        ->toContain('pg_get_userbyid')
+        ->toContain('SELECT COUNT(*) FROM users')
+        ->toContain('SELECT email FROM users')
+        ->toContain('Продолжение прерванной установки')
+        ->toContain('INSTALL_PROGRESS_FILE')
+        ->not->toContain('Каталог ${APP_DIR} уже существует. Установщик не перезаписывает существующее развёртывание.')
+        ->not->toContain('DROP DATABASE')
+        ->not->toContain('DROP ROLE')
+        ->not->toContain('rm -rf -- "$APP_DIR"');
+
+    $freshBuildStart = strpos($installer, "if [[ \"\$resume_mode\" == 'false' ]]; then\n    print_info 'Установка Composer");
+    $frontendBuildPosition = strpos($installer, 'VITE_APP_NAME=CRM369 npm run build', $freshBuildStart);
+    $resumeBuildSkipPosition = strpos($installer, "else\n    print_info 'Исходный код, зависимости и frontend-сборка", $frontendBuildPosition);
+
+    expect($freshBuildStart)->toBeInt()->toBeLessThan($frontendBuildPosition)
+        ->and($frontendBuildPosition)->toBeInt()->toBeLessThan($resumeBuildSkipPosition)
+        ->and($resumeBuildSkipPosition)->toBeInt();
 });
 
 test('readme documents the public repository one-command installation in English', function () {

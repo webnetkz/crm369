@@ -13,9 +13,13 @@ readonly GITHUB_REF='main'
 readonly PHP_VERSION='8.4'
 readonly INSTALL_STATE_DIR='/etc/crm369'
 readonly INSTALL_STATE_FILE='/etc/crm369/installed'
+readonly INSTALL_PROGRESS_FILE='/etc/crm369/installing'
 readonly TTY_DEVICE='/dev/tty'
 
 TEMP_DIR=''
+resume_mode='false'
+resume_domain=''
+resume_admin_email=''
 
 print_info() {
     printf '\033[1;34m[CRM369]\033[0m %s\n' "$*"
@@ -34,6 +38,49 @@ fail() {
     exit 1
 }
 
+read_env_value() {
+    local key="$1"
+
+    awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "${APP_DIR}/.env"
+}
+
+validate_resume_installation() {
+    local resume_app_url=''
+    local resume_database_password=''
+
+    [[ -d "$APP_DIR" && ! -L "$APP_DIR" ]] \
+        || fail "Для продолжения требуется обычный каталог ${APP_DIR}."
+    [[ -f "${APP_DIR}/artisan" && -f "${APP_DIR}/composer.lock" && -f "${APP_DIR}/package-lock.json" && -f "${APP_DIR}/.env" ]] \
+        || fail 'Продолжение разрешено только для ранее распакованного приложения CRM369 с production-конфигурацией.'
+    [[ -f "${APP_DIR}/app/Console/Commands/InstallCrmCommand.php" && -f "${APP_DIR}/config/admin.php" ]] \
+        || fail 'Существующий каталог не прошёл проверку исходного кода CRM369.'
+    [[ -f "${APP_DIR}/vendor/autoload.php" && -f "${APP_DIR}/public/build/manifest.json" ]] \
+        || fail 'Для продолжения требуются ранее установленные PHP-зависимости и собранные frontend-ресурсы.'
+
+    [[ "$(read_env_value APP_ENV)" == 'production' ]] \
+        || fail 'Существующий .env не является production-конфигурацией CRM369.'
+    [[ "$(read_env_value APP_DEBUG)" == 'false' ]] \
+        || fail 'В существующем .env должен быть отключён APP_DEBUG.'
+    [[ "$(read_env_value DB_CONNECTION)" == 'pgsql' ]] \
+        || fail 'Существующий .env использует неподдерживаемое подключение к базе данных.'
+    [[ "$(read_env_value DB_HOST)" == '127.0.0.1' && "$(read_env_value DB_PORT)" == '5432' ]] \
+        || fail 'Существующий .env должен использовать локальный PostgreSQL.'
+    [[ "$(read_env_value DB_DATABASE)" == "$DB_NAME" && "$(read_env_value DB_USERNAME)" == "$DB_USER" ]] \
+        || fail 'Существующий .env указывает на другую базу или роль PostgreSQL.'
+
+    resume_database_password="$(read_env_value DB_PASSWORD)"
+    [[ -n "$resume_database_password" ]] || fail 'В существующем .env отсутствует пароль PostgreSQL.'
+
+    resume_app_url="$(read_env_value APP_URL)"
+    [[ "$resume_app_url" =~ ^https://([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]] \
+        || fail 'В существующем .env указан некорректный APP_URL.'
+    resume_domain="${resume_app_url#https://}"
+
+    resume_admin_email="$(read_env_value SUPER_ADMIN_EMAIL)"
+    [[ "$resume_admin_email" =~ ^[A-Za-z0-9.!#%+_=-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$ ]] \
+        || fail 'В существующем .env указан некорректный SUPER_ADMIN_EMAIL.'
+}
+
 cleanup() {
     local exit_code=$?
 
@@ -49,7 +96,11 @@ handle_error() {
     local exit_code=$?
     local line_number="$1"
 
-    print_warning "Установка остановлена на строке ${line_number}. Частично созданные данные не удалены автоматически; проверьте их перед повторным запуском."
+    if [[ "${BASH_SUBSHELL:-0}" -gt 0 ]]; then
+        return "$exit_code"
+    fi
+
+    print_warning "Установка остановлена на строке ${line_number}. Частично созданные данные не удалены автоматически; после проверки продолжите командой с --resume."
     exit "$exit_code"
 }
 
@@ -62,6 +113,10 @@ CRM369 — установщик production-среды для чистого Ubun
 
 Использование:
   sudo bash scripts/install-ubuntu.sh
+  sudo bash scripts/install-ubuntu.sh --resume
+
+Опция --resume продолжает только проверенную частичную установку CRM369,
+не пересоздавая существующие базу PostgreSQL, роль и production .env.
 
 Установщик интерактивно запросит:
   - домен CRM;
@@ -73,10 +128,22 @@ Node.js 22, Composer и Certbot. Демо-данные и seeders не запу�
 HELP
 }
 
-if [[ "${1:-}" == '--help' || "${1:-}" == '-h' ]]; then
-    show_help
-    exit 0
-fi
+case "${1:-}" in
+    --help|-h)
+        show_help
+        exit 0
+        ;;
+    --resume)
+        resume_mode='true'
+        shift
+        ;;
+    '')
+        ;;
+    *)
+        show_help >&2
+        fail "Неизвестный аргумент: $1"
+        ;;
+esac
 
 if [[ $# -gt 0 ]]; then
     show_help >&2
@@ -104,8 +171,11 @@ source /etc/os-release
 [[ "$(dpkg --print-architecture)" == 'amd64' ]] || fail 'Автоматическая установка поддерживает архитектуру amd64.'
 command -v curl >/dev/null 2>&1 || fail 'Команда curl не найдена. Установите её: apt-get install -y curl'
 
-if [[ -e "$APP_DIR" ]]; then
-    fail "Каталог ${APP_DIR} уже существует. Установщик не перезаписывает существующее развёртывание."
+if [[ "$resume_mode" == 'true' ]]; then
+    validate_resume_installation
+    print_info "Продолжение прерванной установки из ${APP_DIR}."
+elif [[ -e "$APP_DIR" || -L "$APP_DIR" ]]; then
+    fail "Каталог ${APP_DIR} уже существует. Если это частичная установка CRM369, проверьте её и используйте --resume."
 fi
 
 available_kilobytes="$(df -Pk /var | awk 'NR == 2 {print $4}')"
@@ -141,7 +211,7 @@ confirm_installation() {
 domain=''
 
 while true; do
-    prompt_value domain 'Домен CRM369 (например crm.example.com)'
+    prompt_value domain 'Домен CRM369 (например crm.example.com)' "$resume_domain"
     domain="${domain,,}"
 
     if [[ "$domain" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]]; then
@@ -166,7 +236,7 @@ done
 admin_email=''
 
 while true; do
-    prompt_value admin_email 'Email super-admin'
+    prompt_value admin_email 'Email super-admin' "$resume_admin_email"
     admin_email="${admin_email,,}"
 
     if [[ "$admin_email" =~ ^[A-Za-z0-9.!#%+_=-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}$ ]]; then
@@ -189,10 +259,21 @@ while true; do
     print_warning 'Введите корректный email.'
 done
 
+if [[ "$resume_mode" == 'true' ]]; then
+    [[ "$domain" == "$resume_domain" ]] \
+        || fail "Домен должен совпадать с существующим APP_URL: ${resume_domain}."
+    [[ "$admin_email" == "$resume_admin_email" ]] \
+        || fail "Email должен совпадать с существующим SUPER_ADMIN_EMAIL: ${resume_admin_email}."
+fi
+
 printf '\nПараметры установки:\n' >"$TTY_DEVICE"
 printf '  URL:         https://%s\n' "$domain" >"$TTY_DEVICE"
 printf '  Super-admin: %s <%s>\n' "$admin_name" "$admin_email" >"$TTY_DEVICE"
 printf '  Каталог:     %s\n\n' "$APP_DIR" >"$TTY_DEVICE"
+
+if [[ "$resume_mode" == 'true' ]]; then
+    printf '  Режим:       продолжение прерванной установки\n\n' >"$TTY_DEVICE"
+fi
 
 confirm_installation || fail 'Установка отменена.'
 
@@ -203,8 +284,24 @@ fi
 nginx_available_path="/etc/nginx/sites-available/${domain}.conf"
 nginx_enabled_path="/etc/nginx/sites-enabled/${domain}.conf"
 
-if [[ -e "$nginx_available_path" || -L "$nginx_available_path" || -e "$nginx_enabled_path" || -L "$nginx_enabled_path" ]]; then
+if [[ "$resume_mode" == 'false' && ( -e "$nginx_available_path" || -L "$nginx_available_path" || -e "$nginx_enabled_path" || -L "$nginx_enabled_path" ) ]]; then
     fail "Конфигурация Nginx для ${domain} уже существует и не будет перезаписана."
+fi
+
+if [[ "$resume_mode" == 'true' && -L "$nginx_available_path" ]]; then
+    fail "Конфигурация ${nginx_available_path} не должна быть символической ссылкой."
+fi
+
+if [[ "$resume_mode" == 'true' && -e "$nginx_available_path" ]]; then
+    grep -Fq "server_name ${domain};" "$nginx_available_path" \
+        || fail "Существующая конфигурация Nginx ${nginx_available_path} принадлежит другому домену."
+    grep -Fq "root ${APP_DIR}/public;" "$nginx_available_path" \
+        || fail "Существующая конфигурация Nginx ${nginx_available_path} использует другой корневой каталог."
+fi
+
+if [[ "$resume_mode" == 'true' && ( -e "$nginx_enabled_path" || -L "$nginx_enabled_path" ) ]]; then
+    [[ -L "$nginx_enabled_path" && "$(readlink -f "$nginx_enabled_path")" == "$nginx_available_path" ]] \
+        || fail "Существующая конфигурация ${nginx_enabled_path} не принадлежит CRM369."
 fi
 
 TEMP_DIR="$(mktemp -d /tmp/crm369-install.XXXXXX)"
@@ -274,55 +371,73 @@ fi
 systemctl enable --now cron nginx "php${PHP_VERSION}-fpm" postgresql redis-server supervisor
 systemctl restart redis-server
 
+database_exists='false'
+database_role_exists='false'
+database_owner=''
+
 if runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | grep -q 1; then
-    fail "База PostgreSQL ${DB_NAME} уже существует; существующие данные не будут перезаписаны."
+    database_exists='true'
+    database_owner="$(runuser -u postgres -- psql -tAc "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = '${DB_NAME}'")"
 fi
 
 if runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = '${DB_USER}'" | grep -q 1; then
-    fail "Роль PostgreSQL ${DB_USER} уже существует; существующие настройки не будут перезаписаны."
+    database_role_exists='true'
 fi
 
-print_info 'Установка Composer с проверкой подписи...'
-composer_installer="${TEMP_DIR}/composer-setup.php"
-composer_signature="$(curl -fsSL https://composer.github.io/installer.sig)"
-curl -fsSL https://getcomposer.org/installer -o "$composer_installer"
-printf '%s  %s\n' "$composer_signature" "$composer_installer" | sha384sum --check --status
-/usr/bin/php8.4 "$composer_installer" --quiet --install-dir=/usr/local/bin --filename=composer
+if [[ "$resume_mode" == 'true' ]]; then
+    [[ "$database_exists" == 'true' && "$database_role_exists" == 'true' ]] \
+        || fail 'Для продолжения должны существовать и база crm369, и роль crm369. Частичное состояние PostgreSQL не изменено.'
+    [[ "$database_owner" == "$DB_USER" ]] \
+        || fail "Владельцем базы ${DB_NAME} должна быть роль ${DB_USER}; существующая база не изменена."
+elif [[ "$database_exists" == 'true' || "$database_role_exists" == 'true' ]]; then
+    fail 'База или роль PostgreSQL crm369 уже существует; существующие данные не будут перезаписаны. Для проверенной частичной установки используйте --resume.'
+fi
 
-print_info 'Скачивание исходного кода CRM369 из публичного репозитория...'
-source_archive="${TEMP_DIR}/crm369.tar.gz"
-curl -fsSL --retry 3 \
-    "https://github.com/${GITHUB_REPOSITORY}/archive/refs/heads/${GITHUB_REF}.tar.gz" \
-    -o "$source_archive"
+if [[ "$resume_mode" == 'false' ]]; then
+    print_info 'Установка Composer с проверкой подписи...'
+    composer_installer="${TEMP_DIR}/composer-setup.php"
+    composer_signature="$(curl -fsSL https://composer.github.io/installer.sig)"
+    curl -fsSL https://getcomposer.org/installer -o "$composer_installer"
+    printf '%s  %s\n' "$composer_signature" "$composer_installer" | sha384sum --check --status
+    /usr/bin/php8.4 "$composer_installer" --quiet --install-dir=/usr/local/bin --filename=composer
 
-mkdir -p "$APP_DIR"
-tar -xzf "$source_archive" --strip-components=1 -C "$APP_DIR"
+    print_info 'Скачивание исходного кода CRM369 из публичного репозитория...'
+    source_archive="${TEMP_DIR}/crm369.tar.gz"
+    curl -fsSL --retry 3 \
+        "https://github.com/${GITHUB_REPOSITORY}/archive/refs/heads/${GITHUB_REF}.tar.gz" \
+        -o "$source_archive"
 
-[[ -f "${APP_DIR}/artisan" && -f "${APP_DIR}/composer.lock" && -f "${APP_DIR}/package-lock.json" ]] \
-    || fail 'Архив репозитория не содержит ожидаемое приложение CRM369.'
+    mkdir -p "$APP_DIR"
+    tar -xzf "$source_archive" --strip-components=1 -C "$APP_DIR"
 
-print_info 'Установка PHP- и frontend-зависимостей...'
-(
-    cd "$APP_DIR"
-    COMPOSER_ALLOW_SUPERUSER=1 \
-        /usr/local/bin/composer install \
-            --no-dev \
-            --no-interaction \
-            --prefer-dist \
-            --optimize-autoloader \
-            --no-progress
+    [[ -f "${APP_DIR}/artisan" && -f "${APP_DIR}/composer.lock" && -f "${APP_DIR}/package-lock.json" ]] \
+        || fail 'Архив репозитория не содержит ожидаемое приложение CRM369.'
 
-    /usr/local/bin/composer check-platform-reqs --no-dev
+    print_info 'Установка PHP- и frontend-зависимостей...'
+    (
+        cd "$APP_DIR"
+        COMPOSER_ALLOW_SUPERUSER=1 \
+            /usr/local/bin/composer install \
+                --no-dev \
+                --no-interaction \
+                --prefer-dist \
+                --optimize-autoloader \
+                --no-progress
 
-    npm ci --no-audit --no-fund
-    VITE_APP_NAME=CRM369 npm run build
-)
+        /usr/local/bin/composer check-platform-reqs --no-dev
 
-rm -rf -- "${APP_DIR}/node_modules"
+        npm ci --no-audit --no-fund
+        VITE_APP_NAME=CRM369 npm run build
+    )
 
-print_info 'Создание изолированной базы PostgreSQL...'
+    rm -rf -- "${APP_DIR}/node_modules"
+else
+    print_info 'Исходный код, зависимости и frontend-сборка частичной установки прошли проверку и будут использованы без перезаписи.'
+fi
 
-database_password="$(openssl rand -hex 32)"
+if [[ "$resume_mode" == 'false' ]]; then
+    print_info 'Создание изолированной базы PostgreSQL...'
+    database_password="$(openssl rand -hex 32)"
 
 {
     printf "\\set db_name '%s'\n" "$DB_NAME"
@@ -404,25 +519,61 @@ install -m 0660 -o "$APP_USER" -g "$APP_GROUP" /dev/null "${APP_DIR}/.env"
     printf 'VITE_APP_NAME=CRM369\n'
 } >"${APP_DIR}/.env"
 
-database_password=''
+    database_password=''
+else
+    print_info 'Существующие база PostgreSQL и production .env прошли проверку и будут использованы без перезаписи.'
+fi
 
+install -d -m 0700 "$INSTALL_STATE_DIR"
+{
+    printf 'status=installing\n'
+    printf 'domain=%s\n' "$domain"
+    printf 'app_dir=%s\n' "$APP_DIR"
+    printf 'mode=%s\n' "$resume_mode"
+} >"$INSTALL_PROGRESS_FILE"
+chmod 0600 "$INSTALL_PROGRESS_FILE"
+
+chown -R root:"$APP_GROUP" "$APP_DIR"
+find "$APP_DIR" -path "${APP_DIR}/storage" -prune -o -path "${APP_DIR}/bootstrap/cache" -prune -o -type d -exec chmod 0750 {} +
+find "$APP_DIR" -path "${APP_DIR}/storage" -prune -o -path "${APP_DIR}/bootstrap/cache" -prune -o -type f -exec chmod 0640 {} +
 chown -R "$APP_USER:$APP_GROUP" "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache"
 find "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache" -type d -exec chmod 0770 {} +
 find "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache" -type f -exec chmod 0660 {} +
+chown "$APP_USER:$APP_GROUP" "${APP_DIR}/.env"
+chmod 0660 "${APP_DIR}/.env"
 
-(
-    cd "$APP_DIR"
-    runuser -u "$APP_USER" -- /usr/bin/php8.4 artisan key:generate --force --no-interaction
-    runuser -u "$APP_USER" -- /usr/bin/php8.4 artisan migrate --force --no-interaction
+app_key="$(read_env_value APP_KEY)"
 
+if [[ -z "$app_key" ]]; then
+    runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_DIR}/artisan" key:generate --force --no-interaction
+else
+    print_info 'Существующий APP_KEY сохранён без изменения.'
+fi
+
+app_key=''
+chown root:"$APP_GROUP" "${APP_DIR}/.env"
+chmod 0640 "${APP_DIR}/.env"
+
+runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_DIR}/artisan" migrate --force --no-interaction
+
+user_count="$(runuser -u postgres -- psql --dbname="$DB_NAME" -tAc 'SELECT COUNT(*) FROM users')"
+
+if [[ "$user_count" == '0' ]]; then
     print_info 'Создание единственного пользователя. Пароль вводится скрыто и не сохраняется в shell-history.'
-    runuser -u "$APP_USER" -- /usr/bin/php8.4 artisan crm369:install \
+    runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_DIR}/artisan" crm369:install \
         --name="$admin_name" \
         --email="$admin_email" <"$TTY_DEVICE"
+elif [[ "$user_count" == '1' ]]; then
+    installed_admin_email="$(runuser -u postgres -- psql --dbname="$DB_NAME" -tAc 'SELECT email FROM users ORDER BY id LIMIT 1')"
+    [[ "${installed_admin_email,,}" == "$admin_email" ]] \
+        || fail "В базе уже существует другой пользователь ${installed_admin_email}; автоматическое продолжение остановлено."
+    print_info "Super-admin ${admin_email} уже существует и не будет создан повторно."
+else
+    fail "В базе обнаружено пользователей: ${user_count}. Автоматическое продолжение остановлено."
+fi
 
-    /usr/bin/php8.4 artisan storage:link --force --no-interaction
-    runuser -u "$APP_USER" -- /usr/bin/php8.4 artisan optimize --no-interaction
-)
+/usr/bin/php8.4 "${APP_DIR}/artisan" storage:link --force --no-interaction
+runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_DIR}/artisan" optimize --no-interaction
 
 print_info 'Настройка PHP-FPM, Nginx, очередей и планировщика...'
 
@@ -515,7 +666,7 @@ stdout_logfile=/var/log/supervisor/crm369-notifications.log
 SUPERVISOR
 
 cat > /etc/cron.d/crm369 <<CRON
-* * * * * ${APP_USER} cd ${APP_DIR} && /usr/bin/php8.4 artisan schedule:run >> /dev/null 2>&1
+* * * * * ${APP_USER} /usr/bin/php8.4 ${APP_DIR}/artisan schedule:run >> /dev/null 2>&1
 CRON
 chmod 0644 /etc/cron.d/crm369
 
@@ -599,6 +750,7 @@ install -d -m 0700 "$INSTALL_STATE_DIR"
     printf 'admin_email=%s\n' "$admin_email"
 } >"$INSTALL_STATE_FILE"
 chmod 0600 "$INSTALL_STATE_FILE"
+rm -f -- "$INSTALL_PROGRESS_FILE"
 
 print_success "CRM369 установлена: https://${domain}"
 print_success "В базе создан только super-admin ${admin_email}; демонстрационные данные отсутствуют."
