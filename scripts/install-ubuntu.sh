@@ -11,7 +11,7 @@ readonly DB_USER='crm369'
 readonly GITHUB_REPOSITORY='webnetkz/crm369'
 readonly GITHUB_REF='main'
 readonly PHP_VERSION='8.4'
-readonly INSTALLER_VERSION='2026.07.22.4'
+readonly INSTALLER_VERSION='2026.07.22.5'
 readonly INSTALL_STATE_DIR='/etc/crm369'
 readonly INSTALL_STATE_FILE='/etc/crm369/installed'
 readonly INSTALL_PROGRESS_FILE='/etc/crm369/installing'
@@ -97,7 +97,7 @@ validate_resume_installation() {
         [[ "$progress_status" == 'installing' && "$progress_domain" == "$resume_domain" && "$progress_app_dir" == "$APP_DIR" ]] \
             || fail 'Файл состояния частичной установки не соответствует существующему приложению.'
         case "$progress_version" in
-            '2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4')
+            '2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4'|'2026.07.22.5')
                 ;;
             *)
                 fail "Версия частичной установки ${progress_version:-неизвестна} несовместима с установщиком ${INSTALLER_VERSION}."
@@ -667,6 +667,9 @@ grep -Eq 'app\.env[[:space:].]+production' <<<"$production_environment_report" \
     || fail 'Laravel запущен не в production-окружении.'
 grep -Eq 'app\.debug[[:space:].]+false' <<<"$production_debug_report" \
     || fail 'Laravel debug-режим не отключён.'
+runuser -u "$APP_USER" -- /usr/bin/php8.4 -r \
+    "\$configuration = require '${APP_DIR}/bootstrap/cache/config.php'; exit(is_int(\$configuration['queue']['connections']['redis']['block_for']) ? 0 : 1);" \
+    || fail 'Интервал ожидания Redis-очереди должен иметь числовой тип.'
 
 print_success 'Laravel настроен для production; debug-режим отключён.'
 
@@ -789,7 +792,11 @@ find "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache" -type f -exec chmod 0660 
 chown root:"$APP_GROUP" "${APP_DIR}/.env"
 chmod 0640 "${APP_DIR}/.env"
 
+ufw allow 'OpenSSH'
 ufw allow 'Nginx Full'
+ufw --force enable
+ufw status | grep -qx 'Status: active' \
+    || fail 'UFW не активирован.'
 
 nginx -t
 systemctl restart "php${PHP_VERSION}-fpm"

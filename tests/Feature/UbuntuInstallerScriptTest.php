@@ -60,10 +60,10 @@ test('ubuntu installer identifies its release and verifies the Laravel health ro
     $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
 
     expect($installer)->toBeString()
-        ->toContain("readonly INSTALLER_VERSION='2026.07.22.4'")
+        ->toContain("readonly INSTALLER_VERSION='2026.07.22.5'")
         ->toContain('Версия установщика: ${INSTALLER_VERSION}')
         ->toContain('installer_version=%s')
-        ->toContain("'2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4'")
+        ->toContain("'2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4'|'2026.07.22.5'")
         ->toContain('sudo bash -s -- --resume')
         ->toContain('Версия частичной установки')
         ->toContain('"http://${domain}/up"')
@@ -153,6 +153,9 @@ test('ubuntu installer creates a domain-specific nginx site and enables https', 
         ->toContain('access_log /var/log/nginx/${domain}.access.log;')
         ->toContain('error_log /var/log/nginx/${domain}.error.log;')
         ->toContain("ufw allow 'Nginx Full'")
+        ->toContain("ufw allow 'OpenSSH'")
+        ->toContain('ufw --force enable')
+        ->toContain("grep -qx 'Status: active'")
         ->toContain('certbot --nginx')
         ->toContain('--domains "$domain"')
         ->toContain('systemctl enable --now certbot.timer')
@@ -188,7 +191,8 @@ test('ubuntu installer verifies every required production service', function () 
         ->toContain('public_https_health_status="$(curl -sS --max-time 30')
         ->toContain('public_https_application_status="$(curl -sS --max-time 30')
         ->toContain('"http://${domain}/login"')
-        ->toContain('"https://${domain}/login"');
+        ->toContain('"https://${domain}/login"')
+        ->toContain('is_int(\$configuration[\'queue\'][\'connections\'][\'redis\'][\'block_for\'])');
 });
 
 test('ubuntu installer keeps queue retry windows above worker timeouts', function () {
