@@ -49,7 +49,7 @@ handle_error() {
     local exit_code=$?
     local line_number="$1"
 
-    print_warning "Установка остановлена на строке ${line_number}. Исправьте указанную выше ошибку и запустите команду снова."
+    print_warning "Установка остановлена на строке ${line_number}. Частично созданные данные не удалены автоматически; проверьте их перед повторным запуском."
     exit "$exit_code"
 }
 
@@ -85,6 +85,9 @@ fi
 
 [[ $EUID -eq 0 ]] || fail 'Запустите установщик от root через sudo.'
 [[ -r "$TTY_DEVICE" && -w "$TTY_DEVICE" ]] || fail 'Для интерактивной установки требуется терминал /dev/tty.'
+
+exec 9>/run/lock/crm369-install.lock
+flock -n 9 || fail 'Другой процесс установки CRM369 уже запущен.'
 
 if [[ -f "$INSTALL_STATE_FILE" ]]; then
     print_success "CRM369 уже установлена. Состояние: ${INSTALL_STATE_FILE}"
@@ -197,6 +200,13 @@ if ! getent ahosts "$domain" >/dev/null 2>&1; then
     fail "Домен ${domain} не разрешается через DNS. Создайте A-запись на этот сервер и повторите установку."
 fi
 
+nginx_available_path="/etc/nginx/sites-available/${domain}.conf"
+nginx_enabled_path="/etc/nginx/sites-enabled/${domain}.conf"
+
+if [[ -e "$nginx_available_path" || -L "$nginx_available_path" || -e "$nginx_enabled_path" || -L "$nginx_enabled_path" ]]; then
+    fail "Конфигурация Nginx для ${domain} уже существует и не будет перезаписана."
+fi
+
 TEMP_DIR="$(mktemp -d /tmp/crm369-install.XXXXXX)"
 
 print_info 'Обновление Ubuntu и установка системных пакетов...'
@@ -248,9 +258,29 @@ apt-get install -y --no-install-recommends \
     postgresql-contrib \
     python3-certbot-nginx \
     redis-server \
-    supervisor
+    supervisor \
+    ufw
+
+if ! grep -q '^# CRM369 production queue durability\.$' /etc/redis/redis.conf; then
+    cat >> /etc/redis/redis.conf <<'REDIS'
+
+# CRM369 production queue durability.
+appendonly yes
+appendfsync everysec
+maxmemory-policy noeviction
+REDIS
+fi
 
 systemctl enable --now cron nginx "php${PHP_VERSION}-fpm" postgresql redis-server supervisor
+systemctl restart redis-server
+
+if runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | grep -q 1; then
+    fail "База PostgreSQL ${DB_NAME} уже существует; существующие данные не будут перезаписаны."
+fi
+
+if runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = '${DB_USER}'" | grep -q 1; then
+    fail "Роль PostgreSQL ${DB_USER} уже существует; существующие настройки не будут перезаписаны."
+fi
 
 print_info 'Установка Composer с проверкой подписи...'
 composer_installer="${TEMP_DIR}/composer-setup.php"
@@ -282,21 +312,15 @@ print_info 'Установка PHP- и frontend-зависимостей...'
             --optimize-autoloader \
             --no-progress
 
+    /usr/local/bin/composer check-platform-reqs --no-dev
+
     npm ci --no-audit --no-fund
-    npm run build
+    VITE_APP_NAME=CRM369 npm run build
 )
 
 rm -rf -- "${APP_DIR}/node_modules"
 
 print_info 'Создание изолированной базы PostgreSQL...'
-
-if runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | grep -q 1; then
-    fail "База PostgreSQL ${DB_NAME} уже существует; существующие данные не будут перезаписаны."
-fi
-
-if runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = '${DB_USER}'" | grep -q 1; then
-    fail "Роль PostgreSQL ${DB_USER} уже существует; существующие настройки не будут перезаписаны."
-fi
 
 database_password="$(openssl rand -hex 32)"
 
@@ -352,6 +376,7 @@ install -m 0660 -o "$APP_USER" -g "$APP_GROUP" /dev/null "${APP_DIR}/.env"
     printf 'BROADCAST_CONNECTION=log\n'
     printf 'FILESYSTEM_DISK=local\n'
     printf 'QUEUE_CONNECTION=database\n'
+    printf 'DB_QUEUE_RETRY_AFTER=120\n'
     printf 'NOTIFICATION_QUEUE_CONNECTION=redis\n'
     printf 'NOTIFICATION_QUEUE=notifications\n'
     printf 'CACHE_STORE=database\n'
@@ -411,16 +436,20 @@ opcache.enable = 1
 opcache.validate_timestamps = 0
 PHPINI
 
-cat > /etc/nginx/sites-available/crm369 <<NGINX
+cat > "$nginx_available_path" <<NGINX
 server {
     listen 80;
     listen [::]:80;
     server_name ${domain};
     root ${APP_DIR}/public;
 
+    access_log /var/log/nginx/${domain}.access.log;
+    error_log /var/log/nginx/${domain}.error.log;
+
     index index.php;
     charset utf-8;
     client_max_body_size 100M;
+    server_tokens off;
 
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -439,6 +468,7 @@ server {
         fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
         fastcgi_param DOCUMENT_ROOT \$realpath_root;
         fastcgi_hide_header X-Powered-By;
+        fastcgi_read_timeout 120s;
         internal;
     }
 
@@ -452,7 +482,7 @@ server {
 }
 NGINX
 
-ln -sfn /etc/nginx/sites-available/crm369 /etc/nginx/sites-enabled/crm369
+ln -sfn "$nginx_available_path" "$nginx_enabled_path"
 
 if [[ -L /etc/nginx/sites-enabled/default ]]; then
     unlink /etc/nginx/sites-enabled/default
@@ -511,15 +541,19 @@ find "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache" -type f -exec chmod 0660 
 chown root:"$APP_GROUP" "${APP_DIR}/.env"
 chmod 0640 "${APP_DIR}/.env"
 
+ufw allow 'Nginx Full'
+
 nginx -t
 systemctl restart "php${PHP_VERSION}-fpm"
 systemctl reload nginx
 supervisorctl reread
 supervisorctl update
 
+curl -fsS --max-time 20 --resolve "${domain}:80:127.0.0.1" "http://${domain}/" >/dev/null
+
 print_info "Получение TLS-сертификата Let's Encrypt для ${domain}..."
 certbot --nginx \
-    --domain "$domain" \
+    --domains "$domain" \
     --email "$certificate_email" \
     --agree-tos \
     --non-interactive \
@@ -529,7 +563,27 @@ certbot --nginx \
 nginx -t
 systemctl reload nginx
 
+systemctl enable --now certbot.timer
+certbot renew --dry-run --non-interactive
+
 print_info 'Проверка HTTPS и состояния сервисов...'
+[[ -s "/etc/letsencrypt/live/${domain}/fullchain.pem" ]] \
+    || fail "Сертификат для ${domain} не создан."
+[[ -s "/etc/letsencrypt/live/${domain}/privkey.pem" ]] \
+    || fail "Закрытый ключ сертификата для ${domain} не создан."
+
+systemctl is-active --quiet nginx || fail 'Nginx не запущен.'
+systemctl is-active --quiet "php${PHP_VERSION}-fpm" || fail "PHP ${PHP_VERSION}-FPM не запущен."
+systemctl is-active --quiet postgresql || fail 'PostgreSQL не запущен.'
+systemctl is-active --quiet redis-server || fail 'Redis не запущен.'
+systemctl is-active --quiet supervisor || fail 'Supervisor не запущен.'
+systemctl is-active --quiet certbot.timer || fail 'Таймер автопродления TLS-сертификата не запущен.'
+runuser -u postgres -- pg_isready --quiet || fail 'PostgreSQL не принимает подключения.'
+[[ -S "/run/php/php${PHP_VERSION}-fpm.sock" ]] || fail 'Сокет PHP-FPM не создан.'
+/usr/bin/php8.4 -m | grep -qxF pdo_pgsql || fail 'PHP-расширение pdo_pgsql не загружено.'
+/usr/bin/php8.4 -m | grep -qxF redis || fail 'PHP-расширение redis не загружено.'
+redis-cli --raw CONFIG GET appendonly | grep -qx yes || fail 'Redis AOF не включён.'
+redis-cli --raw CONFIG GET maxmemory-policy | grep -qx noeviction || fail 'Redis может удалять задания очереди при нехватке памяти.'
 curl -fsS --max-time 20 --resolve "${domain}:443:127.0.0.1" "https://${domain}/" >/dev/null
 supervisorctl status crm369-default | grep -q RUNNING
 supervisorctl status crm369-notifications | grep -q RUNNING
