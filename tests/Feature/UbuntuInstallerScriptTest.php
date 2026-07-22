@@ -46,7 +46,10 @@ test('ubuntu installer provisions a production stack without demo data', functio
         ->toContain('queue:work database')
         ->toContain('queue:work redis')
         ->toContain('certbot --nginx')
-        ->toContain('https://github.com/${GITHUB_REPOSITORY}/archive/refs/heads/${GITHUB_REF}.tar.gz')
+        ->toContain('git ls-remote --exit-code')
+        ->toContain('https://github.com/${GITHUB_REPOSITORY}/archive/${source_commit}.tar.gz')
+        ->toContain('[[ "$source_commit" =~ ^[0-9a-f]{40}$ ]]')
+        ->toContain('source_commit=%s')
         ->not->toContain('GITHUB_TOKEN')
         ->not->toContain('Authorization: Bearer')
         ->not->toContain('db:seed')
@@ -57,15 +60,16 @@ test('ubuntu installer identifies its release and verifies the Laravel health ro
     $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
 
     expect($installer)->toBeString()
-        ->toContain("readonly INSTALLER_VERSION='2026.07.22.2'")
+        ->toContain("readonly INSTALLER_VERSION='2026.07.22.3'")
         ->toContain('Версия установщика: ${INSTALLER_VERSION}')
         ->toContain('installer_version=%s')
-        ->toContain("'2026.07.22.1'|'2026.07.22.2'")
+        ->toContain("'2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'")
         ->toContain('sudo bash -s -- --resume')
         ->toContain('Версия частичной установки')
         ->toContain('"http://${domain}/up"')
         ->toContain('"https://${domain}/up"')
         ->toContain("[[ \"\$pre_tls_health_status\" == '200' ]]")
+        ->toContain("[[ \"\$public_http_health_status\" == '200' ]]")
         ->toContain("[[ \"\$local_https_health_status\" == '200' ]]")
         ->toContain("[[ \"\$public_https_health_status\" == '200' ]]")
         ->toContain('--retry-connrefused')
@@ -73,26 +77,29 @@ test('ubuntu installer identifies its release and verifies the Laravel health ro
         ->toContain('HTTPS-проверка Laravel успешно завершена');
 });
 
-test('ubuntu installer applies chat migrations in PostgreSQL dependency order', function () {
+test('ubuntu installer applies every required parent migration before the general PostgreSQL pass', function () {
     $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
-    $usersMigration = '--path=database/migrations/0001_01_01_000000_create_users_table.php';
-    $chatConversationMigration = '--path=database/migrations/2026_06_29_005139_create_chat_conversations_table.php';
-    $usersMigrationPosition = strpos($installer, $usersMigration);
-    $chatConversationMigrationPosition = strpos($installer, $chatConversationMigration);
-    $dependencyMigrationCommandPosition = strpos($installer, '"${chat_dependency_migrations[@]}"');
+    $dependencyMigrations = [
+        '--path=database/migrations/0001_01_01_000000_create_users_table.php',
+        '--path=database/migrations/2026_06_28_134816_create_user_groups_table.php',
+        '--path=database/migrations/2026_06_29_005139_create_chat_conversations_table.php',
+        '--path=database/migrations/2026_06_29_010910_create_knowledge_bases_table.php',
+        '--path=database/migrations/2026_06_29_142826_create_crm_funnels_table.php',
+    ];
+    $dependencyMigrationCommandPosition = strpos($installer, '"${migration_dependency_options[@]}"');
     $generalMigrationPosition = strpos(
         $installer,
         '"${APP_DIR}/artisan" migrate --force --no-interaction',
         $dependencyMigrationCommandPosition,
     );
 
-    expect($usersMigrationPosition)->toBeInt()->toBeLessThan($chatConversationMigrationPosition)
-        ->and($chatConversationMigrationPosition)->toBeInt()->toBeLessThan($dependencyMigrationCommandPosition)
-        ->and($dependencyMigrationCommandPosition)->toBeInt()->toBeLessThan($generalMigrationPosition)
-        ->and(substr_count($installer, $usersMigration))->toBe(1)
-        ->and(substr_count($installer, $chatConversationMigration))->toBe(1)
+    foreach ($dependencyMigrations as $dependencyMigration) {
+        expect(substr_count($installer, $dependencyMigration))->toBe(1);
+    }
+
+    expect($dependencyMigrationCommandPosition)->toBeInt()->toBeLessThan($generalMigrationPosition)
         ->and($generalMigrationPosition)->toBeInt()
-        ->and($installer)->toContain('Применение базовых миграций и родительской таблицы чатов');
+        ->and($installer)->toContain('Применение миграций в порядке зависимостей PostgreSQL');
 });
 
 test('ubuntu installer verifies the optimized Laravel application is in production mode', function () {
@@ -109,6 +116,23 @@ test('ubuntu installer verifies the optimized Laravel application is in producti
         ->and($optimizePosition)->toBeInt()->toBeLessThan($environmentCheckPosition)
         ->and($environmentCheckPosition)->toBeInt()->toBeLessThan($installedStatePosition)
         ->and($installedStatePosition)->toBeInt();
+});
+
+test('ubuntu installer verifies every migration and critical PostgreSQL table before creating the administrator', function () {
+    $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
+    $generalMigrationPosition = strpos($installer, '"${APP_DIR}/artisan" migrate --force --no-interaction');
+    $migrationCountPosition = strpos($installer, 'expected_migration_count=', $generalMigrationPosition);
+    $criticalTablePosition = strpos($installer, 'critical_table_count=', $migrationCountPosition);
+    $administratorPosition = strpos($installer, '"${APP_DIR}/artisan" crm369:install', $criticalTablePosition);
+
+    expect($installer)->toBeString()
+        ->toContain('SELECT COUNT(*) FROM migrations')
+        ->toContain("table_name IN ('migrations', 'users', 'jobs', 'notifications', 'chat_conversations', 'chat_conversation_participants', 'chat_messages', 'knowledge_bases', 'knowledge_base_group', 'knowledge_base_articles', 'crm_funnels', 'crm_funnel_stages', 'crm_deals')")
+        ->toContain('Все ${applied_migration_count} миграций и критические таблицы PostgreSQL проверены')
+        ->and($generalMigrationPosition)->toBeInt()->toBeLessThan($migrationCountPosition)
+        ->and($migrationCountPosition)->toBeInt()->toBeLessThan($criticalTablePosition)
+        ->and($criticalTablePosition)->toBeInt()->toBeLessThan($administratorPosition)
+        ->and($administratorPosition)->toBeInt();
 });
 
 test('ubuntu installer creates a domain-specific nginx site and enables https', function () {
@@ -152,6 +176,7 @@ test('ubuntu installer verifies every required production service', function () 
         ->toContain('supervisorctl status crm369-default')
         ->toContain('supervisorctl status crm369-notifications')
         ->toContain('pre_tls_health_status="$(curl -sS --max-time 20')
+        ->toContain('public_http_health_status="$(curl -sS --max-time 30')
         ->toContain('local_https_health_status="$(curl -sS --max-time 20')
         ->toContain('public_https_health_status="$(curl -sS --max-time 30');
 });

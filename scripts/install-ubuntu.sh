@@ -11,7 +11,7 @@ readonly DB_USER='crm369'
 readonly GITHUB_REPOSITORY='webnetkz/crm369'
 readonly GITHUB_REF='main'
 readonly PHP_VERSION='8.4'
-readonly INSTALLER_VERSION='2026.07.22.2'
+readonly INSTALLER_VERSION='2026.07.22.3'
 readonly INSTALL_STATE_DIR='/etc/crm369'
 readonly INSTALL_STATE_FILE='/etc/crm369/installed'
 readonly INSTALL_PROGRESS_FILE='/etc/crm369/installing'
@@ -21,6 +21,7 @@ TEMP_DIR=''
 resume_mode='false'
 resume_domain=''
 resume_admin_email=''
+source_commit='unrecorded'
 
 print_info() {
     printf '\033[1;34m[CRM369]\033[0m %s\n' "$*"
@@ -48,6 +49,7 @@ read_env_value() {
 validate_resume_installation() {
     local progress_app_dir=''
     local progress_domain=''
+    local progress_source_commit=''
     local progress_status=''
     local progress_version=''
     local resume_app_url=''
@@ -90,16 +92,23 @@ validate_resume_installation() {
         progress_version="$(awk -F= '$1 == "installer_version" { print $2; exit }' "$INSTALL_PROGRESS_FILE")"
         progress_domain="$(awk -F= '$1 == "domain" { print $2; exit }' "$INSTALL_PROGRESS_FILE")"
         progress_app_dir="$(awk -F= '$1 == "app_dir" { print $2; exit }' "$INSTALL_PROGRESS_FILE")"
+        progress_source_commit="$(awk -F= '$1 == "source_commit" { print $2; exit }' "$INSTALL_PROGRESS_FILE")"
 
         [[ "$progress_status" == 'installing' && "$progress_domain" == "$resume_domain" && "$progress_app_dir" == "$APP_DIR" ]] \
             || fail 'Файл состояния частичной установки не соответствует существующему приложению.'
         case "$progress_version" in
-            '2026.07.22.1'|'2026.07.22.2')
+            '2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3')
                 ;;
             *)
                 fail "Версия частичной установки ${progress_version:-неизвестна} несовместима с установщиком ${INSTALLER_VERSION}."
                 ;;
         esac
+
+        if [[ -n "$progress_source_commit" ]]; then
+            [[ "$progress_source_commit" =~ ^[0-9a-f]{40}$ || "$progress_source_commit" == 'unrecorded' ]] \
+                || fail 'Файл состояния содержит некорректный commit исходного кода.'
+            source_commit="$progress_source_commit"
+        fi
     elif [[ -e "$INSTALL_PROGRESS_FILE" || -L "$INSTALL_PROGRESS_FILE" ]]; then
         fail "Файл состояния ${INSTALL_PROGRESS_FILE} имеет небезопасный тип."
     fi
@@ -429,9 +438,17 @@ if [[ "$resume_mode" == 'false' ]]; then
     /usr/bin/php8.4 "$composer_installer" --quiet --install-dir=/usr/local/bin --filename=composer
 
     print_info 'Скачивание исходного кода CRM369 из публичного репозитория...'
+    source_commit="$(git ls-remote --exit-code \
+        "https://github.com/${GITHUB_REPOSITORY}.git" \
+        "refs/heads/${GITHUB_REF}" \
+        | awk 'NR == 1 { print $1 }')"
+    [[ "$source_commit" =~ ^[0-9a-f]{40}$ ]] \
+        || fail "Не удалось определить commit ветки ${GITHUB_REF}."
+
+    print_info "Исходный код зафиксирован на commit ${source_commit}."
     source_archive="${TEMP_DIR}/crm369.tar.gz"
     curl -fsSL --retry 3 \
-        "https://github.com/${GITHUB_REPOSITORY}/archive/refs/heads/${GITHUB_REF}.tar.gz" \
+        "https://github.com/${GITHUB_REPOSITORY}/archive/${source_commit}.tar.gz" \
         -o "$source_archive"
 
     mkdir -p "$APP_DIR"
@@ -558,6 +575,7 @@ install -d -m 0700 "$INSTALL_STATE_DIR"
     printf 'domain=%s\n' "$domain"
     printf 'app_dir=%s\n' "$APP_DIR"
     printf 'mode=%s\n' "$resume_mode"
+    printf 'source_commit=%s\n' "$source_commit"
 } >"$INSTALL_PROGRESS_FILE"
 chmod 0600 "$INSTALL_PROGRESS_FILE"
 
@@ -582,24 +600,42 @@ app_key=''
 chown root:"$APP_GROUP" "${APP_DIR}/.env"
 chmod 0640 "${APP_DIR}/.env"
 
-chat_dependency_migrations=(
+migration_dependency_options=(
     '--path=database/migrations/0001_01_01_000000_create_users_table.php'
+    '--path=database/migrations/2026_06_28_134816_create_user_groups_table.php'
     '--path=database/migrations/2026_06_29_005139_create_chat_conversations_table.php'
+    '--path=database/migrations/2026_06_29_010910_create_knowledge_bases_table.php'
+    '--path=database/migrations/2026_06_29_142826_create_crm_funnels_table.php'
 )
 
-for migration_option in "${chat_dependency_migrations[@]}"; do
+for migration_option in "${migration_dependency_options[@]}"; do
     migration_file="${migration_option#--path=database/migrations/}"
     [[ -f "${APP_DIR}/database/migrations/${migration_file}" ]] \
         || fail "Не найдена обязательная миграция ${migration_file}."
 done
 
-print_info 'Применение базовых миграций и родительской таблицы чатов...'
+print_info 'Применение миграций в порядке зависимостей PostgreSQL...'
 runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_DIR}/artisan" migrate \
     --force \
     --no-interaction \
-    "${chat_dependency_migrations[@]}"
+    "${migration_dependency_options[@]}"
 
 runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_DIR}/artisan" migrate --force --no-interaction
+
+expected_migration_count="$(find "${APP_DIR}/database/migrations" -maxdepth 1 -type f -name '*.php' | wc -l)"
+applied_migration_count="$(runuser -u postgres -- psql --dbname="$DB_NAME" -tAc 'SELECT COUNT(*) FROM migrations')"
+
+[[ "$expected_migration_count" =~ ^[[:space:]]*[0-9]+[[:space:]]*$ && "$applied_migration_count" =~ ^[0-9]+$ ]] \
+    || fail 'Не удалось проверить количество миграций PostgreSQL.'
+[[ "$expected_migration_count" -eq "$applied_migration_count" ]] \
+    || fail "Применено миграций ${applied_migration_count}, ожидалось ${expected_migration_count}."
+
+critical_table_count="$(runuser -u postgres -- psql --dbname="$DB_NAME" -tAc \
+    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('migrations', 'users', 'jobs', 'notifications', 'chat_conversations', 'chat_conversation_participants', 'chat_messages', 'knowledge_bases', 'knowledge_base_group', 'knowledge_base_articles', 'crm_funnels', 'crm_funnel_stages', 'crm_deals')")"
+[[ "$critical_table_count" == '13' ]] \
+    || fail "Созданы не все критические таблицы CRM369: найдено ${critical_table_count} из 13."
+
+print_success "Все ${applied_migration_count} миграций и критические таблицы PostgreSQL проверены."
 
 user_count="$(runuser -u postgres -- psql --dbname="$DB_NAME" -tAc 'SELECT COUNT(*) FROM users')"
 
@@ -767,6 +803,16 @@ pre_tls_health_status="$(curl -sS --max-time 20 \
 [[ "$pre_tls_health_status" == '200' ]] \
     || fail "Laravel не прошёл HTTP-проверку перед выпуском сертификата; получен статус ${pre_tls_health_status}."
 
+public_http_health_status="$(curl -sS --max-time 30 \
+    --retry 5 \
+    --retry-delay 2 \
+    --retry-connrefused \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "http://${domain}/up")"
+[[ "$public_http_health_status" == '200' ]] \
+    || fail "Домен ${domain} или порт 80 не ведёт к Laravel на этом сервере; публичная HTTP-проверка вернула ${public_http_health_status}."
+
 print_info "Получение TLS-сертификата Let's Encrypt для ${domain}..."
 certbot --nginx \
     --domains "$domain" \
@@ -839,6 +885,7 @@ install -d -m 0700 "$INSTALL_STATE_DIR"
     printf 'app_dir=%s\n' "$APP_DIR"
     printf 'repository=%s\n' "$GITHUB_REPOSITORY"
     printf 'ref=%s\n' "$GITHUB_REF"
+    printf 'source_commit=%s\n' "$source_commit"
     printf 'admin_email=%s\n' "$admin_email"
 } >"$INSTALL_STATE_FILE"
 chmod 0600 "$INSTALL_STATE_FILE"
