@@ -16,6 +16,7 @@ use App\Http\Controllers\DocumentationController;
 use App\Http\Controllers\EdoDocumentController;
 use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\FileController;
+use App\Http\Controllers\GoodsReceiptController;
 use App\Http\Controllers\KnowledgeBaseController;
 use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\MobileNotificationFeedController;
@@ -29,10 +30,12 @@ use App\Http\Controllers\PortalWebhookContactController;
 use App\Http\Controllers\PortalWebhookEdoController;
 use App\Http\Controllers\PortalWebhookEquipmentController;
 use App\Http\Controllers\PortalWebhookInvokeController;
+use App\Http\Controllers\PortalWebhookProcurementController;
 use App\Http\Controllers\PortalWebhookReferenceDirectoryController;
 use App\Http\Controllers\PortalWebhookTsdController;
 use App\Http\Controllers\PortalWebhookUserController;
 use App\Http\Controllers\PortalWebhookWarehouseController;
+use App\Http\Controllers\ProcurementController;
 use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectTaskConversationController;
@@ -40,7 +43,12 @@ use App\Http\Controllers\PublicConferenceController;
 use App\Http\Controllers\PublicConferenceRoomController;
 use App\Http\Controllers\PublicEdoSigningController;
 use App\Http\Controllers\PublicPortalFormController;
+use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\PurchaseRequestController;
+use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\ReferenceDirectoryController;
+use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SupplierQuotationController;
 use App\Http\Controllers\TsdController;
 use App\Http\Controllers\WarehouseController;
 use Illuminate\Http\Request;
@@ -152,6 +160,36 @@ Route::patch('portal-webhooks/{portalWebhook}/warehouses/{warehouse}', [PortalWe
 Route::delete('portal-webhooks/{portalWebhook}/warehouses/{warehouse}', [PortalWebhookWarehouseController::class, 'destroy'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:warehouses.write', 'module.enabled:warehouses'])
     ->name('portal-webhooks.warehouses.destroy');
+Route::get('portal-webhooks/{portalWebhook}/procurement', [PortalWebhookProcurementController::class, 'index'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:procurement.read', 'module.enabled:procurement'])
+    ->name('portal-webhooks.procurement.index');
+Route::post('portal-webhooks/{portalWebhook}/procurement/suppliers', [PortalWebhookProcurementController::class, 'storeSupplier'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:procurement.write', 'module.enabled:procurement'])
+    ->name('portal-webhooks.procurement.suppliers.store');
+Route::patch('portal-webhooks/{portalWebhook}/procurement/suppliers/{supplier}', [PortalWebhookProcurementController::class, 'updateSupplier'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:procurement.write', 'module.enabled:procurement'])
+    ->name('portal-webhooks.procurement.suppliers.update');
+Route::post('portal-webhooks/{portalWebhook}/procurement/requests', [PortalWebhookProcurementController::class, 'storeRequest'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:procurement.write', 'module.enabled:procurement'])
+    ->name('portal-webhooks.procurement.requests.store');
+Route::patch('portal-webhooks/{portalWebhook}/procurement/requests/{purchaseRequest}/decision', [PortalWebhookProcurementController::class, 'decideRequest'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:procurement.write', 'module.enabled:procurement'])
+    ->name('portal-webhooks.procurement.requests.decision.update');
+Route::post('portal-webhooks/{portalWebhook}/procurement/quotations', [PortalWebhookProcurementController::class, 'storeQuotation'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:procurement.write', 'module.enabled:procurement'])
+    ->name('portal-webhooks.procurement.quotations.store');
+Route::post('portal-webhooks/{portalWebhook}/procurement/orders', [PortalWebhookProcurementController::class, 'storeOrder'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:procurement.write', 'module.enabled:procurement'])
+    ->name('portal-webhooks.procurement.orders.store');
+Route::patch('portal-webhooks/{portalWebhook}/procurement/orders/{purchaseOrder}/send', [PortalWebhookProcurementController::class, 'sendOrder'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:procurement.write', 'module.enabled:procurement'])
+    ->name('portal-webhooks.procurement.orders.send');
+Route::post('portal-webhooks/{portalWebhook}/procurement/receipts', [PortalWebhookProcurementController::class, 'storeReceipt'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:procurement.write', 'module.enabled:procurement'])
+    ->name('portal-webhooks.procurement.receipts.store');
+Route::post('portal-webhooks/{portalWebhook}/procurement/returns', [PortalWebhookProcurementController::class, 'storeReturn'])
+    ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:procurement.write', 'module.enabled:procurement'])
+    ->name('portal-webhooks.procurement.returns.store');
 Route::get('portal-webhooks/{portalWebhook}/equipment', [PortalWebhookEquipmentController::class, 'index'])
     ->middleware(['module.enabled:webhooks', 'throttle:30,1', 'portal.webhook:equipment.read', 'module.enabled:equipment'])
     ->name('portal-webhooks.equipment.index');
@@ -387,8 +425,41 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('production/{section}', [ProductionController::class, 'show'])->name('production.show');
     });
 
+    Route::prefix('procurement')
+        ->name('procurement.')
+        ->middleware(['module.enabled:procurement', 'can:access-procurement'])
+        ->group(function (): void {
+            Route::get('/', [ProcurementController::class, 'index'])->name('index');
+            Route::post('requests', [PurchaseRequestController::class, 'store'])->name('requests.store');
+            Route::patch('requests/{purchaseRequest}/decision', [PurchaseRequestController::class, 'decide'])
+                ->middleware('can:approve-procurement-budget')
+                ->name('requests.decision.update');
+            Route::post('suppliers', [SupplierController::class, 'store'])
+                ->middleware('can:manage-procurement')
+                ->name('suppliers.store');
+            Route::patch('suppliers/{supplier}', [SupplierController::class, 'update'])
+                ->middleware('can:manage-procurement')
+                ->name('suppliers.update');
+            Route::post('quotations', [SupplierQuotationController::class, 'store'])
+                ->middleware('can:manage-procurement')
+                ->name('quotations.store');
+            Route::post('orders', [PurchaseOrderController::class, 'store'])
+                ->middleware('can:manage-procurement-orders')
+                ->name('orders.store');
+            Route::patch('orders/{purchaseOrder}/send', [PurchaseOrderController::class, 'send'])
+                ->middleware('can:manage-procurement-orders')
+                ->name('orders.send');
+            Route::post('receipts', [GoodsReceiptController::class, 'store'])
+                ->middleware('can:receive-procurement-orders')
+                ->name('receipts.store');
+            Route::post('returns', [PurchaseReturnController::class, 'store'])
+                ->middleware('can:return-procurement-goods')
+                ->name('returns.store');
+        });
+
     Route::middleware(['module.enabled:warehouses', 'can:access-warehouses'])->group(function () {
         Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
+        Route::get('warehouses/qr/{qrCode}', [WarehouseController::class, 'qr'])->name('warehouses.qr.show');
         Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show'])->name('warehouses.show');
         Route::get('warehouses/{warehouse}/floors/{warehouseFloor}', [WarehouseController::class, 'floor'])->name('warehouses.floors.show');
         Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');

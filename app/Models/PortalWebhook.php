@@ -62,6 +62,10 @@ class PortalWebhook extends Model
 
     public const string PERMISSION_WAREHOUSES_WRITE = 'warehouses.write';
 
+    public const string PERMISSION_PROCUREMENT_READ = 'procurement.read';
+
+    public const string PERMISSION_PROCUREMENT_WRITE = 'procurement.write';
+
     public const string PERMISSION_EQUIPMENT_READ = 'equipment.read';
 
     public const string PERMISSION_EQUIPMENT_WRITE = 'equipment.write';
@@ -164,6 +168,14 @@ class PortalWebhook extends Model
             self::PERMISSION_WAREHOUSES_WRITE => [
                 'label_key' => 'ui.webhooks.permission_warehouses_write',
                 'description_key' => 'ui.webhooks.permission_warehouses_write_description',
+            ],
+            self::PERMISSION_PROCUREMENT_READ => [
+                'label_key' => 'ui.webhooks.permission_procurement_read',
+                'description_key' => 'ui.webhooks.permission_procurement_read_description',
+            ],
+            self::PERMISSION_PROCUREMENT_WRITE => [
+                'label_key' => 'ui.webhooks.permission_procurement_write',
+                'description_key' => 'ui.webhooks.permission_procurement_write_description',
             ],
             self::PERMISSION_EQUIPMENT_READ => [
                 'label_key' => 'ui.webhooks.permission_equipment_read',

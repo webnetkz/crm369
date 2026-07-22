@@ -67,6 +67,18 @@ class UserGroup extends Model
 
     public const string PERMISSION_ACCESS_PRODUCTION = 'access_production';
 
+    public const string PERMISSION_ACCESS_PROCUREMENT = 'access_procurement';
+
+    public const string PERMISSION_MANAGE_PROCUREMENT = 'manage_procurement';
+
+    public const string PERMISSION_APPROVE_PROCUREMENT_BUDGET = 'approve_procurement_budget';
+
+    public const string PERMISSION_MANAGE_PROCUREMENT_ORDERS = 'manage_procurement_orders';
+
+    public const string PERMISSION_RECEIVE_PROCUREMENT_ORDERS = 'receive_procurement_orders';
+
+    public const string PERMISSION_RETURN_PROCUREMENT_GOODS = 'return_procurement_goods';
+
     public const string PERMISSION_ACCESS_WAREHOUSES = 'access_warehouses';
 
     public const string PERMISSION_ACCESS_TSD = 'access_tsd';
@@ -235,6 +247,36 @@ class UserGroup extends Model
                 'description_key' => 'ui.admin.permission_access_production_description',
                 'module_key' => 'production',
             ],
+            self::PERMISSION_ACCESS_PROCUREMENT => [
+                'label_key' => 'ui.admin.permission_access_procurement',
+                'description_key' => 'ui.admin.permission_access_procurement_description',
+                'module_key' => 'procurement',
+            ],
+            self::PERMISSION_MANAGE_PROCUREMENT => [
+                'label_key' => 'ui.admin.permission_manage_procurement',
+                'description_key' => 'ui.admin.permission_manage_procurement_description',
+                'module_key' => 'procurement',
+            ],
+            self::PERMISSION_APPROVE_PROCUREMENT_BUDGET => [
+                'label_key' => 'ui.admin.permission_approve_procurement_budget',
+                'description_key' => 'ui.admin.permission_approve_procurement_budget_description',
+                'module_key' => 'procurement',
+            ],
+            self::PERMISSION_MANAGE_PROCUREMENT_ORDERS => [
+                'label_key' => 'ui.admin.permission_manage_procurement_orders',
+                'description_key' => 'ui.admin.permission_manage_procurement_orders_description',
+                'module_key' => 'procurement',
+            ],
+            self::PERMISSION_RECEIVE_PROCUREMENT_ORDERS => [
+                'label_key' => 'ui.admin.permission_receive_procurement_orders',
+                'description_key' => 'ui.admin.permission_receive_procurement_orders_description',
+                'module_key' => 'procurement',
+            ],
+            self::PERMISSION_RETURN_PROCUREMENT_GOODS => [
+                'label_key' => 'ui.admin.permission_return_procurement_goods',
+                'description_key' => 'ui.admin.permission_return_procurement_goods_description',
+                'module_key' => 'procurement',
+            ],
             self::PERMISSION_ACCESS_WAREHOUSES => [
                 'label_key' => 'ui.admin.permission_access_warehouses',
                 'description_key' => 'ui.admin.permission_access_warehouses_description',
@@ -308,6 +350,7 @@ class UserGroup extends Model
             'edo' => $portalModules['edo'],
             'files' => $portalModules['files'],
             'production' => $portalModules['production'],
+            'procurement' => $portalModules['procurement'],
             'warehouses' => $portalModules['warehouses'],
             'tsd' => $portalModules['tsd'],
             'equipment' => $portalModules['equipment'],
@@ -336,6 +379,7 @@ class UserGroup extends Model
             'edo',
             'files',
             'production',
+            'procurement',
             'warehouses',
             'tsd',
             'equipment',

@@ -23,6 +23,7 @@ return new class extends Migration
             $table->timestamp('sent_at')->nullable();
             $table->decimal('subtotal', 14, 2)->default(0);
             $table->decimal('tax_amount', 14, 2)->default(0);
+            $table->decimal('delivery_amount', 14, 2)->default(0);
             $table->decimal('total_amount', 14, 2)->default(0);
             $table->text('notes')->nullable();
             $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();

@@ -6,6 +6,7 @@ use App\Http\Requests\StoreTsdQrScanRequest;
 use App\Http\Resources\ApiTsdQrScanResource;
 use App\Models\EquipmentItem;
 use App\Models\TsdQrScan;
+use App\Support\QrCodeResolver;
 use App\Support\TsdQrScanManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,8 +51,11 @@ class TsdController extends Controller
         ]);
     }
 
-    public function store(StoreTsdQrScanRequest $request, TsdQrScanManager $scanManager): RedirectResponse
-    {
+    public function store(
+        StoreTsdQrScanRequest $request,
+        TsdQrScanManager $scanManager,
+        QrCodeResolver $qrCodeResolver,
+    ): RedirectResponse {
         $user = $request->user();
         abort_unless($user !== null, 403);
 
@@ -73,6 +77,17 @@ class TsdController extends Controller
 
             if ($equipmentItem instanceof EquipmentItem) {
                 return to_route('equipment.index', ['equipment' => $equipmentItem->id]);
+            }
+        }
+
+        if ($user->canAccessWarehouses()) {
+            $resolvedQrCode = $qrCodeResolver->resolve($scan->qr_code);
+
+            if ($resolvedQrCode !== null) {
+                return to_route('warehouses.show', [
+                    'warehouse' => $resolvedQrCode['warehouse']['id'],
+                    'qr_code' => $resolvedQrCode['qr_code'],
+                ]);
             }
         }
 

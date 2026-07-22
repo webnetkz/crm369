@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\MessengerIntegrationController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PortalController;
 use App\Http\Controllers\Api\V1\PortalWebhookController;
+use App\Http\Controllers\Api\V1\ProcurementController as ApiProcurementController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\ReferenceDirectoryController as ApiReferenceDirectoryController;
@@ -234,6 +235,39 @@ Route::prefix('v1')->middleware(['module.enabled:api', 'auth:api', ResolveApiSub
         Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])
             ->middleware('api.token:warehouses.write')
             ->name('api.v1.warehouses.destroy');
+    });
+
+    Route::middleware('module.enabled:procurement')->prefix('procurement')->group(function (): void {
+        Route::get('/', [ApiProcurementController::class, 'index'])
+            ->middleware(['api.token:procurement.read', 'can:access-procurement'])
+            ->name('api.v1.procurement.index');
+        Route::post('suppliers', [ApiProcurementController::class, 'storeSupplier'])
+            ->middleware(['api.token:procurement.write', 'can:manage-procurement'])
+            ->name('api.v1.procurement.suppliers.store');
+        Route::patch('suppliers/{supplier}', [ApiProcurementController::class, 'updateSupplier'])
+            ->middleware(['api.token:procurement.write', 'can:manage-procurement'])
+            ->name('api.v1.procurement.suppliers.update');
+        Route::post('requests', [ApiProcurementController::class, 'storeRequest'])
+            ->middleware(['api.token:procurement.write', 'can:access-procurement'])
+            ->name('api.v1.procurement.requests.store');
+        Route::patch('requests/{purchaseRequest}/decision', [ApiProcurementController::class, 'decideRequest'])
+            ->middleware(['api.token:procurement.write', 'can:approve-procurement-budget'])
+            ->name('api.v1.procurement.requests.decision.update');
+        Route::post('quotations', [ApiProcurementController::class, 'storeQuotation'])
+            ->middleware(['api.token:procurement.write', 'can:manage-procurement'])
+            ->name('api.v1.procurement.quotations.store');
+        Route::post('orders', [ApiProcurementController::class, 'storeOrder'])
+            ->middleware(['api.token:procurement.write', 'can:manage-procurement-orders'])
+            ->name('api.v1.procurement.orders.store');
+        Route::patch('orders/{purchaseOrder}/send', [ApiProcurementController::class, 'sendOrder'])
+            ->middleware(['api.token:procurement.write', 'can:manage-procurement-orders'])
+            ->name('api.v1.procurement.orders.send');
+        Route::post('receipts', [ApiProcurementController::class, 'storeReceipt'])
+            ->middleware(['api.token:procurement.write', 'can:receive-procurement-orders'])
+            ->name('api.v1.procurement.receipts.store');
+        Route::post('returns', [ApiProcurementController::class, 'storeReturn'])
+            ->middleware(['api.token:procurement.write', 'can:return-procurement-goods'])
+            ->name('api.v1.procurement.returns.store');
     });
 
     Route::middleware('module.enabled:equipment')->group(function (): void {

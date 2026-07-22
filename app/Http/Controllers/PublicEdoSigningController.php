@@ -18,24 +18,14 @@ class PublicEdoSigningController extends Controller
             'document' => [
                 'id' => $edoDocument->id,
                 'title' => $edoDocument->title,
-                'external_reference' => $edoDocument->external_reference,
-                'counterparty_name' => $edoDocument->counterparty_name,
-                'counterparty_identifier' => $edoDocument->counterparty_identifier,
                 'content' => $edoDocument->content,
                 'document_source' => $edoDocument->document_source,
                 'document_file' => $edoDocument->hasDocumentFile()
                     ? [
                         'original_name' => $edoDocument->document_file_name,
-                        'mime_type' => $edoDocument->document_file_mime_type,
-                        'size_bytes' => $edoDocument->document_file_size_bytes,
                     ]
                     : null,
                 'document_file_download_url' => $edoDocument->publicDownloadUrl(),
-                'status' => $edoDocument->status,
-                'public_link_expires_at' => $edoDocument->public_link_expires_at?->toISOString(),
-                'signed_at' => $edoDocument->signed_at?->toISOString(),
-                'signature_subject' => $edoDocument->signature_subject,
-                'signature_algorithm' => $edoDocument->signature_algorithm,
                 'signed_payload_hash' => $edoDocument->signingPayloadHash(),
                 'sign_payload_xml' => $edoDocument->signingPayload(),
                 'submit_url' => $edoDocument->publicSignUrl(),
@@ -55,10 +45,10 @@ class PublicEdoSigningController extends Controller
 
         $edoDocument->markSigned(
             signaturePayload: (string) $request->validated('signature_payload'),
-            signatureSubject: (string) $request->validated('signature_subject'),
-            signatureSerialNumber: $request->validated('signature_serial_number'),
-            signatureAlgorithm: $request->validated('signature_algorithm'),
-            signatureMetadata: $request->signatureMetadata(),
+            signatureSubject: null,
+            signatureSerialNumber: null,
+            signatureAlgorithm: null,
+            signatureMetadata: ['provider' => 'ncalayer', 'format' => 'xml'],
         );
 
         return back();

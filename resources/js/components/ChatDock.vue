@@ -111,7 +111,15 @@ const dockEntries = computed<DockEntry[]>(() => {
         seenUsers.add(contact.id);
     }
 
-    return entries.slice(0, 6);
+    return entries;
+});
+
+const visibleDockEntries = computed<DockEntry[]>(() => {
+    return [...dockEntries.value]
+        .sort((left, right) => {
+            return Number(right.unreadCount > 0) - Number(left.unreadCount > 0);
+        })
+        .slice(0, 6);
 });
 
 const avatarStyle = (entry: DockEntry): Record<string, string> => ({
@@ -134,6 +142,14 @@ const shouldShowAvatar = (
 
 const markAvatarFailed = (entry: DockEntry): void => {
     failedAvatarKeys.value.add(avatarKey(entry));
+};
+
+const entryAriaLabel = (entry: DockEntry): string => {
+    if (entry.unreadCount > 0) {
+        return `${entry.title}. ${t.value.chat.unread}: ${entry.unreadCount}`;
+    }
+
+    return entry.subtitle ? `${entry.title}. ${entry.subtitle}` : entry.title;
 };
 
 const syncSharedUnread = (unreadCount: number): void => {
@@ -241,22 +257,23 @@ onBeforeUnmount(() => {
             />
 
             <div
-                class="pointer-events-none absolute right-0 bottom-full mb-3 flex translate-y-2 flex-col items-center gap-2 rounded-3xl border border-border/70 bg-background/88 p-2 opacity-0 shadow-2xl backdrop-blur-xl transition-all duration-200 group-focus-within/dock:pointer-events-auto group-focus-within/dock:translate-y-0 group-focus-within/dock:opacity-100 group-hover/dock:pointer-events-auto group-hover/dock:translate-y-0 group-hover/dock:opacity-100 supports-[backdrop-filter]:bg-background/70"
+                class="pointer-events-none absolute right-0 bottom-full mb-3 flex max-h-[min(32rem,calc(100vh-7rem))] w-72 translate-y-2 flex-col items-stretch gap-2 overflow-y-auto rounded-3xl border border-border/70 bg-background/88 p-2 opacity-0 shadow-2xl backdrop-blur-xl transition-all duration-200 group-focus-within/dock:pointer-events-auto group-focus-within/dock:translate-y-0 group-focus-within/dock:opacity-100 group-hover/dock:pointer-events-auto group-hover/dock:translate-y-0 group-hover/dock:opacity-100 supports-[backdrop-filter]:bg-background/70"
             >
                 <div
-                    v-if="dockEntries.length > 0"
-                    class="flex flex-col items-center gap-2"
+                    v-if="visibleDockEntries.length > 0"
+                    class="flex flex-col gap-1"
                 >
                     <button
-                        v-for="entry in dockEntries"
+                        v-for="entry in visibleDockEntries"
                         :key="entry.key"
                         type="button"
-                        class="group relative rounded-2xl transition outline-none hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-ring"
+                        class="group flex w-full items-center gap-3 rounded-2xl p-2 text-left transition outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
                         :title="
                             entry.subtitle
                                 ? `${entry.title} · ${entry.subtitle}`
                                 : entry.title
                         "
+                        :aria-label="entryAriaLabel(entry)"
                         @click="
                             openChatCenter(
                                 'chats',
@@ -266,7 +283,7 @@ onBeforeUnmount(() => {
                         "
                     >
                         <Avatar
-                            class="size-12 rounded-2xl border border-border bg-background shadow-sm transition group-hover:border-primary/40"
+                            class="size-11 shrink-0 rounded-2xl border border-border bg-background shadow-sm transition group-hover:border-primary/40"
                         >
                             <img
                                 v-if="shouldShowAvatar(entry)"
@@ -288,9 +305,29 @@ onBeforeUnmount(() => {
                                 {{ getInitials(entry.title) }}
                             </AvatarFallback>
                         </Avatar>
+                        <span class="min-w-0 flex-1">
+                            <span
+                                class="block truncate text-sm font-semibold text-foreground"
+                            >
+                                {{ entry.title }}
+                            </span>
+                            <span
+                                v-if="entry.unreadCount > 0"
+                                class="block truncate text-xs font-medium text-primary"
+                            >
+                                {{ t.chat.unread }}: {{ entry.unreadCount }}
+                            </span>
+                            <span
+                                v-else-if="entry.subtitle"
+                                class="block truncate text-xs text-muted-foreground"
+                            >
+                                {{ entry.subtitle }}
+                            </span>
+                        </span>
                         <span
                             v-if="entry.unreadCount > 0"
-                            class="absolute -top-1 -right-1 z-20 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground"
+                            aria-hidden="true"
+                            class="inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
                         >
                             {{
                                 entry.unreadCount > 9 ? '9+' : entry.unreadCount

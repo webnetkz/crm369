@@ -181,6 +181,12 @@ class MenuItem extends Model
                 'url' => '/production',
                 'sort_order' => 100,
             ],
+            'procurement' => [
+                'title_key' => 'ui.procurement.title',
+                'fallback_title' => 'Procurement & suppliers',
+                'url' => '/procurement',
+                'sort_order' => 101,
+            ],
             'warehouses' => [
                 'title_key' => 'ui.warehouses.title',
                 'fallback_title' => 'Warehouses',
@@ -313,6 +319,7 @@ class MenuItem extends Model
             'directories',
             'edo',
             'production',
+            'procurement',
             'warehouses',
             'qr',
             'tsd',

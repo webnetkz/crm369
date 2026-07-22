@@ -17,6 +17,7 @@ use App\Models\ReferenceDirectory;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Support\CompanyStructureData;
+use App\Support\ProcurementPageData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -43,6 +44,7 @@ class PortalWebhookInvokeController extends Controller
             'edo_documents' => $this->edoPayload($resolvedWebhook),
             'equipment_items' => $this->equipmentPayload($resolvedWebhook),
             'warehouses' => $this->warehousesPayload($resolvedWebhook),
+            'procurement' => $this->procurementPayload($resolvedWebhook),
             'endpoints' => $this->availableEndpoints($resolvedWebhook, $plainTextToken),
         ]);
     }
@@ -238,7 +240,46 @@ class PortalWebhookInvokeController extends Controller
             ];
         }
 
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_PROCUREMENT_READ)) {
+            $endpoints['procurement'] = [
+                'index' => route('portal-webhooks.procurement.index', $portalWebhook).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
+        if ($portalWebhook->hasPermission(PortalWebhook::PERMISSION_PROCUREMENT_WRITE)) {
+            $endpoints['procurement_write'] = [
+                'suppliers_store' => route('portal-webhooks.procurement.suppliers.store', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'suppliers_update_template' => route('portal-webhooks.procurement.suppliers.update', [
+                    'portalWebhook' => $portalWebhook,
+                    'supplier' => '__SUPPLIER_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+                'requests_store' => route('portal-webhooks.procurement.requests.store', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'requests_decision_template' => route('portal-webhooks.procurement.requests.decision.update', [
+                    'portalWebhook' => $portalWebhook,
+                    'purchaseRequest' => '__PURCHASE_REQUEST_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+                'quotations_store' => route('portal-webhooks.procurement.quotations.store', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'orders_store' => route('portal-webhooks.procurement.orders.store', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'orders_send_template' => route('portal-webhooks.procurement.orders.send', [
+                    'portalWebhook' => $portalWebhook,
+                    'purchaseOrder' => '__PURCHASE_ORDER_ID__',
+                ]).'?token='.urlencode($plainTextToken),
+                'receipts_store' => route('portal-webhooks.procurement.receipts.store', $portalWebhook).'?token='.urlencode($plainTextToken),
+                'returns_store' => route('portal-webhooks.procurement.returns.store', $portalWebhook).'?token='.urlencode($plainTextToken),
+            ];
+        }
+
         return $endpoints;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function procurementPayload(PortalWebhook $portalWebhook): ?array
+    {
+        if (! $portalWebhook->hasPermission(PortalWebhook::PERMISSION_PROCUREMENT_READ)) {
+            return null;
+        }
+
+        return app(ProcurementPageData::class)->index(null);
     }
 
     /**

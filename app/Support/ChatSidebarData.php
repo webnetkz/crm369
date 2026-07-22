@@ -14,7 +14,6 @@ class ChatSidebarData
     public function __construct(
         private readonly ChatMessageData $chatMessageData,
         private readonly ChatConversationReadMarker $chatConversationReadMarker,
-        private readonly ChatRuntimeCache $chatRuntimeCache,
         private readonly GeneralChatManager $generalChatManager,
     ) {}
 
@@ -24,13 +23,6 @@ class ChatSidebarData
     public function build(User $user, string $search = '', ?ChatConversation $activeConversation = null): array
     {
         $this->generalChatManager->ensureForUser($user);
-
-        if ($search === '' && $activeConversation === null) {
-            return $this->chatRuntimeCache->sidebar(
-                $user,
-                fn (): array => $this->buildPayload($user, $search, $activeConversation),
-            );
-        }
 
         return $this->buildPayload($user, $search, $activeConversation);
     }
@@ -42,9 +34,9 @@ class ChatSidebarData
     {
         $this->generalChatManager->ensureForUser($user);
 
-        return $this->chatRuntimeCache->shared($user, fn (): array => [
+        return [
             'unreadCount' => (int) array_sum($this->unreadCounts($user)),
-        ]);
+        ];
     }
 
     /**
@@ -54,33 +46,31 @@ class ChatSidebarData
     {
         $this->generalChatManager->ensureForUser($user);
 
-        return $this->chatRuntimeCache->unreadConversations($user, $limit, function () use ($limit, $user): array {
-            $unreadCounts = $this->unreadCounts($user);
+        $unreadCounts = $this->unreadCounts($user);
 
-            return $this->conversationCollection($user, '')
-                ->map(function (ChatConversation $conversation) use ($unreadCounts, $user): array {
-                    $otherParticipant = $this->otherParticipant($conversation, $user);
+        return $this->conversationCollection($user, '')
+            ->map(function (ChatConversation $conversation) use ($unreadCounts, $user): array {
+                $otherParticipant = $this->otherParticipant($conversation, $user);
 
-                    return [
-                        'id' => $conversation->id,
-                        'title' => $conversation->type === ChatConversation::TYPE_DIRECT
-                            ? $this->displayName($otherParticipant)
-                            : (
-                                $conversation->isGeneralConversation()
-                                    ? ChatConversation::GENERAL_CHAT_TITLE
-                                    : ($conversation->title ?? __('ui.chat.untitled_chat'))
-                            ),
-                        'excerpt' => $this->chatMessageData->excerpt($conversation->latestMessage),
-                        'unreadCount' => Arr::get($unreadCounts, $conversation->id, 0),
-                        'latestMessageId' => $conversation->latestMessage?->id,
-                        'lastMessageAt' => $conversation->last_message_at?->toISOString(),
-                    ];
-                })
-                ->filter(fn (array $conversation): bool => $conversation['unreadCount'] > 0)
-                ->take($limit)
-                ->values()
-                ->all();
-        });
+                return [
+                    'id' => $conversation->id,
+                    'title' => $conversation->type === ChatConversation::TYPE_DIRECT
+                        ? $this->displayName($otherParticipant)
+                        : (
+                            $conversation->isGeneralConversation()
+                                ? ChatConversation::GENERAL_CHAT_TITLE
+                                : ($conversation->title ?? __('ui.chat.untitled_chat'))
+                        ),
+                    'excerpt' => $this->chatMessageData->excerpt($conversation->latestMessage),
+                    'unreadCount' => Arr::get($unreadCounts, $conversation->id, 0),
+                    'latestMessageId' => $conversation->latestMessage?->id,
+                    'lastMessageAt' => $conversation->last_message_at?->toISOString(),
+                ];
+            })
+            ->filter(fn (array $conversation): bool => $conversation['unreadCount'] > 0)
+            ->take($limit)
+            ->values()
+            ->all();
     }
 
     public function resolveConversation(User $user, int $conversationId): ChatConversation

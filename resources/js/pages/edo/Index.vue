@@ -116,7 +116,9 @@ const startCreate = (): void => {
     form.defaults(buildDefaults(null));
     form.reset();
     form.clearErrors();
-    router.visit(edoIndex.url());
+    router.visit(edoIndex({ query: { create: true } }), {
+        preserveScroll: true,
+    });
 };
 
 const setDocumentSource = (source: EdoDocumentSource): void => {

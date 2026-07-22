@@ -11,6 +11,7 @@ use App\Http\Controllers\Settings\OneCIntegrationController;
 use App\Http\Controllers\Settings\PortalController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
+use App\Http\Controllers\Settings\SystemSecurityController;
 use App\Http\Controllers\Settings\UserController;
 use App\Http\Controllers\Settings\UserGroupController;
 use App\Http\Controllers\Settings\UserGroupPermissionController;
@@ -32,6 +33,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware(RequirePassword::class)
         ->name('security.edit');
 
+    Route::post('settings/security/audits', [SecurityController::class, 'storeAudit'])
+        ->middleware([RequirePassword::class, 'throttle:3,1'])
+        ->name('security.audits.store');
+
     Route::put('settings/password', [SecurityController::class, 'update'])
         ->middleware('throttle:6,1')
         ->name('user-password.update');
@@ -39,6 +44,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('settings/appearance', [AppearanceController::class, 'edit'])->name('appearance.edit');
     Route::post('settings/appearance', [AppearanceController::class, 'update'])->name('appearance.update');
 });
+
+Route::middleware(['auth', 'verified', 'can:manage-system-security', RequirePassword::class])
+    ->prefix('settings/system-security')
+    ->name('settings.system-security.')
+    ->group(function () {
+        Route::get('/', [SystemSecurityController::class, 'edit'])->name('edit');
+        Route::post('audits', [SystemSecurityController::class, 'storeAudit'])
+            ->middleware('throttle:3,1')
+            ->name('audits.store');
+        Route::patch('two-factor-requirement', [SystemSecurityController::class, 'updateTwoFactorRequirement'])
+            ->middleware('throttle:6,1')
+            ->name('two-factor-requirement.update');
+    });
 
 Route::middleware(['auth', 'verified', 'module.enabled:api', 'can:manage-api-tokens'])->group(function () {
     Route::get('settings/api', [ApiController::class, 'edit'])->name('settings.api.edit');

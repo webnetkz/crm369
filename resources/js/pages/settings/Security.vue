@@ -18,6 +18,9 @@ import ManagePasskeys from '@/components/ManagePasskeys.vue';
 import type { Props as ManageTwoFactorProps } from '@/components/ManageTwoFactor.vue';
 import ManageTwoFactor from '@/components/ManageTwoFactor.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
+import type { SecurityAuditData } from '@/components/SecurityAuditPanel.vue';
+import SecurityAuditPanel from '@/components/SecurityAuditPanel.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/composables/useLanguage';
@@ -56,6 +59,9 @@ type Props = {
     passwordRules: string;
     sessions: SessionRow[];
     loginActivities: LoginActivityRow[];
+    securityAudit: SecurityAuditData;
+    twoFactorRequired: boolean;
+    mustCompleteTwoFactor: boolean;
 } & ManagePasskeysProps &
     ManageTwoFactorProps;
 
@@ -138,6 +144,21 @@ watchEffect(() => {
                 {{ t.common.back }}
             </Link>
         </Button>
+
+        <Alert
+            v-if="props.mustCompleteTwoFactor"
+            class="border-amber-500/35 bg-amber-500/10"
+        >
+            <ShieldCheck class="size-4 text-amber-600 dark:text-amber-300" />
+            <AlertTitle>{{
+                t.system_security.setup_required_title
+            }}</AlertTitle>
+            <AlertDescription>
+                {{ t.system_security.two_factor_setup_required }}
+            </AlertDescription>
+        </Alert>
+
+        <SecurityAuditPanel :audit="props.securityAudit" />
 
         <Heading
             variant="small"
@@ -367,6 +388,7 @@ watchEffect(() => {
 
     <ManageTwoFactor
         :canManageTwoFactor="canManageTwoFactor"
+        :canDisableTwoFactor="!props.twoFactorRequired"
         :requiresConfirmation="requiresConfirmation"
         :twoFactorEnabled="twoFactorEnabled"
     />

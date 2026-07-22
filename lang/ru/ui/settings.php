@@ -24,6 +24,7 @@ return [
     'remove_background_image' => 'Убрать изображение',
     'russian' => 'Русский',
     'security' => 'Безопасность',
+    'system_security' => 'Безопасность системы',
     'system' => 'Системная',
     'users' => 'Пользователи',
     'groups' => 'Группы',

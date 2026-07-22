@@ -18,6 +18,7 @@ return [
     'edo' => require __DIR__.'/ui/edo.php',
     'files' => require __DIR__.'/ui/files.php',
     'production' => require __DIR__.'/ui/production.php',
+    'procurement' => require __DIR__.'/ui/procurement.php',
     'warehouses' => require __DIR__.'/ui/warehouses.php',
     'tsd' => require __DIR__.'/ui/tsd.php',
     'equipment' => require __DIR__.'/ui/equipment.php',
@@ -35,6 +36,7 @@ return [
     'webhooks' => require __DIR__.'/ui/webhooks.php',
     'api' => require __DIR__.'/ui/api.php',
     'security' => require __DIR__.'/ui/security.php',
+    'system_security' => require __DIR__.'/ui/system_security.php',
     'passkeys' => require __DIR__.'/ui/passkeys.php',
     'two_factor' => require __DIR__.'/ui/two_factor.php',
 ];

@@ -38,9 +38,12 @@ class WarehouseController extends Controller
         return Inertia::render('warehouses/Index', $warehousePageData->index());
     }
 
-    public function show(Warehouse $warehouse, WarehousePageData $warehousePageData): Response
-    {
-        $inventoryPerPage = $this->resolveInventoryPerPage(request());
+    public function show(
+        Request $request,
+        Warehouse $warehouse,
+        WarehousePageData $warehousePageData,
+    ): Response {
+        $inventoryPerPage = $this->resolveInventoryPerPage($request);
         $inventoryQrCodes = $this->warehouseInventoryQuery($warehouse)
             ->paginate($inventoryPerPage, ['*'], 'items_page')
             ->withQueryString()
@@ -53,6 +56,18 @@ class WarehouseController extends Controller
             'filters' => [
                 'items_per_page' => $inventoryPerPage,
             ],
+            'activeQrCode' => $request->string('qr_code')->trim()->limit(255, '')->value(),
+        ]);
+    }
+
+    public function qr(string $qrCode, QrCodeResolver $qrCodeResolver): JsonResponse
+    {
+        $resolvedQrCode = $qrCodeResolver->resolve($qrCode);
+
+        abort_if($resolvedQrCode === null, 404);
+
+        return response()->json([
+            'data' => (new ApiResolvedQrCodeResource($resolvedQrCode))->resolve(),
         ]);
     }
 

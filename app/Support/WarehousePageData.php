@@ -111,8 +111,9 @@ class WarehousePageData
      *     places: array<int, array{
      *         id: int,
      *         name: string,
+     *         qr_code: string,
      *         item_count: int,
-     *         items: array<int, array{id: int, name: string, sku: string|null, quantity: int}>
+     *         items: array<int, array{id: int, name: string, sku: string|null, qr_code: string, quantity: int}>
      *     }>
      * }
      */
@@ -129,8 +130,8 @@ class WarehousePageData
 
         $floor->load([
             'places' => fn (HasMany $query): HasMany => $query
-                ->select(['id', 'warehouse_floor_id', 'name', 'sort_order']),
-            'places.items:id,warehouse_place_id,name,sku,quantity',
+                ->select(['id', 'warehouse_floor_id', 'name', 'qr_code', 'sort_order']),
+            'places.items:id,warehouse_place_id,name,sku,qr_code,quantity',
         ]);
 
         return [
@@ -139,12 +140,14 @@ class WarehousePageData
                 ->map(fn (WarehousePlace $place): array => [
                     'id' => $place->id,
                     'name' => $place->name,
+                    'qr_code' => $place->qr_code,
                     'item_count' => $place->items->count(),
                     'items' => $place->items
                         ->map(fn (WarehouseItem $warehouseItem): array => [
                             'id' => $warehouseItem->id,
                             'name' => $warehouseItem->name,
                             'sku' => $warehouseItem->sku,
+                            'qr_code' => $warehouseItem->qr_code,
                             'quantity' => $warehouseItem->quantity,
                         ])
                         ->values()
@@ -219,6 +222,7 @@ class WarehousePageData
         return [
             'id' => $row->id,
             'name' => $row->name,
+            'qr_code' => $row->qr_code,
             'column_count' => $columns->count(),
             'floor_count' => (int) $columns->sum('floor_count'),
             'place_count' => (int) $columns->sum('place_count'),
@@ -236,6 +240,7 @@ class WarehousePageData
             ->map(fn (WarehouseFloor $floor): array => [
                 'id' => $floor->id,
                 'name' => $floor->name,
+                'qr_code' => $floor->qr_code,
                 'place_count' => $this->countAttribute($floor, 'places_count'),
                 'item_count' => $this->countAttribute($floor, 'items_count'),
                 'places' => [],
@@ -245,6 +250,7 @@ class WarehousePageData
         return [
             'id' => $column->id,
             'name' => $column->name,
+            'qr_code' => $column->qr_code,
             'floor_count' => $floors->count(),
             'place_count' => (int) $floors->sum('place_count'),
             'item_count' => (int) $floors->sum('item_count'),

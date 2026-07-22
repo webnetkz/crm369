@@ -18,6 +18,7 @@ import {
     QrCode,
     ScanLine,
     Settings,
+    ShoppingCart,
     ListTodo,
     Users,
     Video,
@@ -61,6 +62,7 @@ import {
     index as productionIndex,
     show as showProductionSection,
 } from '@/routes/production';
+import { index as procurementIndex } from '@/routes/procurement';
 import { index as projectsIndex } from '@/routes/projects';
 import { index as qrIndex } from '@/routes/qr';
 import { edit as editMenu } from '@/routes/settings/menu';
@@ -333,6 +335,17 @@ const baseMainNavItems = computed<NavItem[]>(() => {
                               href: showProductionSection('quality-control'),
                           },
                       ],
+                  },
+              ]
+            : []),
+        ...(page.props.auth.canAccessProcurement &&
+        isMenuItemVisible('procurement')
+            ? [
+                  {
+                      key: 'procurement',
+                      title: t.value.procurement.title,
+                      href: procurementIndex(),
+                      icon: ShoppingCart,
                   },
               ]
             : []),

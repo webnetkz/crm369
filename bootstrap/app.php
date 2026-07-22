@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureApiTokenHasPermission;
 use App\Http\Middleware\EnsureModuleIsEnabled;
 use App\Http\Middleware\EnsurePortalWebhookHasPermission;
+use App\Http\Middleware\EnsureTwoFactorAuthenticationIsRequired;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleAppearance::class,
             HandleLanguage::class,
             EnsureUserIsActive::class,
+            EnsureTwoFactorAuthenticationIsRequired::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);

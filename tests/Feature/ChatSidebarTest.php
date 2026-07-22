@@ -6,6 +6,7 @@ use App\Models\ChatMessage;
 use App\Models\ChatMessageRead;
 use App\Models\User;
 use App\Models\UserGroup;
+use App\Support\ChatRuntimeCache;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
@@ -382,6 +383,123 @@ test('general chat unread notifications remain for every user who has not opened
         ->sort()
         ->values()
         ->all())->toBe($readers->pluck('id')->sort()->values()->all());
+});
+
+test('general chat messages stay unread for active users without verified emails until they open the chat', function () {
+    $author = User::factory()->create();
+    $firstReader = User::factory()->create();
+    $waitingRecipient = User::factory()->create([
+        'email_verified_at' => null,
+        'is_active' => true,
+    ]);
+
+    $generalConversationId = $this->actingAs($author)
+        ->get(route('chats.sidebar'))
+        ->assertSuccessful()
+        ->json('conversations.0.id');
+
+    $this->actingAs($author)
+        ->post(route('chats.messages.store', $generalConversationId), [
+            'body' => 'Новое сообщение для каждого активного пользователя',
+        ])
+        ->assertSuccessful();
+
+    $message = ChatMessage::query()->latest('id')->firstOrFail();
+
+    expect(ChatConversationParticipant::query()
+        ->where('chat_conversation_id', $generalConversationId)
+        ->where('user_id', $waitingRecipient->id)
+        ->exists())->toBeTrue();
+
+    $this->actingAs($firstReader)
+        ->get(route('chats.sidebar', ['conversation' => $generalConversationId]))
+        ->assertSuccessful()
+        ->assertJsonPath('unreadCount', 0);
+
+    $this->actingAs($waitingRecipient)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 1));
+
+    $this->actingAs($waitingRecipient)
+        ->get(route('chats.sidebar'))
+        ->assertSuccessful()
+        ->assertJsonPath('unreadCount', 1)
+        ->assertJsonPath('conversations.0.id', $generalConversationId)
+        ->assertJsonPath('conversations.0.unreadCount', 1);
+
+    expect(ChatMessageRead::query()
+        ->where('chat_message_id', $message->id)
+        ->where('user_id', $firstReader->id)
+        ->exists())->toBeTrue()
+        ->and(ChatMessageRead::query()
+            ->where('chat_message_id', $message->id)
+            ->where('user_id', $waitingRecipient->id)
+            ->exists())->toBeFalse();
+});
+
+test('database unread state ignores stale personalized chat cache', function () {
+    $author = User::factory()->create();
+    $reader = User::factory()->create();
+    $waitingRecipient = User::factory()->create();
+
+    $generalConversationId = $this->actingAs($author)
+        ->get(route('chats.sidebar'))
+        ->assertSuccessful()
+        ->json('conversations.0.id');
+
+    $this->actingAs($author)
+        ->post(route('chats.messages.store', $generalConversationId), [
+            'body' => 'Персональное состояние непрочитанного сообщения',
+        ])
+        ->assertSuccessful();
+
+    $message = ChatMessage::query()->latest('id')->firstOrFail();
+
+    $chatRuntimeCache = app(ChatRuntimeCache::class);
+
+    $chatRuntimeCache->shared($waitingRecipient, fn (): array => [
+        'unreadCount' => 0,
+    ]);
+    $chatRuntimeCache->sidebar($waitingRecipient, fn (): array => [
+        'unreadCount' => 0,
+        'conversations' => [],
+        'contacts' => [],
+        'activeConversation' => null,
+    ]);
+    $chatRuntimeCache->unreadConversations($waitingRecipient, 10, fn (): array => []);
+
+    $this->actingAs($reader)
+        ->get(route('chats.sidebar', ['conversation' => $generalConversationId]))
+        ->assertSuccessful()
+        ->assertJsonPath('unreadCount', 0);
+
+    $this->actingAs($waitingRecipient)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page->where('chat.unreadCount', 1));
+
+    $this->actingAs($waitingRecipient)
+        ->get(route('chats.sidebar'))
+        ->assertSuccessful()
+        ->assertJsonPath('unreadCount', 1)
+        ->assertJsonPath('conversations.0.id', $generalConversationId)
+        ->assertJsonPath('conversations.0.unreadCount', 1);
+
+    $this->actingAs($waitingRecipient)
+        ->getJson(route('mobile.notifications.feed'))
+        ->assertSuccessful()
+        ->assertJsonPath('meta.chat_unread_count', 1)
+        ->assertJsonPath('data.chats.0.conversation_id', $generalConversationId);
+
+    expect(ChatConversationParticipant::query()
+        ->where('chat_conversation_id', $generalConversationId)
+        ->where('user_id', $waitingRecipient->id)
+        ->value('last_read_at'))->toBeNull()
+        ->and(ChatMessageRead::query()
+            ->where('chat_message_id', $message->id)
+            ->where('user_id', $waitingRecipient->id)
+            ->exists())->toBeFalse();
 });
 
 test('direct chat messages expose a read check after the recipient opens the conversation', function () {
@@ -1184,6 +1302,12 @@ test('chat ui renders header trigger, sidebar dock, and sheet targeting hooks', 
         ->and($dock)->toContain("openChatCenter('chats'")
         ->and($dock)->toContain('entry.conversationId')
         ->and($dock)->toContain('entry.contactId')
+        ->and($dock)->toContain('visibleDockEntries')
+        ->and($dock)->toContain('Number(right.unreadCount > 0)')
+        ->and($dock)->toContain('{{ entry.title }}')
+        ->and($dock)->toContain('t.chat.unread')
+        ->and($dock)->toContain(':aria-label="entryAriaLabel(entry)"')
+        ->and($dock)->toContain('aria-hidden="true"')
         ->and($dock)->toContain("conversation.type === 'general'")
         ->and($dock)->toContain('page.props.portal.logoUrl')
         ->and($dock)->toContain("'bg-white object-contain p-1'")
@@ -1191,7 +1315,7 @@ test('chat ui renders header trigger, sidebar dock, and sheet targeting hooks', 
         ->and($dock)->toContain('@error="markAvatarFailed(entry)"')
         ->and($dock)->toContain(':aria-hidden="shouldShowAvatar(entry)"')
         ->and($dock)->toContain('absolute inset-0 z-10 aspect-square size-full')
-        ->and($dock)->toContain('absolute -top-1 -right-1 z-20 inline-flex')
+        ->and($dock)->toContain('min-w-6 shrink-0 items-center justify-center rounded-full bg-primary')
         ->and($dock)->toContain('group-hover/dock:pointer-events-auto')
         ->and($dock)->toContain('group-focus-within/dock:opacity-100')
         ->and($dock)->toContain('absolute right-0 bottom-full h-5 w-20')

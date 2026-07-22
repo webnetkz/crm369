@@ -166,6 +166,25 @@ class ApiCatalog
                 ],
             ],
             [
+                'title' => __('ui.api.section_procurement'),
+                'description' => __('ui.api.section_procurement_description'),
+                'notes' => [
+                    __('ui.api.section_procurement_note'),
+                ],
+                'endpoints' => [
+                    $this->endpoint('GET', '/api/v1/procurement', 'ui.api.endpoint_procurement_index', ApiAccessToken::PERMISSION_PROCUREMENT_READ, 'ui.api.access_scope_based'),
+                    $this->endpoint('POST', '/api/v1/procurement/suppliers', 'ui.api.endpoint_procurement_suppliers_store', ApiAccessToken::PERMISSION_PROCUREMENT_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('PATCH', '/api/v1/procurement/suppliers/{supplier}', 'ui.api.endpoint_procurement_suppliers_update', ApiAccessToken::PERMISSION_PROCUREMENT_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('POST', '/api/v1/procurement/requests', 'ui.api.endpoint_procurement_requests_store', ApiAccessToken::PERMISSION_PROCUREMENT_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('PATCH', '/api/v1/procurement/requests/{purchaseRequest}/decision', 'ui.api.endpoint_procurement_requests_decide', ApiAccessToken::PERMISSION_PROCUREMENT_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('POST', '/api/v1/procurement/quotations', 'ui.api.endpoint_procurement_quotations_store', ApiAccessToken::PERMISSION_PROCUREMENT_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('POST', '/api/v1/procurement/orders', 'ui.api.endpoint_procurement_orders_store', ApiAccessToken::PERMISSION_PROCUREMENT_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('PATCH', '/api/v1/procurement/orders/{purchaseOrder}/send', 'ui.api.endpoint_procurement_orders_send', ApiAccessToken::PERMISSION_PROCUREMENT_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('POST', '/api/v1/procurement/receipts', 'ui.api.endpoint_procurement_receipts_store', ApiAccessToken::PERMISSION_PROCUREMENT_WRITE, 'ui.api.access_scope_based'),
+                    $this->endpoint('POST', '/api/v1/procurement/returns', 'ui.api.endpoint_procurement_returns_store', ApiAccessToken::PERMISSION_PROCUREMENT_WRITE, 'ui.api.access_scope_based'),
+                ],
+            ],
+            [
                 'title' => __('ui.api.section_tsd'),
                 'description' => __('ui.api.section_tsd_description'),
                 'notes' => [],

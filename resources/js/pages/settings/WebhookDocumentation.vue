@@ -48,6 +48,16 @@ type WebhookDocumentation = {
     warehouses_store_url: string;
     warehouses_update_url: string;
     warehouses_destroy_url: string;
+    procurement_index_url: string;
+    procurement_suppliers_store_url: string;
+    procurement_suppliers_update_url: string;
+    procurement_requests_store_url: string;
+    procurement_requests_decision_url: string;
+    procurement_quotations_store_url: string;
+    procurement_orders_store_url: string;
+    procurement_orders_send_url: string;
+    procurement_receipts_store_url: string;
+    procurement_returns_store_url: string;
 };
 
 type EndpointExample = {
@@ -82,6 +92,8 @@ const PortalWebhookTsdReadPermission = 'tsd.read';
 const PortalWebhookTsdWritePermission = 'tsd.write';
 const PortalWebhookWarehousesReadPermission = 'warehouses.read';
 const PortalWebhookWarehousesWritePermission = 'warehouses.write';
+const PortalWebhookProcurementReadPermission = 'procurement.read';
+const PortalWebhookProcurementWritePermission = 'procurement.write';
 
 const authorizationHeaderValue = (token: string): string => {
     return `Authorization: Bearer ${token}`;
@@ -455,6 +467,105 @@ const endpointExamples = computed<EndpointExample[]>(() => [
             t.value.webhooks
                 .documentation_endpoint_warehouses_destroy_description,
         permission: PortalWebhookWarehousesWritePermission,
+    },
+    {
+        method: 'GET',
+        path: `${props.documentation.procurement_index_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks.documentation_endpoint_procurement_index_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_procurement_index_description,
+        permission: PortalWebhookProcurementReadPermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.procurement_suppliers_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks
+            .documentation_endpoint_procurement_suppliers_store_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_procurement_suppliers_store_description,
+        permission: PortalWebhookProcurementWritePermission,
+    },
+    {
+        method: 'PATCH',
+        path: `${props.documentation.procurement_suppliers_update_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks
+            .documentation_endpoint_procurement_suppliers_update_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_procurement_suppliers_update_description,
+        permission: PortalWebhookProcurementWritePermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.procurement_requests_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks
+            .documentation_endpoint_procurement_requests_store_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_procurement_requests_store_description,
+        permission: PortalWebhookProcurementWritePermission,
+    },
+    {
+        method: 'PATCH',
+        path: `${props.documentation.procurement_requests_decision_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks
+            .documentation_endpoint_procurement_requests_decision_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_procurement_requests_decision_description,
+        permission: PortalWebhookProcurementWritePermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.procurement_quotations_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks
+            .documentation_endpoint_procurement_quotations_store_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_procurement_quotations_store_description,
+        permission: PortalWebhookProcurementWritePermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.procurement_orders_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks
+            .documentation_endpoint_procurement_orders_store_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_procurement_orders_store_description,
+        permission: PortalWebhookProcurementWritePermission,
+    },
+    {
+        method: 'PATCH',
+        path: `${props.documentation.procurement_orders_send_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks
+            .documentation_endpoint_procurement_orders_send_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_procurement_orders_send_description,
+        permission: PortalWebhookProcurementWritePermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.procurement_receipts_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks
+            .documentation_endpoint_procurement_receipts_store_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_procurement_receipts_store_description,
+        permission: PortalWebhookProcurementWritePermission,
+    },
+    {
+        method: 'POST',
+        path: `${props.documentation.procurement_returns_store_url}?token=${tokenQueryValue}`,
+        title: t.value.webhooks
+            .documentation_endpoint_procurement_returns_store_title,
+        description:
+            t.value.webhooks
+                .documentation_endpoint_procurement_returns_store_description,
+        permission: PortalWebhookProcurementWritePermission,
     },
 ]);
 

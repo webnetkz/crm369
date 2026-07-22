@@ -28,9 +28,11 @@ class EdoDocumentController extends Controller
 
         $documents = $this->documentQuery($user)->get();
         $requestedDocumentId = $request->integer('document');
-        $activeDocument = $requestedDocumentId > 0
-            ? $documents->firstWhere('id', $requestedDocumentId)
-            : $documents->first();
+        $activeDocument = $request->boolean('create')
+            ? null
+            : ($requestedDocumentId > 0
+                ? $documents->firstWhere('id', $requestedDocumentId)
+                : $documents->first());
 
         return Inertia::render('edo/Index', [
             'documents' => ApiEdoDocumentResource::collection($documents)->resolve(),

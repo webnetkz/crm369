@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Listeners\InvalidateNotificationRuntimeCache;
 use App\Models\ApiAccessToken;
+use App\Models\SystemSecuritySetting;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -47,6 +48,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-api-tokens', fn (User $user): bool => $user->canManageApiTokens());
         Gate::define('impersonate-users', fn (User $user): bool => $user->canImpersonateUsers());
         Gate::define('manage-users', fn (User $user): bool => $user->isSuperAdmin());
+        Gate::define('manage-system-security', fn (User $user): bool => $user->isSuperAdmin());
         Gate::define('access-company-structure', fn (User $user): bool => $user->canAccessCompanyStructure());
         Gate::define('access-news', fn (User $user): bool => $user->canAccessNews());
         Gate::define('access-projects', fn (User $user): bool => $user->canAccessProjects());
@@ -58,6 +60,12 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('access-edo', fn (User $user): bool => $user->canAccessEdo());
         Gate::define('access-files', fn (User $user): bool => $user->canAccessFiles());
         Gate::define('access-production', fn (User $user): bool => $user->canAccessProduction());
+        Gate::define('access-procurement', fn (User $user): bool => $user->canAccessProcurement());
+        Gate::define('manage-procurement', fn (User $user): bool => $user->canManageProcurement());
+        Gate::define('approve-procurement-budget', fn (User $user): bool => $user->canApproveProcurementBudget());
+        Gate::define('manage-procurement-orders', fn (User $user): bool => $user->canManageProcurementOrders());
+        Gate::define('receive-procurement-orders', fn (User $user): bool => $user->canReceiveProcurementOrders());
+        Gate::define('return-procurement-goods', fn (User $user): bool => $user->canReturnProcurementGoods());
         Gate::define('access-warehouses', fn (User $user): bool => $user->canAccessWarehouses());
         Gate::define('access-equipment', fn (User $user): bool => $user->canAccessEquipment());
         Gate::define('access-tsd', fn (User $user): bool => $user->canAccessTsd());
@@ -99,6 +107,8 @@ class AppServiceProvider extends ServiceProvider
                 || ! $user->is_active
                 || $user->email_verified_at === null
                 || ! $user->canManageApiTokens()
+                || (SystemSecuritySetting::requiresTwoFactorAuthentication()
+                    && ! $user->hasEnabledTwoFactorAuthentication())
             ) {
                 return null;
             }

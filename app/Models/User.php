@@ -355,6 +355,43 @@ class User extends Authenticatable implements PasskeyUser
         ]);
     }
 
+    public function canAccessProcurement(): bool
+    {
+        return $this->canAccessConfiguredModule('procurement', [
+            UserGroup::PERMISSION_ACCESS_PROCUREMENT,
+            UserGroup::PERMISSION_MANAGE_PROCUREMENT,
+            UserGroup::PERMISSION_APPROVE_PROCUREMENT_BUDGET,
+            UserGroup::PERMISSION_MANAGE_PROCUREMENT_ORDERS,
+            UserGroup::PERMISSION_RECEIVE_PROCUREMENT_ORDERS,
+            UserGroup::PERMISSION_RETURN_PROCUREMENT_GOODS,
+        ]);
+    }
+
+    public function canManageProcurement(): bool
+    {
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_MANAGE_PROCUREMENT);
+    }
+
+    public function canApproveProcurementBudget(): bool
+    {
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_APPROVE_PROCUREMENT_BUDGET);
+    }
+
+    public function canManageProcurementOrders(): bool
+    {
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_MANAGE_PROCUREMENT_ORDERS);
+    }
+
+    public function canReceiveProcurementOrders(): bool
+    {
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_RECEIVE_PROCUREMENT_ORDERS);
+    }
+
+    public function canReturnProcurementGoods(): bool
+    {
+        return $this->isSuperAdmin() || $this->hasGroupPermission(UserGroup::PERMISSION_RETURN_PROCUREMENT_GOODS);
+    }
+
     public function canAccessWarehouses(): bool
     {
         return $this->canAccessConfiguredModule('warehouses', [

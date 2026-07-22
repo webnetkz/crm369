@@ -11,6 +11,7 @@ import {
     MessageSquareShare,
     Palette,
     Shield,
+    ShieldAlert,
     UserRound,
     UsersRound,
     Network,
@@ -32,6 +33,7 @@ import { edit as editModules } from '@/routes/settings/modules';
 import { edit as editOneC } from '@/routes/settings/one-c';
 import { edit as editPortal } from '@/routes/settings/portal';
 import { index as rightsIndex } from '@/routes/settings/rights';
+import { edit as editSystemSecurity } from '@/routes/settings/system-security';
 import { index as usersIndex } from '@/routes/settings/users';
 import { edit as editWebhooks } from '@/routes/settings/webhooks';
 import type { NavItem } from '@/types';
@@ -104,6 +106,17 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                           title: t.value.settings.groups,
                           href: groupsIndex(),
                           icon: Network,
+                      },
+                  ]
+                : []),
+            ...(page.props.auth.isSuperAdmin &&
+            isVisible('settings.system-security')
+                ? [
+                      {
+                          key: 'settings.system-security',
+                          title: t.value.settings.system_security,
+                          href: editSystemSecurity(),
+                          icon: ShieldAlert,
                       },
                   ]
                 : []),

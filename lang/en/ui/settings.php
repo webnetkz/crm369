@@ -24,6 +24,7 @@ return [
     'remove_background_image' => 'Remove image',
     'russian' => 'Русский',
     'security' => 'Security',
+    'system_security' => 'System security',
     'system' => 'System',
     'users' => 'Users',
     'groups' => 'Groups',

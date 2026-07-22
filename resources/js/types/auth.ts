@@ -53,6 +53,12 @@ export type Auth = {
     canAccessEdo: boolean;
     canAccessFiles: boolean;
     canAccessProduction: boolean;
+    canAccessProcurement: boolean;
+    canManageProcurement: boolean;
+    canApproveProcurementBudget: boolean;
+    canManageProcurementOrders: boolean;
+    canReceiveProcurementOrders: boolean;
+    canReturnProcurementGoods: boolean;
     canAccessWarehouses: boolean;
     canAccessEquipment: boolean;
     canAccessTsd: boolean;

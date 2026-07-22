@@ -12,12 +12,14 @@ import { disable, enable } from '@/routes/two-factor';
 
 export type Props = {
     canManageTwoFactor?: boolean;
+    canDisableTwoFactor?: boolean;
     requiresConfirmation?: boolean;
     twoFactorEnabled?: boolean;
 };
 
 withDefaults(defineProps<Props>(), {
     canManageTwoFactor: false,
+    canDisableTwoFactor: true,
     requiresConfirmation: false,
     twoFactorEnabled: false,
 });
@@ -67,7 +69,7 @@ onUnmounted(() => clearTwoFactorAuthData());
                 {{ t.two_factor.enabled_description }}
             </p>
 
-            <div class="relative inline">
+            <div v-if="canDisableTwoFactor" class="relative inline">
                 <Form v-bind="disable.form()" #default="{ processing }">
                     <Button
                         variant="destructive"
@@ -78,6 +80,13 @@ onUnmounted(() => clearTwoFactorAuthData());
                     </Button>
                 </Form>
             </div>
+
+            <p
+                v-else
+                class="rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm text-foreground"
+            >
+                {{ t.system_security.two_factor_disable_blocked }}
+            </p>
 
             <TwoFactorRecoveryCodes />
         </div>

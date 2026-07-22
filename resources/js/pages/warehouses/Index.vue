@@ -406,15 +406,30 @@ const submitScanForm = (): void => {
                                     </p>
                                 </div>
 
-                                <Link
-                                    :href="showWarehouse.url(warehouse.id)"
-                                    class="inline-flex w-full items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 sm:w-auto sm:shrink-0"
-                                >
-                                    <span>{{
-                                        t.warehouses.open_warehouse
-                                    }}</span>
-                                    <ArrowRight class="size-4" />
-                                </Link>
+                                <div class="flex flex-col gap-2 sm:shrink-0">
+                                    <Link
+                                        :href="
+                                            showWarehouse.url(warehouse.id, {
+                                                query: {
+                                                    qr_code: warehouse.qr_code,
+                                                },
+                                            })
+                                        "
+                                        class="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-muted sm:w-auto"
+                                    >
+                                        <QrCode class="size-4" />
+                                        <span>{{ t.warehouses.view_qr }}</span>
+                                    </Link>
+                                    <Link
+                                        :href="showWarehouse.url(warehouse.id)"
+                                        class="inline-flex w-full items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 sm:w-auto"
+                                    >
+                                        <span>{{
+                                            t.warehouses.open_warehouse
+                                        }}</span>
+                                        <ArrowRight class="size-4" />
+                                    </Link>
+                                </div>
                             </div>
 
                             <div

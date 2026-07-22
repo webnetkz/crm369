@@ -77,7 +77,6 @@ class GeneralChatManager
         User::query()
             ->select('id')
             ->where('is_active', true)
-            ->whereNotNull('email_verified_at')
             ->whereNotIn(
                 'id',
                 ChatConversationParticipant::query()

@@ -59,6 +59,25 @@ test('authenticated users can open the edo page and it appears in the sidebar me
         ->and($builtInKeys->all())->toContain('edo');
 });
 
+test('users can open a blank create editor when documents already exist', function () {
+    $user = User::factory()->create();
+    $document = EdoDocument::factory()->create([
+        'created_by_user_id' => $user->id,
+        'updated_by_user_id' => $user->id,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('edo.index', ['create' => true]))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('edo/Index')
+            ->has('documents', 1)
+            ->where('documents.0.id', $document->id)
+            ->where('activeDocument', null)
+            ->where('defaults.title', '')
+        );
+});
+
 test('users can create edo documents and issue a 12 hour public signing link', function () {
     CarbonImmutable::setTestNow('2026-07-01 10:00:00');
 
@@ -173,23 +192,44 @@ test('public edo signing page accepts a signature and marks the document as sign
             ->component('public/edo/Show')
             ->where('document.title', 'Employment contract')
             ->where('document.state', 'ready')
+            ->missing('document.external_reference')
+            ->missing('document.counterparty_name')
+            ->missing('document.counterparty_identifier')
+            ->missing('document.signature_subject')
+            ->missing('document.signature_algorithm')
         );
 
     $this->post($signUrl, [
         'signature_payload' => base64_encode(str_repeat('signature', 8)),
-        'signature_subject' => 'CN=Test Signer',
-        'signature_serial_number' => '12345678',
-        'signature_algorithm' => 'GOST3411',
         'signed_payload_hash' => $document->signingPayloadHash(),
-        'signature_metadata' => [
-            'provider' => 'ncalayer',
-        ],
     ])->assertRedirect();
 
     expect($document->fresh()->status)->toBe(EdoDocument::STATUS_SIGNED)
-        ->and($document->fresh()->signature_subject)->toBe('CN=Test Signer')
-        ->and($document->fresh()->signature_algorithm)->toBe('GOST3411')
+        ->and($document->fresh()->signature_subject)->toBeNull()
+        ->and($document->fresh()->signature_algorithm)->toBeNull()
+        ->and($document->fresh()->signature_metadata)->toBe([
+            'provider' => 'ncalayer',
+            'format' => 'xml',
+        ])
         ->and($document->fresh()->signed_at)->not->toBeNull();
+});
+
+test('public edo signing page contains no manual signature or certificate fields', function () {
+    $component = file_get_contents(resource_path('js/pages/public/edo/Show.vue'));
+    $app = file_get_contents(resource_path('js/app.ts'));
+
+    expect($component)
+        ->not->toContain('<textarea')
+        ->not->toContain('manual_signature_label')
+        ->not->toContain('signature_subject')
+        ->not->toContain('signature_serial_number')
+        ->not->toContain('signature_algorithm')
+        ->toContain('signXmlWithNcaLayer')
+        ->toContain('document_file_download_url');
+
+    expect($app)
+        ->toContain("case name.startsWith('public/edo/'):")
+        ->toContain('return null;');
 });
 
 test('public signing page can download the attached document snapshot', function () {
@@ -208,8 +248,19 @@ test('public signing page can download the attached document snapshot', function
     Storage::disk('local')->put((string) $document->document_file_path, 'signed-contract');
 
     $downloadUrl = $document->publicDownloadUrl();
+    $showUrl = $document->publicShowUrl();
 
     expect($downloadUrl)->not->toBeNull();
+
+    $this->get($showUrl)
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('public/edo/Show')
+            ->where('document.document_file.original_name', 'signed-contract.pdf')
+            ->where('document.document_file_download_url', $downloadUrl)
+            ->missing('document.document_file.mime_type')
+            ->missing('document.document_file.size_bytes')
+        );
 
     $this->get($downloadUrl)
         ->assertDownload('signed-contract.pdf');

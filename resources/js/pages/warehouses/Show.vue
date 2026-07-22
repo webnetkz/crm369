@@ -4,6 +4,7 @@ import {
     ArrowLeft,
     Boxes,
     Building2,
+    LoaderCircle,
     Package,
     QrCode,
     Rows3,
@@ -18,6 +19,8 @@ import {
 } from 'vue';
 import Heading from '@/components/Heading.vue';
 import PaginationControls from '@/components/PaginationControls.vue';
+import { Button } from '@/components/ui/button';
+import WarehouseQrDialog from '@/components/WarehouseQrDialog.vue';
 import { useLanguage } from '@/composables/useLanguage';
 import { fetchSameOriginJson } from '@/lib/sameOriginJson';
 import {
@@ -25,6 +28,7 @@ import {
     show as showWarehouse,
 } from '@/routes/warehouses';
 import { show as showWarehouseFloor } from '@/routes/warehouses/floors';
+import { show as showWarehouseQr } from '@/routes/warehouses/qr';
 import type { PaginatedCollection } from '@/types/ui';
 
 type WarehouseUser = {
@@ -53,12 +57,14 @@ type MapItem = {
     id: number;
     name: string;
     sku: string | null;
+    qr_code: string;
     quantity: number;
 };
 
 type MapPlace = {
     id: number;
     name: string;
+    qr_code: string;
     item_count: number;
     items: MapItem[];
 };
@@ -66,6 +72,7 @@ type MapPlace = {
 type MapFloor = {
     id: number;
     name: string;
+    qr_code: string;
     place_count: number;
     item_count: number;
     places: MapPlace[];
@@ -74,6 +81,7 @@ type MapFloor = {
 type MapColumn = {
     id: number;
     name: string;
+    qr_code: string;
     floor_count: number;
     place_count: number;
     item_count: number;
@@ -83,6 +91,7 @@ type MapColumn = {
 type MapRow = {
     id: number;
     name: string;
+    qr_code: string;
     column_count: number;
     floor_count: number;
     place_count: number;
@@ -105,6 +114,33 @@ type InventoryQrItem = {
     };
 };
 
+type WarehouseQrEntity = {
+    entity_type: string;
+    entity_type_label: string;
+    title: string;
+    qr_code: string;
+    qr_code_svg_data_uri: string;
+    warehouse: {
+        id: number;
+        name: string;
+    };
+    location: {
+        path: string;
+    };
+    details: Record<string, string | number | null>;
+    contents: Array<{
+        id: number;
+        name: string;
+        sku: string | null;
+        quantity: number;
+        qr_code: string;
+        location: {
+            path: string;
+        };
+    }>;
+    contents_truncated: boolean;
+};
+
 const props = defineProps<{
     warehouse: WarehouseSummary;
     map: WarehouseMap;
@@ -113,6 +149,7 @@ const props = defineProps<{
     filters: {
         items_per_page: number;
     };
+    activeQrCode: string;
 }>();
 
 const { language, t } = useLanguage();
@@ -126,7 +163,12 @@ const selectedFloorId = ref<number | null>(
 const loadedFloorPlaces = reactive(new Map<number, MapPlace[]>());
 const loadingFloorId = ref<number | null>(null);
 const failedFloorId = ref<number | null>(null);
+const selectedQrEntity = ref<WarehouseQrEntity | null>(null);
+const qrDialogOpen = ref(false);
+const qrLoadingCode = ref<string | null>(null);
+const qrLoadError = ref<string | null>(null);
 let floorAbortController: AbortController | null = null;
+let qrAbortController: AbortController | null = null;
 
 const formatNumber = (value: number): string => {
     return new Intl.NumberFormat(language.value === 'ru' ? 'ru-RU' : 'en-US', {
@@ -228,6 +270,54 @@ const loadFloorPlaces = async (
     }
 };
 
+const openQrCode = async (qrCode: string): Promise<void> => {
+    qrAbortController?.abort();
+
+    const requestController = new AbortController();
+
+    qrAbortController = requestController;
+    qrLoadingCode.value = qrCode;
+    qrLoadError.value = null;
+
+    try {
+        const response = await fetchSameOriginJson<{
+            data: WarehouseQrEntity;
+        }>(showWarehouseQr.url(qrCode), {
+            method: 'GET',
+            signal: requestController.signal,
+        });
+
+        selectedQrEntity.value = response.data;
+        qrDialogOpen.value = true;
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            return;
+        }
+
+        console.error(error);
+        qrLoadError.value = t.value.warehouses.qr_load_failed;
+    } finally {
+        if (qrAbortController === requestController) {
+            qrAbortController = null;
+            qrLoadingCode.value = null;
+        }
+    }
+};
+
+const closeQrDialog = (): void => {
+    qrDialogOpen.value = false;
+};
+
+watch(
+    () => props.activeQrCode,
+    (qrCode) => {
+        if (qrCode !== '') {
+            void openQrCode(qrCode);
+        }
+    },
+    { immediate: true },
+);
+
 watchEffect(() => {
     if (!selectedColumn.value && props.map.rows[0]?.columns[0]) {
         selectedColumnId.value = props.map.rows[0].columns[0].id;
@@ -289,6 +379,7 @@ const updateInventoryPerPage = (value: number): void => {
 
 onBeforeUnmount(() => {
     floorAbortController?.abort();
+    qrAbortController?.abort();
 });
 </script>
 
@@ -333,16 +424,37 @@ onBeforeUnmount(() => {
                         </div>
 
                         <div
-                            class="rounded-2xl border border-border bg-background/80 px-4 py-3 text-sm"
+                            class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-background/80 px-4 py-3 text-sm"
                         >
-                            <div class="text-muted-foreground">
-                                {{ t.warehouses.warehouse_qr }}
+                            <div class="min-w-0">
+                                <div class="text-muted-foreground">
+                                    {{ t.warehouses.warehouse_qr }}
+                                </div>
+                                <div
+                                    class="mt-1 font-mono font-semibold break-all text-foreground"
+                                >
+                                    {{ props.warehouse.qr_code }}
+                                </div>
                             </div>
-                            <div
-                                class="mt-1 font-mono font-semibold text-foreground"
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                class="gap-2"
+                                :disabled="qrLoadingCode !== null"
+                                @click="openQrCode(props.warehouse.qr_code)"
                             >
-                                {{ props.warehouse.qr_code }}
-                            </div>
+                                <LoaderCircle
+                                    v-if="
+                                        qrLoadingCode ===
+                                        props.warehouse.qr_code
+                                    "
+                                    class="size-4 animate-spin"
+                                />
+                                <QrCode v-else class="size-4" />
+                                <span>{{ t.warehouses.view_qr }}</span>
+                            </Button>
                         </div>
                     </div>
 
@@ -398,6 +510,13 @@ onBeforeUnmount(() => {
                 </div>
             </section>
 
+            <div
+                v-if="qrLoadError"
+                class="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            >
+                {{ qrLoadError }}
+            </div>
+
             <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
                 <div class="rounded-3xl border border-border bg-card p-6">
                     <Heading
@@ -429,7 +548,24 @@ onBeforeUnmount(() => {
                                     </p>
                                 </div>
 
-                                <div class="flex flex-wrap gap-2 text-xs">
+                                <div
+                                    class="flex flex-wrap items-center gap-2 text-xs"
+                                >
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        class="gap-1.5"
+                                        :disabled="qrLoadingCode !== null"
+                                        @click="openQrCode(row.qr_code)"
+                                    >
+                                        <LoaderCircle
+                                            v-if="qrLoadingCode === row.qr_code"
+                                            class="size-4 animate-spin"
+                                        />
+                                        <QrCode v-else class="size-4" />
+                                        <span>{{ t.warehouses.row_qr }}</span>
+                                    </Button>
                                     <div
                                         class="rounded-full border border-border bg-card px-3 py-1.5"
                                     >
@@ -454,44 +590,80 @@ onBeforeUnmount(() => {
                             <div
                                 class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
                             >
-                                <button
+                                <article
                                     v-for="column in row.columns"
                                     :key="column.id"
-                                    type="button"
-                                    class="rounded-2xl border px-4 py-4 text-left transition-colors"
+                                    class="rounded-2xl border p-2 transition-colors"
                                     :class="
                                         column.id === selectedColumnId
                                             ? 'border-primary bg-primary/10'
                                             : 'border-border bg-card hover:bg-muted/40'
                                     "
-                                    @click="selectedColumnId = column.id"
                                 >
-                                    <div class="font-medium">
-                                        {{ column.name }}
-                                    </div>
-                                    <div
-                                        class="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground"
+                                    <button
+                                        type="button"
+                                        class="w-full rounded-xl px-2 py-2 text-left"
+                                        @click="selectedColumnId = column.id"
                                     >
-                                        <span
-                                            >{{ t.warehouses.metric_floors }}:
-                                            {{
-                                                formatNumber(column.floor_count)
-                                            }}</span
+                                        <div class="font-medium">
+                                            {{ column.name }}
+                                        </div>
+                                        <div
+                                            class="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground"
                                         >
-                                        <span
-                                            >{{ t.warehouses.metric_places }}:
-                                            {{
-                                                formatNumber(column.place_count)
-                                            }}</span
-                                        >
-                                        <span
-                                            >{{ t.warehouses.metric_items }}:
-                                            {{
-                                                formatNumber(column.item_count)
-                                            }}</span
-                                        >
-                                    </div>
-                                </button>
+                                            <span
+                                                >{{
+                                                    t.warehouses.metric_floors
+                                                }}:
+                                                {{
+                                                    formatNumber(
+                                                        column.floor_count,
+                                                    )
+                                                }}</span
+                                            >
+                                            <span
+                                                >{{
+                                                    t.warehouses.metric_places
+                                                }}:
+                                                {{
+                                                    formatNumber(
+                                                        column.place_count,
+                                                    )
+                                                }}</span
+                                            >
+                                            <span
+                                                >{{
+                                                    t.warehouses.metric_items
+                                                }}:
+                                                {{
+                                                    formatNumber(
+                                                        column.item_count,
+                                                    )
+                                                }}</span
+                                            >
+                                        </div>
+                                    </button>
+
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        class="mt-1 w-full gap-1.5"
+                                        :disabled="qrLoadingCode !== null"
+                                        @click="openQrCode(column.qr_code)"
+                                    >
+                                        <LoaderCircle
+                                            v-if="
+                                                qrLoadingCode === column.qr_code
+                                            "
+                                            class="size-4 animate-spin"
+                                        />
+                                        <QrCode v-else class="size-4" />
+                                        <span>{{
+                                            t.warehouses.column_qr
+                                        }}</span>
+                                    </Button>
+                                </article>
                             </div>
                         </article>
                     </div>
@@ -512,8 +684,29 @@ onBeforeUnmount(() => {
                         <div
                             class="rounded-2xl border border-border bg-background/70 p-4"
                         >
-                            <div class="font-semibold">
-                                {{ selectedColumn.name }}
+                            <div
+                                class="flex items-center justify-between gap-3"
+                            >
+                                <div class="font-semibold">
+                                    {{ selectedColumn.name }}
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon-sm"
+                                    :aria-label="t.warehouses.column_qr"
+                                    :disabled="qrLoadingCode !== null"
+                                    @click="openQrCode(selectedColumn.qr_code)"
+                                >
+                                    <LoaderCircle
+                                        v-if="
+                                            qrLoadingCode ===
+                                            selectedColumn.qr_code
+                                        "
+                                        class="size-4 animate-spin"
+                                    />
+                                    <QrCode v-else class="size-4" />
+                                </Button>
                             </div>
                             <div class="mt-3 flex flex-wrap gap-2 text-xs">
                                 <div
@@ -544,36 +737,58 @@ onBeforeUnmount(() => {
                         </div>
 
                         <div class="space-y-3">
-                            <button
+                            <article
                                 v-for="floor in selectedColumn.floors"
                                 :key="floor.id"
-                                type="button"
-                                class="w-full rounded-2xl border px-4 py-4 text-left transition-colors"
+                                class="w-full rounded-2xl border p-2 transition-colors"
                                 :class="
                                     floor.id === selectedFloorId
                                         ? 'border-primary bg-primary/10'
                                         : 'border-border bg-background hover:bg-muted/40'
                                 "
-                                @click="selectedFloorId = floor.id"
                             >
-                                <div class="font-medium">{{ floor.name }}</div>
-                                <div
-                                    class="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground"
+                                <button
+                                    type="button"
+                                    class="w-full rounded-xl px-2 py-2 text-left"
+                                    @click="selectedFloorId = floor.id"
                                 >
-                                    <span
-                                        >{{ t.warehouses.metric_places }}:
-                                        {{
-                                            formatNumber(floor.place_count)
-                                        }}</span
+                                    <div class="font-medium">
+                                        {{ floor.name }}
+                                    </div>
+                                    <div
+                                        class="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground"
                                     >
-                                    <span
-                                        >{{ t.warehouses.metric_items }}:
-                                        {{
-                                            formatNumber(floor.item_count)
-                                        }}</span
-                                    >
-                                </div>
-                            </button>
+                                        <span
+                                            >{{ t.warehouses.metric_places }}:
+                                            {{
+                                                formatNumber(floor.place_count)
+                                            }}</span
+                                        >
+                                        <span
+                                            >{{ t.warehouses.metric_items }}:
+                                            {{
+                                                formatNumber(floor.item_count)
+                                            }}</span
+                                        >
+                                    </div>
+                                </button>
+
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    class="mt-1 w-full gap-1.5"
+                                    :disabled="qrLoadingCode !== null"
+                                    @click="openQrCode(floor.qr_code)"
+                                >
+                                    <LoaderCircle
+                                        v-if="qrLoadingCode === floor.qr_code"
+                                        class="size-4 animate-spin"
+                                    />
+                                    <QrCode v-else class="size-4" />
+                                    <span>{{ t.warehouses.floor_qr }}</span>
+                                </Button>
+                            </article>
                         </div>
 
                         <div v-if="selectedFloor" class="space-y-3">
@@ -625,9 +840,30 @@ onBeforeUnmount(() => {
                                     <div class="font-medium">
                                         {{ place.name }}
                                     </div>
-                                    <div class="text-xs text-muted-foreground">
-                                        {{ t.warehouses.metric_items }}:
-                                        {{ formatNumber(place.item_count) }}
+                                    <div class="flex items-center gap-2">
+                                        <div
+                                            class="text-xs text-muted-foreground"
+                                        >
+                                            {{ t.warehouses.metric_items }}:
+                                            {{ formatNumber(place.item_count) }}
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon-sm"
+                                            :aria-label="t.warehouses.place_qr"
+                                            :disabled="qrLoadingCode !== null"
+                                            @click="openQrCode(place.qr_code)"
+                                        >
+                                            <LoaderCircle
+                                                v-if="
+                                                    qrLoadingCode ===
+                                                    place.qr_code
+                                                "
+                                                class="size-4 animate-spin"
+                                            />
+                                            <QrCode v-else class="size-4" />
+                                        </Button>
                                     </div>
                                 </div>
 
@@ -640,20 +876,54 @@ onBeforeUnmount(() => {
                                         :key="item.id"
                                         class="rounded-xl border border-border bg-card px-3 py-3 text-sm"
                                     >
-                                        <div class="font-medium">
-                                            {{ item.name }}
-                                        </div>
                                         <div
-                                            class="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground"
+                                            class="flex items-start justify-between gap-2"
                                         >
-                                            <span v-if="item.sku"
-                                                >{{ t.warehouses.sku }}:
-                                                {{ item.sku }}</span
+                                            <div class="min-w-0">
+                                                <div class="font-medium">
+                                                    {{ item.name }}
+                                                </div>
+                                                <div
+                                                    class="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground"
+                                                >
+                                                    <span v-if="item.sku"
+                                                        >{{ t.warehouses.sku }}:
+                                                        {{ item.sku }}</span
+                                                    >
+                                                    <span
+                                                        >{{
+                                                            t.warehouses
+                                                                .quantity
+                                                        }}:
+                                                        {{
+                                                            item.quantity
+                                                        }}</span
+                                                    >
+                                                </div>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                :aria-label="
+                                                    t.warehouses.view_qr
+                                                "
+                                                :disabled="
+                                                    qrLoadingCode !== null
+                                                "
+                                                @click="
+                                                    openQrCode(item.qr_code)
+                                                "
                                             >
-                                            <span
-                                                >{{ t.warehouses.quantity }}:
-                                                {{ item.quantity }}</span
-                                            >
+                                                <LoaderCircle
+                                                    v-if="
+                                                        qrLoadingCode ===
+                                                        item.qr_code
+                                                    "
+                                                    class="size-4 animate-spin"
+                                                />
+                                                <QrCode v-else class="size-4" />
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>
@@ -726,10 +996,31 @@ onBeforeUnmount(() => {
                                 </div>
 
                                 <div
-                                    class="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                                    class="flex shrink-0 flex-col items-end gap-2"
                                 >
-                                    {{ t.warehouses.quantity }}:
-                                    {{ item.quantity }}
+                                    <div
+                                        class="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                                    >
+                                        {{ t.warehouses.quantity }}:
+                                        {{ item.quantity }}
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        class="gap-1.5"
+                                        :disabled="qrLoadingCode !== null"
+                                        @click="openQrCode(item.qr_code)"
+                                    >
+                                        <LoaderCircle
+                                            v-if="
+                                                qrLoadingCode === item.qr_code
+                                            "
+                                            class="size-4 animate-spin"
+                                        />
+                                        <QrCode v-else class="size-4" />
+                                        <span>{{ t.warehouses.view_qr }}</span>
+                                    </Button>
                                 </div>
                             </div>
 
@@ -766,5 +1057,13 @@ onBeforeUnmount(() => {
                 </div>
             </section>
         </div>
+
+        <WarehouseQrDialog
+            :open="qrDialogOpen"
+            :entity="selectedQrEntity"
+            @update:open="
+                (value) => (value ? (qrDialogOpen = true) : closeQrDialog())
+            "
+        />
     </div>
 </template>

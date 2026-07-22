@@ -51,6 +51,16 @@ class WebhookDocumentationCatalog
             'warehouses_store_url' => url('/portal-webhooks').'/{webhook_id}/warehouses',
             'warehouses_update_url' => url('/portal-webhooks').'/{webhook_id}/warehouses/{warehouse_id}',
             'warehouses_destroy_url' => url('/portal-webhooks').'/{webhook_id}/warehouses/{warehouse_id}',
+            'procurement_index_url' => url('/portal-webhooks').'/{webhook_id}/procurement',
+            'procurement_suppliers_store_url' => url('/portal-webhooks').'/{webhook_id}/procurement/suppliers',
+            'procurement_suppliers_update_url' => url('/portal-webhooks').'/{webhook_id}/procurement/suppliers/{supplier_id}',
+            'procurement_requests_store_url' => url('/portal-webhooks').'/{webhook_id}/procurement/requests',
+            'procurement_requests_decision_url' => url('/portal-webhooks').'/{webhook_id}/procurement/requests/{purchase_request_id}/decision',
+            'procurement_quotations_store_url' => url('/portal-webhooks').'/{webhook_id}/procurement/quotations',
+            'procurement_orders_store_url' => url('/portal-webhooks').'/{webhook_id}/procurement/orders',
+            'procurement_orders_send_url' => url('/portal-webhooks').'/{webhook_id}/procurement/orders/{purchase_order_id}/send',
+            'procurement_receipts_store_url' => url('/portal-webhooks').'/{webhook_id}/procurement/receipts',
+            'procurement_returns_store_url' => url('/portal-webhooks').'/{webhook_id}/procurement/returns',
         ];
     }
 }

@@ -1,7 +1,9 @@
 <?php
 
+use App\Models\SecurityAudit;
 use App\Models\User;
 use App\Models\UserLoginActivity;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -28,6 +30,9 @@ test('security page is displayed', function () {
             ->where('canManagePasskeys', true)
             ->where('sessions', [])
             ->where('loginActivities', [])
+            ->where('securityAudit.latest', null)
+            ->where('securityAudit.history', [])
+            ->where('securityAudit.manualDefaults.unique_password', false)
             ->where('passkeys', [])
             ->where('canManageTwoFactor', true)
             ->where('twoFactorEnabled', false),
@@ -66,6 +71,8 @@ test('security page renders without two factor when feature is disabled', functi
             ->where('canManagePasskeys', false)
             ->where('sessions', [])
             ->where('loginActivities', [])
+            ->where('securityAudit.latest', null)
+            ->where('securityAudit.history', [])
             ->where('passkeys', [])
             ->where('canManageTwoFactor', false)
             ->missing('twoFactorEnabled')
@@ -161,6 +168,203 @@ test('security page includes password generator support', function () {
         ->and($securityPage)->toContain('props.loginActivities.length')
         ->and($securityPage)->toContain('t.security.sessions_title')
         ->and($securityPage)->toContain('t.security.login_history_title');
+});
+
+test('security audit can be run from the security settings checklist', function () {
+    Features::twoFactorAuthentication([
+        'confirm' => true,
+        'confirmPassword' => true,
+    ]);
+    Features::passkeys([
+        'confirmPassword' => true,
+    ]);
+
+    $user = User::factory()->withTwoFactor()->create();
+
+    $response = $this
+        ->actingAs($user)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->from(route('security.edit'))
+        ->post(route('security.audits.store'), [
+            'manual' => [
+                'unique_password' => true,
+                'recovery_codes_stored' => true,
+                'sessions_reviewed' => true,
+                'device_protected' => true,
+                'phishing_ready' => true,
+            ],
+        ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('security.edit'));
+
+    $audit = SecurityAudit::query()->whereBelongsTo($user)->sole();
+    $checks = collect($audit->checks)->keyBy('key');
+
+    $this->assertModelExists($audit);
+
+    expect($audit->total_count)->toBe(12)
+        ->and($audit->score)->toBeGreaterThanOrEqual(90)
+        ->and($audit->risk_level)->toBe('protected')
+        ->and($checks)->toHaveKeys([
+            'email_verified',
+            'two_factor_enabled',
+            'passkey_registered',
+            'recovery_codes_available',
+            'active_sessions',
+            'recent_login_alerts',
+            'api_tokens',
+            'unique_password',
+            'recovery_codes_stored',
+            'sessions_reviewed',
+            'device_protected',
+            'phishing_ready',
+        ])
+        ->and($checks->get('two_factor_enabled')['status'])->toBe('passed')
+        ->and($checks->get('passkey_registered')['status'])->toBe('warning')
+        ->and($checks->get('unique_password')['status'])->toBe('passed');
+});
+
+test('security audit records risks from the manual checklist', function () {
+    Features::twoFactorAuthentication([
+        'confirm' => true,
+        'confirmPassword' => true,
+    ]);
+
+    $user = User::factory()->create();
+
+    $this
+        ->actingAs($user)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->post(route('security.audits.store'), [
+            'manual' => [
+                'unique_password' => false,
+                'recovery_codes_stored' => false,
+                'sessions_reviewed' => true,
+                'device_protected' => false,
+                'phishing_ready' => true,
+            ],
+        ])
+        ->assertSessionHasNoErrors();
+
+    $audit = SecurityAudit::query()->whereBelongsTo($user)->sole();
+    $checks = collect($audit->checks)->keyBy('key');
+
+    expect($audit->risk_level)->toBe('high_risk')
+        ->and($audit->failed_count)->toBeGreaterThanOrEqual(4)
+        ->and($checks->get('two_factor_enabled')['status'])->toBe('failed')
+        ->and($checks->get('unique_password')['status'])->toBe('failed')
+        ->and($checks->get('sessions_reviewed')['status'])->toBe('passed');
+});
+
+test('security audit checklist input is validated', function () {
+    $user = User::factory()->create();
+
+    $this
+        ->actingAs($user)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->from(route('security.edit'))
+        ->post(route('security.audits.store'), [
+            'manual' => [
+                'unique_password' => 'yes',
+            ],
+        ])
+        ->assertSessionHasErrors([
+            'manual.unique_password',
+            'manual.recovery_codes_stored',
+            'manual.sessions_reviewed',
+            'manual.device_protected',
+            'manual.phishing_ready',
+        ])
+        ->assertRedirect(route('security.edit'));
+
+    expect(SecurityAudit::query()->whereBelongsTo($user)->exists())->toBeFalse();
+});
+
+test('security audit history is private to the authenticated user', function () {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+
+    SecurityAudit::factory()->for($otherUser)->create([
+        'score' => 12,
+        'checked_at' => now()->addMinute(),
+    ]);
+    SecurityAudit::factory()->for($user)->create([
+        'score' => 74,
+        'risk_level' => 'attention',
+        'checked_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->get(route('security.edit'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('securityAudit.latest.score', 74)
+            ->has('securityAudit.latest.checks', 1)
+            ->has('securityAudit.history', 1)
+            ->where('securityAudit.history.0.score', 74),
+        );
+});
+
+test('security audit refuses a concurrent run for the same user', function () {
+    $user = User::factory()->create();
+    $lock = Cache::lock('security-audit:user:'.$user->id, 10);
+
+    expect($lock->get())->toBeTrue();
+
+    try {
+        $this
+            ->actingAs($user)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->from(route('security.edit'))
+            ->post(route('security.audits.store'), [
+                'manual' => [
+                    'unique_password' => true,
+                    'recovery_codes_stored' => true,
+                    'sessions_reviewed' => true,
+                    'device_protected' => true,
+                    'phishing_ready' => true,
+                ],
+            ])
+            ->assertSessionHasErrors('audit')
+            ->assertRedirect(route('security.edit'));
+    } finally {
+        $lock->release();
+    }
+
+    expect(SecurityAudit::query()->whereBelongsTo($user)->exists())->toBeFalse();
+});
+
+test('security audit route requires recent password confirmation', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('security.audits.store'), [
+            'manual' => [
+                'unique_password' => true,
+                'recovery_codes_stored' => true,
+                'sessions_reviewed' => true,
+                'device_protected' => true,
+                'phishing_ready' => true,
+            ],
+        ])
+        ->assertRedirect(route('password.confirm'));
+
+    expect(SecurityAudit::query()->whereBelongsTo($user)->exists())->toBeFalse();
+});
+
+test('security audit user interface contains the score checklist and history', function () {
+    $securityPage = file_get_contents(resource_path('js/pages/settings/Security.vue'));
+    $auditPanel = file_get_contents(resource_path('js/components/SecurityAuditPanel.vue'));
+
+    expect($securityPage)->toContain('<SecurityAuditPanel :audit="props.securityAudit" />')
+        ->and($auditPanel)->toContain('run-security-audit')
+        ->and($auditPanel)->toContain('automaticCheckKeys')
+        ->and($auditPanel)->toContain('manualKeys')
+        ->and($auditPanel)->toContain('audit.history.length')
+        ->and($auditPanel)->toContain('scoreRingStyle')
+        ->and($auditPanel)->toContain('SecurityController.storeAudit.url()');
 });
 
 test('settings layout uses shared settings navigation for all available tabs', function () {

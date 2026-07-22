@@ -96,6 +96,24 @@ class HandleInertiaRequests extends Middleware
                 'canAccessProduction' => $this->moduleEnabled('production')
                     ? ($request->user()?->canAccessProduction() ?? false)
                     : false,
+                'canAccessProcurement' => $this->moduleEnabled('procurement')
+                    ? ($request->user()?->canAccessProcurement() ?? false)
+                    : false,
+                'canManageProcurement' => $this->moduleEnabled('procurement')
+                    ? ($request->user()?->canManageProcurement() ?? false)
+                    : false,
+                'canApproveProcurementBudget' => $this->moduleEnabled('procurement')
+                    ? ($request->user()?->canApproveProcurementBudget() ?? false)
+                    : false,
+                'canManageProcurementOrders' => $this->moduleEnabled('procurement')
+                    ? ($request->user()?->canManageProcurementOrders() ?? false)
+                    : false,
+                'canReceiveProcurementOrders' => $this->moduleEnabled('procurement')
+                    ? ($request->user()?->canReceiveProcurementOrders() ?? false)
+                    : false,
+                'canReturnProcurementGoods' => $this->moduleEnabled('procurement')
+                    ? ($request->user()?->canReturnProcurementGoods() ?? false)
+                    : false,
                 'canAccessWarehouses' => $this->moduleEnabled('warehouses')
                     ? ($request->user()?->canAccessWarehouses() ?? false)
                     : false,

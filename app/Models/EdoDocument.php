@@ -213,7 +213,7 @@ class EdoDocument extends Model
 
     public function markSigned(
         string $signaturePayload,
-        string $signatureSubject,
+        ?string $signatureSubject,
         ?string $signatureSerialNumber,
         ?string $signatureAlgorithm,
         ?array $signatureMetadata = null,

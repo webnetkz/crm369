@@ -23,6 +23,8 @@ createInertiaApp({
                 return AuthLayout;
             case name.startsWith('public/conferences/'):
                 return PublicConferenceLayout;
+            case name.startsWith('public/edo/'):
+                return null;
             case name.startsWith('public/'):
                 return AuthLayout;
             case name.startsWith('documentation/'):
