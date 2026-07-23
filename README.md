@@ -74,6 +74,37 @@ The initial installation uses `MAIL_MAILER=log`. Outbound messages are written t
 cd /var/www/crm369 && sudo -u www-data php8.4 artisan optimize
 ```
 
+## Native Android API and Firebase push notifications
+
+The native Android application uses the `/api/mobile/v1` API. Mobile sessions are stored as hashed bearer tokens and expire after 365 days by default. System and chat push notifications use Firebase Cloud Messaging HTTP v1 and the existing `notifications` queue worker.
+
+To enable real push delivery, create a Firebase service account with access to Firebase Cloud Messaging and store its JSON credentials outside the application directory. For example:
+
+```bash
+sudo install -o root -g www-data -m 0640 firebase-service-account.json /etc/crm369/firebase-service-account.json
+```
+
+Add the following values to `/var/www/crm369/.env` without committing the credentials:
+
+```dotenv
+MOBILE_SESSION_DAYS=365
+FCM_PROJECT_ID=your-firebase-project-id
+FCM_SERVICE_ACCOUNT_PATH=/etc/crm369/firebase-service-account.json
+FCM_CONNECT_TIMEOUT_SECONDS=5
+FCM_TIMEOUT_SECONDS=10
+```
+
+Apply migrations, rebuild Laravel's cache, and restart the notification worker:
+
+```bash
+cd /var/www/crm369
+sudo -u www-data php8.4 artisan migrate --force --no-interaction
+sudo -u www-data php8.4 artisan optimize
+sudo supervisorctl restart crm369-notifications
+```
+
+If the Firebase values are empty, the native API remains available but FCM delivery is disabled.
+
 ## Run an already downloaded installer
 
 If the repository is already present on the server, run:

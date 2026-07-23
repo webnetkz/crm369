@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\MobileAccessToken;
+use App\Models\MobileDevice;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Notification;
@@ -45,10 +47,12 @@ test('password can be reset with valid token', function () {
     Notification::fake();
 
     $user = User::factory()->create();
+    $mobileAccessToken = MobileAccessToken::factory()->create(['user_id' => $user->id]);
+    $mobileDevice = MobileDevice::factory()->create(['user_id' => $user->id]);
 
     $this->post(route('password.email'), ['email' => $user->email]);
 
-    Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
+    Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user, $mobileAccessToken, $mobileDevice) {
         $response = $this->post(route('password.update'), [
             'token' => $notification->token,
             'email' => $user->email,
@@ -59,6 +63,9 @@ test('password can be reset with valid token', function () {
         $response
             ->assertSessionHasNoErrors()
             ->assertRedirect(route('login'));
+
+        expect($mobileAccessToken->fresh())->toBeNull()
+            ->and($mobileDevice->fresh()->disabled_at)->not->toBeNull();
 
         return true;
     });

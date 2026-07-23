@@ -196,6 +196,25 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * @return HasMany<MobileAccessToken, $this>
+     */
+    public function mobileAccessTokens(): HasMany
+    {
+        return $this->hasMany(MobileAccessToken::class)
+            ->orderByDesc('id');
+    }
+
+    /**
+     * @return HasMany<MobileDevice, $this>
+     */
+    public function mobileDevices(): HasMany
+    {
+        return $this->hasMany(MobileDevice::class)
+            ->whereNull('disabled_at')
+            ->orderByDesc('last_seen_at');
+    }
+
+    /**
      * @return HasMany<UserLoginActivity, $this>
      */
     public function loginActivities(): HasMany

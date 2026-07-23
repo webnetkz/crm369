@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Actions\Security\RevokeUserMobileSessions;
 use App\Actions\Security\RunSecurityAudit;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Support\SecurityAuditPageData;
 use App\Support\SecurityPageData;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -98,11 +100,17 @@ class SecurityController extends Controller
     /**
      * Update the user's password.
      */
-    public function update(PasswordUpdateRequest $request): RedirectResponse
-    {
-        $request->user()->update([
-            'password' => $request->password,
-        ]);
+    public function update(
+        PasswordUpdateRequest $request,
+        RevokeUserMobileSessions $revokeUserMobileSessions,
+    ): RedirectResponse {
+        DB::transaction(function () use ($request, $revokeUserMobileSessions): void {
+            $request->user()->update([
+                'password' => $request->password,
+            ]);
+
+            $revokeUserMobileSessions($request->user());
+        });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Password updated.')]);
 

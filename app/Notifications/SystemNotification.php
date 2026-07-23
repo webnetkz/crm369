@@ -31,7 +31,7 @@ class SystemNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['database', FirebaseChannel::class];
     }
 
     /**
@@ -46,6 +46,19 @@ class SystemNotification extends Notification implements ShouldQueue
             'message' => $this->message,
             'action_url' => $this->actionUrl,
             'action_label' => $this->actionLabel,
+        ];
+    }
+
+    /**
+     * @return array{title: string, body: string, type: string, action_path: string|null}
+     */
+    public function toFirebase(object $notifiable): array
+    {
+        return [
+            'title' => $this->title,
+            'body' => $this->message,
+            'type' => 'system',
+            'action_path' => $this->actionUrl,
         ];
     }
 }

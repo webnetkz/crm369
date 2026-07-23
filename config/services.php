@@ -35,4 +35,15 @@ return [
         ],
     ],
 
+    'mobile' => [
+        'session_days' => (int) env('MOBILE_SESSION_DAYS', 365),
+    ],
+
+    'fcm' => [
+        'project_id' => env('FCM_PROJECT_ID'),
+        'service_account_path' => env('FCM_SERVICE_ACCOUNT_PATH'),
+        'connect_timeout_seconds' => (int) env('FCM_CONNECT_TIMEOUT_SECONDS', 5),
+        'timeout_seconds' => (int) env('FCM_TIMEOUT_SECONDS', 10),
+    ],
+
 ];

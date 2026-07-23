@@ -46,6 +46,10 @@ return [
             'driver' => 'api-token',
             'provider' => 'users',
         ],
+        'mobile' => [
+            'driver' => 'mobile-token',
+            'provider' => 'users',
+        ],
     ],
 
     /*

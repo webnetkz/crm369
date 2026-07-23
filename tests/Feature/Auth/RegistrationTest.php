@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Models\UserGroup;
+use App\Notifications\FirebaseChannel;
 use App\Notifications\SystemNotification;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Fortify\Features;
@@ -80,7 +81,7 @@ test('new users can register and remain pending administrator approval', functio
         function (SystemNotification $notification, array $channels) use ($superAdmin, $user): bool {
             $data = $notification->toArray($superAdmin);
 
-            return $channels === ['database']
+            return $channels === ['database', FirebaseChannel::class]
                 && $data['title'] === 'Новая самостоятельная регистрация'
                 && $data['message'] === 'Пользователь Test User (test@example.com) самостоятельно зарегистрировался и ожидает активации.'
                 && $data['action_url'] === route('settings.users.index', [

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\Security\RevokeUserMobileSessions;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\FilterUsersIndexRequest;
 use App\Http\Requests\Settings\ResetManagedUserPasswordRequest;
@@ -18,6 +19,7 @@ use App\Support\PerPageOptions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 
 class UserController extends Controller
@@ -167,8 +169,11 @@ class UserController extends Controller
         ]);
     }
 
-    public function updateActivation(UpdateUserActivationRequest $request, User $user): JsonResponse
-    {
+    public function updateActivation(
+        UpdateUserActivationRequest $request,
+        User $user,
+        RevokeUserMobileSessions $revokeUserMobileSessions,
+    ): JsonResponse {
         if ($user->is($request->user()) || $user->isSuperAdmin()) {
             return response()->json([
                 'message' => __('ui.admin.user_activation_denied'),
@@ -177,10 +182,16 @@ class UserController extends Controller
 
         $isActive = $request->isActive();
 
-        $user->update([
-            'is_active' => $isActive,
-            'deactivated_at' => $isActive ? null : now(),
-        ]);
+        DB::transaction(function () use ($user, $isActive, $revokeUserMobileSessions): void {
+            $user->update([
+                'is_active' => $isActive,
+                'deactivated_at' => $isActive ? null : now(),
+            ]);
+
+            if (! $isActive) {
+                $revokeUserMobileSessions($user);
+            }
+        });
 
         return response()->json([
             'message' => $isActive
@@ -190,17 +201,24 @@ class UserController extends Controller
         ]);
     }
 
-    public function resetPassword(ResetManagedUserPasswordRequest $request, User $user): JsonResponse
-    {
+    public function resetPassword(
+        ResetManagedUserPasswordRequest $request,
+        User $user,
+        RevokeUserMobileSessions $revokeUserMobileSessions,
+    ): JsonResponse {
         if ($user->is($request->user()) || ($user->isSuperAdmin() && ! $request->user()?->isSuperAdmin())) {
             return response()->json([
                 'message' => __('ui.admin.password_reset_denied'),
             ], 422);
         }
 
-        $user->update([
-            'password' => $request->validated('password'),
-        ]);
+        DB::transaction(function () use ($request, $user, $revokeUserMobileSessions): void {
+            $user->update([
+                'password' => $request->validated('password'),
+            ]);
+
+            $revokeUserMobileSessions($user);
+        });
         $user->notify($this->systemNotification(
             $user,
             'ui.notifications.password_reset_title',

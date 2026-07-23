@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Actions\Security\RevokeUserMobileSessions;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\FilterUsersIndexRequest;
 use App\Http\Requests\Settings\ImportUsersRequest;
@@ -24,6 +25,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -258,8 +260,11 @@ class UserController extends Controller
         return back();
     }
 
-    public function updateActivation(UpdateUserActivationRequest $request, User $user): RedirectResponse
-    {
+    public function updateActivation(
+        UpdateUserActivationRequest $request,
+        User $user,
+        RevokeUserMobileSessions $revokeUserMobileSessions,
+    ): RedirectResponse {
         if ($user->is($request->user()) || $user->isSuperAdmin()) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('ui.admin.user_activation_denied')]);
 
@@ -268,10 +273,16 @@ class UserController extends Controller
 
         $isActive = $request->isActive();
 
-        $user->update([
-            'is_active' => $isActive,
-            'deactivated_at' => $isActive ? null : now(),
-        ]);
+        DB::transaction(function () use ($user, $isActive, $revokeUserMobileSessions): void {
+            $user->update([
+                'is_active' => $isActive,
+                'deactivated_at' => $isActive ? null : now(),
+            ]);
+
+            if (! $isActive) {
+                $revokeUserMobileSessions($user);
+            }
+        });
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -283,17 +294,24 @@ class UserController extends Controller
         return back();
     }
 
-    public function resetPassword(ResetManagedUserPasswordRequest $request, User $user): RedirectResponse
-    {
+    public function resetPassword(
+        ResetManagedUserPasswordRequest $request,
+        User $user,
+        RevokeUserMobileSessions $revokeUserMobileSessions,
+    ): RedirectResponse {
         if ($user->is($request->user()) || ($user->isSuperAdmin() && ! $request->user()?->isSuperAdmin())) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('ui.admin.password_reset_denied')]);
 
             return back();
         }
 
-        $user->update([
-            'password' => $request->validated('password'),
-        ]);
+        DB::transaction(function () use ($request, $user, $revokeUserMobileSessions): void {
+            $user->update([
+                'password' => $request->validated('password'),
+            ]);
+
+            $revokeUserMobileSessions($user);
+        });
         $user->notify($this->systemNotification(
             $user,
             'ui.notifications.password_reset_title',

@@ -677,7 +677,7 @@ test('new task assignees and co assignees receive notifications without repeats 
         fn (SystemNotification $notification): bool => $notification->toArray($coAssignee)['title']
             === __('ui.notifications.task_co_assignee_added_title', [], $coAssignee->resolvedLanguage()),
     );
-    Notification::assertCount(2);
+    Notification::assertSentTimes(SystemNotification::class, 2);
 
     Notification::fake();
 
@@ -708,7 +708,7 @@ test('new task assignees and co assignees receive notifications without repeats 
             ], $newCoAssignee->resolvedLanguage()),
     );
     Notification::assertNotSentTo([$creator, $assignee, $coAssignee], SystemNotification::class);
-    Notification::assertCount(2);
+    Notification::assertSentTimes(SystemNotification::class, 2);
 });
 
 test('user can create a standalone task directly in the workspace', function () {

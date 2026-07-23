@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\Mobile\V1\MobileDeviceController;
+use App\Http\Controllers\Api\Mobile\V1\MobileSessionController;
 use App\Http\Controllers\Api\V1\CalendarController;
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\CompanyStructureController as ApiCompanyStructureController;
@@ -22,6 +24,82 @@ use App\Http\Controllers\Api\V1\UserGroupController;
 use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Middleware\ResolveApiSubjectUser;
 use Illuminate\Support\Facades\Route;
+
+Route::prefix('mobile/v1')->name('mobile.v1.')->group(function (): void {
+    Route::post('login', [MobileSessionController::class, 'store'])
+        ->middleware('throttle:mobile-login')
+        ->name('login');
+    Route::post('two-factor-challenge', [MobileSessionController::class, 'challenge'])
+        ->middleware('throttle:mobile-two-factor')
+        ->name('two-factor.challenge');
+
+    Route::middleware(['auth:mobile', 'throttle:mobile-api'])->group(function (): void {
+        Route::get('me', [MobileSessionController::class, 'show'])->name('me');
+        Route::delete('logout', [MobileSessionController::class, 'destroy'])->name('logout');
+        Route::put('device', [MobileDeviceController::class, 'store'])->name('device.store');
+
+        Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
+        Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
+
+        Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::patch('notifications/read-all', [NotificationController::class, 'updateAll'])->name('notifications.read-all');
+        Route::patch('notifications/{notification}/read', [NotificationController::class, 'update'])->name('notifications.read');
+
+        Route::middleware(['module.enabled:chats', 'can:access-chats'])->group(function (): void {
+            Route::get('chats', [ChatController::class, 'index'])->name('chats.index');
+            Route::post('chats/direct', [ChatController::class, 'storeDirect'])->name('chats.direct.store');
+            Route::post('chats/{chatConversation}/messages', [ChatController::class, 'storeMessage'])->name('chats.messages.store');
+            Route::patch('chats/{chatConversation}/messages/{chatMessage}', [ChatController::class, 'updateMessage'])->name('chats.messages.update');
+            Route::delete('chats/{chatConversation}/messages/{chatMessage}', [ChatController::class, 'destroyMessage'])->name('chats.messages.destroy');
+        });
+
+        Route::middleware(['module.enabled:calendar', 'can:access-calendar'])->group(function (): void {
+            Route::get('calendar/events', [CalendarController::class, 'index'])->name('calendar.events');
+        });
+
+        Route::middleware(['module.enabled:company-structure', 'can:access-company-structure'])->group(function (): void {
+            Route::get('company-structure', [ApiCompanyStructureController::class, 'index'])->name('company-structure.index');
+            Route::get('company-structure/users/{user}', [ApiCompanyStructureController::class, 'show'])->name('company-structure.show');
+        });
+
+        Route::middleware(['module.enabled:contacts', 'can:access-contacts'])->group(function (): void {
+            Route::get('contacts', [ContactController::class, 'index'])->name('contacts.index');
+            Route::get('contacts/{contact}', [ContactController::class, 'show'])->name('contacts.show');
+            Route::post('contacts', [ContactController::class, 'store'])->name('contacts.store');
+            Route::patch('contacts/{contact}', [ContactController::class, 'update'])->name('contacts.update');
+        });
+
+        Route::middleware(['module.enabled:knowledge-bases', 'can:access-knowledge-bases'])->group(function (): void {
+            Route::get('knowledge-bases', [KnowledgeBaseController::class, 'index'])->name('knowledge-bases.index');
+            Route::get('knowledge-bases/{knowledgeBase}', [KnowledgeBaseController::class, 'show'])->name('knowledge-bases.show');
+            Route::get('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'showArticle'])->name('knowledge-bases.articles.show');
+        });
+
+        Route::middleware(['module.enabled:projects', 'can:access-projects'])->group(function (): void {
+            Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
+            Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+            Route::post('tasks', [ProjectController::class, 'storeTask'])->name('tasks.store');
+            Route::get('tasks/{projectTask}', [ProjectController::class, 'showTask'])->name('tasks.show');
+            Route::patch('tasks/{projectTask}', [ProjectController::class, 'updateTask'])->name('tasks.update');
+        });
+
+        Route::middleware(['module.enabled:warehouses', 'can:access-warehouses'])->group(function (): void {
+            Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
+            Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show'])->name('warehouses.show');
+            Route::get('warehouses/{warehouse}/items', [WarehouseController::class, 'items'])->name('warehouses.items');
+        });
+
+        Route::middleware(['module.enabled:equipment', 'can:access-equipment'])->group(function (): void {
+            Route::get('equipment', [EquipmentController::class, 'index'])->name('equipment.index');
+            Route::get('equipment/{equipmentItem}', [EquipmentController::class, 'show'])->name('equipment.show');
+        });
+
+        Route::middleware(['module.enabled:tsd', 'can:access-tsd'])->group(function (): void {
+            Route::get('tsd/scans', [ApiTsdController::class, 'index'])->name('tsd.index');
+            Route::post('tsd/scans', [ApiTsdController::class, 'store'])->name('tsd.store');
+        });
+    });
+});
 
 Route::prefix('v1')->middleware(['module.enabled:api', 'auth:api', ResolveApiSubjectUser::class, 'throttle:api'])->group(function (): void {
     Route::get('profile', [ProfileController::class, 'show'])

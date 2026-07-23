@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\EquipmentItem;
+use App\Models\MobileAccessToken;
+use App\Models\MobileDevice;
 use App\Models\User;
 use App\Models\UserGroup;
 use Illuminate\Support\Facades\Hash;
@@ -40,6 +42,8 @@ test('super admin can deactivate and restore a user', function () {
     ]);
 
     $user = User::factory()->create();
+    $mobileAccessToken = MobileAccessToken::factory()->create(['user_id' => $user->id]);
+    $mobileDevice = MobileDevice::factory()->create(['user_id' => $user->id]);
 
     $this->actingAs($admin)
         ->patch(route('settings.users.activation.update', $user), [
@@ -48,7 +52,9 @@ test('super admin can deactivate and restore a user', function () {
         ->assertRedirect();
 
     expect($user->refresh()->is_active)->toBeFalse()
-        ->and($user->deactivated_at)->not->toBeNull();
+        ->and($user->deactivated_at)->not->toBeNull()
+        ->and($mobileAccessToken->fresh())->toBeNull()
+        ->and($mobileDevice->fresh()->disabled_at)->not->toBeNull();
 
     $this->actingAs($admin)
         ->patch(route('settings.users.activation.update', $user), [
@@ -189,6 +195,8 @@ test('administrators group can reset user passwords manually', function () {
     ]);
 
     $targetUser = User::factory()->create();
+    $mobileAccessToken = MobileAccessToken::factory()->create(['user_id' => $targetUser->id]);
+    $mobileDevice = MobileDevice::factory()->create(['user_id' => $targetUser->id]);
 
     $this->actingAs($adminUser)
         ->patch(route('settings.users.password.reset', $targetUser), [
@@ -197,7 +205,9 @@ test('administrators group can reset user passwords manually', function () {
         ])
         ->assertRedirect();
 
-    expect(Hash::check('new-password', $targetUser->refresh()->password))->toBeTrue();
+    expect(Hash::check('new-password', $targetUser->refresh()->password))->toBeTrue()
+        ->and($mobileAccessToken->fresh())->toBeNull()
+        ->and($mobileDevice->fresh()->disabled_at)->not->toBeNull();
 });
 
 test('administrators group cannot reset a super admin password', function () {

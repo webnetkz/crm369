@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\MobileAccessToken;
+use App\Models\MobileDevice;
 use App\Models\SecurityAudit;
 use App\Models\User;
 use App\Models\UserLoginActivity;
@@ -398,6 +400,8 @@ test('settings layout uses shared settings navigation for all available tabs', f
 
 test('password can be updated', function () {
     $user = User::factory()->create();
+    $mobileAccessToken = MobileAccessToken::factory()->create(['user_id' => $user->id]);
+    $mobileDevice = MobileDevice::factory()->create(['user_id' => $user->id]);
 
     $response = $this
         ->actingAs($user)
@@ -412,7 +416,9 @@ test('password can be updated', function () {
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('security.edit'));
 
-    expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue();
+    expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue()
+        ->and($mobileAccessToken->fresh())->toBeNull()
+        ->and($mobileDevice->fresh()->disabled_at)->not->toBeNull();
 });
 
 test('correct password must be provided to update password', function () {

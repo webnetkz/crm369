@@ -4,8 +4,11 @@ namespace App\Providers;
 
 use App\Listeners\InvalidateNotificationRuntimeCache;
 use App\Models\ApiAccessToken;
+use App\Models\ChatMessage;
+use App\Models\MobileAccessToken;
 use App\Models\SystemSecuritySetting;
 use App\Models\User;
+use App\Observers\ChatMessageObserver;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -80,6 +83,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-news', fn (User $user): bool => $user->canManageNews());
         Gate::define('manage-funnels', fn (User $user): bool => $user->canManageFunnels());
         Event::listen(NotificationSent::class, InvalidateNotificationRuntimeCache::class);
+        ChatMessage::observe(ChatMessageObserver::class);
 
         Auth::viaRequest('api-token', function (Request $request): ?User {
             $plainTextToken = trim((string) $request->bearerToken());
@@ -119,6 +123,31 @@ class AppServiceProvider extends ServiceProvider
             return $user;
         });
 
+        Auth::viaRequest('mobile-token', function (Request $request): ?User {
+            $mobileAccessToken = MobileAccessToken::resolve($request->bearerToken());
+
+            if (! $mobileAccessToken || ! $mobileAccessToken->isAvailable()) {
+                return null;
+            }
+
+            $user = $mobileAccessToken->user;
+
+            if (
+                ! $user
+                || ! $user->is_active
+                || $user->email_verified_at === null
+                || (SystemSecuritySetting::requiresTwoFactorAuthentication()
+                    && ! $user->hasEnabledTwoFactorAuthentication())
+            ) {
+                return null;
+            }
+
+            $mobileAccessToken->touchUsage($request);
+            $request->attributes->set('mobile_access_token', $mobileAccessToken);
+
+            return $user;
+        });
+
         RateLimiter::for('api', function (Request $request): array {
             $apiAccessToken = $request->attributes->get('api_access_token');
             $subject = $apiAccessToken instanceof ApiAccessToken
@@ -139,6 +168,36 @@ class AppServiceProvider extends ServiceProvider
             return [
                 Limit::perMinute(5)->by('minute:'.$subject),
                 Limit::perHour(30)->by('hour:'.$subject),
+            ];
+        });
+
+        RateLimiter::for('mobile-login', function (Request $request): array {
+            $email = mb_strtolower(trim((string) $request->input('email')));
+
+            return [
+                Limit::perMinute(5)->by('minute:'.$email.'|'.$request->ip()),
+                Limit::perHour(30)->by('hour:'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('mobile-two-factor', function (Request $request): array {
+            $challenge = hash('sha256', (string) $request->input('challenge'));
+
+            return [
+                Limit::perMinute(5)->by('minute:'.$challenge.'|'.$request->ip()),
+                Limit::perHour(30)->by('hour:'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('mobile-api', function (Request $request): array {
+            $mobileAccessToken = $request->attributes->get('mobile_access_token');
+            $subject = $mobileAccessToken instanceof MobileAccessToken
+                ? 'token:'.$mobileAccessToken->id
+                : 'ip:'.$request->ip();
+
+            return [
+                Limit::perMinute(240)->by('minute:'.$subject),
+                Limit::perDay(10000)->by('day:'.$subject),
             ];
         });
 

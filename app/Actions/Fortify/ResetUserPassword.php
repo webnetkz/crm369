@@ -2,14 +2,20 @@
 
 namespace App\Actions\Fortify;
 
+use App\Actions\Security\RevokeUserMobileSessions;
 use App\Concerns\PasswordValidationRules;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
 
 class ResetUserPassword implements ResetsUserPasswords
 {
     use PasswordValidationRules;
+
+    public function __construct(
+        private readonly RevokeUserMobileSessions $revokeUserMobileSessions,
+    ) {}
 
     /**
      * Validate and reset the user's forgotten password.
@@ -22,8 +28,12 @@ class ResetUserPassword implements ResetsUserPasswords
             'password' => $this->passwordRules(),
         ])->validate();
 
-        $user->forceFill([
-            'password' => $input['password'],
-        ])->save();
+        DB::transaction(function () use ($user, $input): void {
+            $user->forceFill([
+                'password' => $input['password'],
+            ])->save();
+
+            ($this->revokeUserMobileSessions)($user);
+        });
     }
 }
