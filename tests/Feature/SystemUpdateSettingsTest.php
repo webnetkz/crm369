@@ -319,6 +319,7 @@ test('stale updater processes are marked as failed when the page is opened', fun
 test('system updater uses an independent allowlisted root bridge with backups and migrations', function () {
     $updater = file_get_contents(base_path('scripts/update-system.sh'));
     $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
+    $bridgeInspector = file_get_contents(base_path('app/Support/SystemUpdates/SystemUpdateBridgeInspector.php'));
 
     expect($updater)
         ->toContain('systemd-run')
@@ -329,11 +330,19 @@ test('system updater uses an independent allowlisted root bridge with backups an
         ->toContain('health_check')
         ->toContain('flock -n 9')
         ->toContain('"${incoming_path}/bootstrap/cache"')
+        ->toContain('install -m 0750 -o root -g root')
         ->not->toContain('sh -c')
         ->and($installer)
         ->toContain('/usr/local/sbin/crm369-updater')
+        ->toContain('install -m 0750 -o root -g root')
         ->toContain('NOPASSWD: /usr/local/sbin/crm369-updater start *')
-        ->toContain('visudo -cf');
+        ->toContain('visudo -cf')
+        ->and($bridgeInspector)
+        ->toContain('@lstat($path)')
+        ->toContain('($permissions & 0170000) === 0100000')
+        ->toContain('($permissions & 0100) !== 0')
+        ->toContain('($permissions & 0022) === 0')
+        ->not->toContain('is_executable($path)');
 });
 
 /**

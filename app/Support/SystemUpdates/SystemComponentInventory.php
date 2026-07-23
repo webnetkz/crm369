@@ -9,6 +9,10 @@ use Throwable;
 
 class SystemComponentInventory
 {
+    public function __construct(
+        private SystemUpdateBridgeInspector $bridgeInspector,
+    ) {}
+
     /**
      * @param  array{laravel: string|null, composer: string|null}  $remoteVersions
      * @return array<int, array<string, mixed>>
@@ -70,9 +74,7 @@ class SystemComponentInventory
 
     public function bridgeAvailable(): bool
     {
-        $path = (string) config('system-updates.bridge_path');
-
-        return $path !== '' && is_file($path) && is_executable($path);
+        return $this->bridgeInspector->isAvailable();
     }
 
     /**
