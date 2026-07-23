@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\SystemUpdates\StartSystemUpdate;
 use App\Http\Controllers\Settings\ApiController;
 use App\Http\Controllers\Settings\AppearanceController;
 use App\Http\Controllers\Settings\BusinessProcessController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Settings\PortalController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Controllers\Settings\SystemSecurityController;
+use App\Http\Controllers\Settings\SystemUpdateController;
 use App\Http\Controllers\Settings\UserController;
 use App\Http\Controllers\Settings\UserGroupController;
 use App\Http\Controllers\Settings\UserGroupPermissionController;
@@ -56,6 +58,20 @@ Route::middleware(['auth', 'verified', 'can:manage-system-security', RequirePass
         Route::patch('two-factor-requirement', [SystemSecurityController::class, 'updateTwoFactorRequirement'])
             ->middleware('throttle:6,1')
             ->name('two-factor-requirement.update');
+    });
+
+Route::middleware(['auth', 'verified', 'can:manage-system-updates', RequirePassword::class])
+    ->prefix('settings/system-updates')
+    ->name('settings.system-updates.')
+    ->group(function () {
+        Route::get('/', [SystemUpdateController::class, 'edit'])->name('edit');
+        Route::post('checks', [SystemUpdateController::class, 'check'])
+            ->middleware('throttle:3,1')
+            ->name('checks.store');
+        Route::post('components/{component}', [SystemUpdateController::class, 'start'])
+            ->whereIn('component', StartSystemUpdate::COMPONENTS)
+            ->middleware('throttle:3,1')
+            ->name('components.update');
     });
 
 Route::middleware(['auth', 'verified', 'module.enabled:api', 'can:manage-api-tokens'])->group(function () {

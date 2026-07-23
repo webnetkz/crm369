@@ -60,10 +60,10 @@ test('ubuntu installer identifies its release and verifies the Laravel health ro
     $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
 
     expect($installer)->toBeString()
-        ->toContain("readonly INSTALLER_VERSION='2026.07.22.5'")
+        ->toContain("readonly INSTALLER_VERSION='2026.07.24.1'")
         ->toContain('Версия установщика: ${INSTALLER_VERSION}')
         ->toContain('installer_version=%s')
-        ->toContain("'2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4'|'2026.07.22.5'")
+        ->toContain("'2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4'|'2026.07.22.5'|'2026.07.24.1'")
         ->toContain('sudo bash -s -- --resume')
         ->toContain('Версия частичной установки')
         ->toContain('"http://${domain}/up"')

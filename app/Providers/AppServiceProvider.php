@@ -52,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('impersonate-users', fn (User $user): bool => $user->canImpersonateUsers());
         Gate::define('manage-users', fn (User $user): bool => $user->isSuperAdmin());
         Gate::define('manage-system-security', fn (User $user): bool => $user->isSuperAdmin());
+        Gate::define('manage-system-updates', fn (User $user): bool => $user->isSuperAdmin());
         Gate::define('access-company-structure', fn (User $user): bool => $user->canAccessCompanyStructure());
         Gate::define('access-news', fn (User $user): bool => $user->canAccessNews());
         Gate::define('access-projects', fn (User $user): bool => $user->canAccessProjects());

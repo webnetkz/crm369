@@ -247,6 +247,18 @@ class MenuItem extends Model
                 'url' => '/settings/groups',
                 'sort_order' => 150,
             ],
+            'settings.system-security' => [
+                'title_key' => 'ui.settings.system_security',
+                'fallback_title' => 'System security',
+                'url' => '/settings/system-security',
+                'sort_order' => 152,
+            ],
+            'settings.system-updates' => [
+                'title_key' => 'ui.settings.system_updates',
+                'fallback_title' => 'System updates',
+                'url' => '/settings/system-updates',
+                'sort_order' => 154,
+            ],
             'settings.rights' => [
                 'title_key' => 'ui.settings.rights',
                 'fallback_title' => 'Rights',

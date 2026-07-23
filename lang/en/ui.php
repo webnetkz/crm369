@@ -37,6 +37,7 @@ return [
     'api' => require __DIR__.'/ui/api.php',
     'security' => require __DIR__.'/ui/security.php',
     'system_security' => require __DIR__.'/ui/system_security.php',
+    'system_updates' => require __DIR__.'/ui/system_updates.php',
     'passkeys' => require __DIR__.'/ui/passkeys.php',
     'two_factor' => require __DIR__.'/ui/two_factor.php',
 ];

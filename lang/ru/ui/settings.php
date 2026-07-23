@@ -25,6 +25,7 @@ return [
     'russian' => 'Русский',
     'security' => 'Безопасность',
     'system_security' => 'Безопасность системы',
+    'system_updates' => 'Обновление системы',
     'system' => 'Системная',
     'users' => 'Пользователи',
     'groups' => 'Группы',

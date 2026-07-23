@@ -10,6 +10,7 @@ import {
     Menu,
     MessageSquareShare,
     Palette,
+    RefreshCw,
     Shield,
     ShieldAlert,
     UserRound,
@@ -34,6 +35,7 @@ import { edit as editOneC } from '@/routes/settings/one-c';
 import { edit as editPortal } from '@/routes/settings/portal';
 import { index as rightsIndex } from '@/routes/settings/rights';
 import { edit as editSystemSecurity } from '@/routes/settings/system-security';
+import { edit as editSystemUpdates } from '@/routes/settings/system-updates';
 import { index as usersIndex } from '@/routes/settings/users';
 import { edit as editWebhooks } from '@/routes/settings/webhooks';
 import type { NavItem } from '@/types';
@@ -117,6 +119,17 @@ export function useSettingsNavigation(): ComputedRef<NavItem[]> {
                           title: t.value.settings.system_security,
                           href: editSystemSecurity(),
                           icon: ShieldAlert,
+                      },
+                  ]
+                : []),
+            ...(page.props.auth.isSuperAdmin &&
+            isVisible('settings.system-updates')
+                ? [
+                      {
+                          key: 'settings.system-updates',
+                          title: t.value.settings.system_updates,
+                          href: editSystemUpdates(),
+                          icon: RefreshCw,
                       },
                   ]
                 : []),

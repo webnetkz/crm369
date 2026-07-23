@@ -11,7 +11,7 @@ readonly DB_USER='crm369'
 readonly GITHUB_REPOSITORY='webnetkz/crm369'
 readonly GITHUB_REF='main'
 readonly PHP_VERSION='8.4'
-readonly INSTALLER_VERSION='2026.07.22.5'
+readonly INSTALLER_VERSION='2026.07.24.1'
 readonly INSTALL_STATE_DIR='/etc/crm369'
 readonly INSTALL_STATE_FILE='/etc/crm369/installed'
 readonly INSTALL_PROGRESS_FILE='/etc/crm369/installing'
@@ -97,7 +97,7 @@ validate_resume_installation() {
         [[ "$progress_status" == 'installing' && "$progress_domain" == "$resume_domain" && "$progress_app_dir" == "$APP_DIR" ]] \
             || fail 'Файл состояния частичной установки не соответствует существующему приложению.'
         case "$progress_version" in
-            '2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4'|'2026.07.22.5')
+            '2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4'|'2026.07.22.5'|'2026.07.24.1')
                 ;;
             *)
                 fail "Версия частичной установки ${progress_version:-неизвестна} несовместима с установщиком ${INSTALLER_VERSION}."
@@ -354,6 +354,7 @@ apt-get install -y --no-install-recommends \
     gnupg \
     lsb-release \
     openssl \
+    python3 \
     software-properties-common \
     unzip
 
@@ -917,7 +918,33 @@ runuser -u "$APP_USER" -- redis-cli ping | grep -q PONG
 
 print_success "HTTPS-проверка Laravel и страницы входа успешно завершена: https://${domain}/login"
 
-install -d -m 0700 "$INSTALL_STATE_DIR"
+print_info 'Установка защищённого системного updater...'
+install -d -m 0750 -o root -g "$APP_GROUP" "$INSTALL_STATE_DIR" /var/lib/crm369/updates
+install -m 0750 -o root -g root "${APP_DIR}/scripts/update-system.sh" /usr/local/sbin/crm369-updater
+
+sudoers_update_file='/etc/sudoers.d/crm369-updater'
+install -m 0440 -o root -g root /dev/null "$sudoers_update_file"
+printf '%s ALL=(root) NOPASSWD: /usr/local/sbin/crm369-updater start *\n' "$APP_USER" >"$sudoers_update_file"
+visudo -cf "$sudoers_update_file" >/dev/null
+
+python3 - "${INSTALL_STATE_DIR}/version.json" "$source_commit" "$GITHUB_REF" <<'PY'
+import json
+import os
+import sys
+from datetime import datetime, timezone
+
+path, reference, branch = sys.argv[1:]
+with open(path, "w", encoding="utf-8") as output:
+    json.dump({
+        "version": branch + " @ " + reference[:8],
+        "reference": reference,
+        "installed_at": datetime.now(timezone.utc).isoformat(),
+    }, output, ensure_ascii=False)
+    output.write("\n")
+os.chmod(path, 0o640)
+PY
+chown root:"$APP_GROUP" "${INSTALL_STATE_DIR}/version.json"
+
 {
     printf 'installed_at=%s\n' "$(date --iso-8601=seconds)"
     printf 'installer_version=%s\n' "$INSTALLER_VERSION"

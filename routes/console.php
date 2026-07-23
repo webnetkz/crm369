@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\CheckSystemUpdatesCommand;
 use App\Console\Commands\SendProjectTaskDueSoonRemindersCommand;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -12,3 +13,8 @@ Artisan::command('inspire', function () {
 Schedule::command(SendProjectTaskDueSoonRemindersCommand::class)
     ->everyMinute()
     ->withoutOverlapping();
+
+Schedule::command(CheckSystemUpdatesCommand::class)
+    ->dailyAt('03:15')
+    ->withoutOverlapping()
+    ->onOneServer();
