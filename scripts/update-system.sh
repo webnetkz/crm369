@@ -227,6 +227,7 @@ maintenance_finish() {
     app_command optimize --no-interaction
     app_command up --no-interaction
     maintenance_started='false'
+    write_progress 'running' '82' 'php_reload' 'Перезапуск PHP-FPM и восстановление соединения с CRM369.'
     systemctl reload "php${PHP_VERSION}-fpm" >>"$log_file" 2>&1
 }
 

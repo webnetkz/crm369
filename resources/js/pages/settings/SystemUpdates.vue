@@ -43,6 +43,7 @@ import { edit } from '@/routes/settings/system-updates';
 
 type ComponentStatus = 'current' | 'update_available' | 'unknown';
 type RunStatus = 'queued' | 'running' | 'completed' | 'failed';
+type CheckDialogStatus = 'checking' | 'completed' | 'failed';
 
 type SystemComponent = {
     key: string;
@@ -105,6 +106,8 @@ const updateForm = useForm({
     component: '',
 });
 const selectedComponent = ref<SystemComponent | null>(null);
+const checkDialogOpen = ref(false);
+const checkDialogStatus = ref<CheckDialogStatus>('checking');
 const application = computed(
     () =>
         props.snapshot.components.find(
@@ -121,6 +124,8 @@ const runIsActive = computed(
         props.latestRun?.status === 'queued' ||
         props.latestRun?.status === 'running',
 );
+const updateProgressDialogOpen = ref(runIsActive.value);
+const updateConnectionInterrupted = ref(false);
 const bridgeUnavailable = computed(() =>
     props.snapshot.components.some(
         (component) =>
@@ -129,11 +134,42 @@ const bridgeUnavailable = computed(() =>
             component.blockedReason !== 'working_tree_modified',
     ),
 );
+const availableUpdatesCount = computed(
+    () =>
+        props.snapshot.components.filter(
+            (component) => component.updateAvailable,
+        ).length,
+);
+const currentComponentsCount = computed(
+    () =>
+        props.snapshot.components.filter(
+            (component) => component.status === 'current',
+        ).length,
+);
+const unknownComponentsCount = computed(
+    () =>
+        props.snapshot.components.filter(
+            (component) => component.status === 'unknown',
+        ).length,
+);
 
 const { start: startPolling, stop: stopPolling } = usePoll(
     2500,
     {
         only: ['snapshot', 'latestRun', 'history'],
+        onSuccess: () => {
+            updateConnectionInterrupted.value = false;
+        },
+        onHttpException: () => {
+            updateConnectionInterrupted.value = runIsActive.value;
+
+            return false;
+        },
+        onNetworkError: () => {
+            updateConnectionInterrupted.value = runIsActive.value;
+
+            return false;
+        },
     },
     {
         autoStart: false,
@@ -146,8 +182,10 @@ watch(
     runIsActive,
     (active) => {
         if (active) {
+            updateProgressDialogOpen.value = true;
             startPolling();
         } else {
+            updateConnectionInterrupted.value = false;
             stopPolling();
         }
     },
@@ -228,12 +266,31 @@ const formatDateTime = (value: string | null): string => {
 };
 
 const checkUpdates = (): void => {
+    checkDialogStatus.value = 'checking';
+    checkDialogOpen.value = true;
+    checkForm.clearErrors();
+
     checkForm.post(SystemUpdateController.check.url(), {
         preserveScroll: true,
+        onSuccess: () => {
+            checkDialogStatus.value = props.snapshot.error
+                ? 'failed'
+                : 'completed';
+        },
+        onError: () => {
+            checkDialogStatus.value = 'failed';
+        },
     });
 };
 
+const closeCheckDialog = (): void => {
+    if (!checkForm.processing) {
+        checkDialogOpen.value = false;
+    }
+};
+
 const selectComponent = (component: SystemComponent): void => {
+    updateForm.clearErrors();
     selectedComponent.value = component;
     updateForm.component = component.key;
 };
@@ -249,10 +306,17 @@ const startUpdate = (): void => {
             preserveScroll: true,
             onSuccess: () => {
                 selectedComponent.value = null;
+                updateProgressDialogOpen.value = true;
                 startPolling();
             },
         },
     );
+};
+
+const closeUpdateProgressDialog = (): void => {
+    if (!runIsActive.value) {
+        updateProgressDialogOpen.value = false;
+    }
 };
 
 watchEffect(() => {
@@ -271,6 +335,164 @@ watchEffect(() => {
     <Head :title="t.system_updates.title" />
 
     <h1 class="sr-only">{{ t.system_updates.title }}</h1>
+
+    <Dialog
+        :open="checkDialogOpen"
+        @update:open="
+            (open) => {
+                if (open) checkDialogOpen = true;
+                else closeCheckDialog();
+            }
+        "
+    >
+        <DialogContent
+            class="sm:max-w-xl"
+            :show-close-button="!checkForm.processing"
+        >
+            <DialogHeader>
+                <div class="flex items-start gap-3 pr-6">
+                    <div
+                        class="grid size-11 shrink-0 place-items-center rounded-full"
+                        :class="{
+                            'bg-primary/10 text-primary':
+                                checkDialogStatus === 'checking',
+                            'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300':
+                                checkDialogStatus === 'completed',
+                            'bg-destructive/10 text-destructive':
+                                checkDialogStatus === 'failed',
+                        }"
+                    >
+                        <LoaderCircle
+                            v-if="checkDialogStatus === 'checking'"
+                            class="size-5 animate-spin"
+                        />
+                        <CheckCircle2
+                            v-else-if="checkDialogStatus === 'completed'"
+                            class="size-5"
+                        />
+                        <AlertTriangle v-else class="size-5" />
+                    </div>
+                    <div class="space-y-1.5">
+                        <DialogTitle>
+                            {{ t.system_updates.check_modal_title }}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {{
+                                checkDialogStatus === 'checking'
+                                    ? t.system_updates
+                                          .check_modal_running_description
+                                    : checkDialogStatus === 'completed'
+                                      ? t.system_updates
+                                            .check_modal_completed_description
+                                      : t.system_updates
+                                            .check_modal_failed_description
+                            }}
+                        </DialogDescription>
+                    </div>
+                </div>
+            </DialogHeader>
+
+            <div class="space-y-5">
+                <div class="space-y-2">
+                    <div
+                        class="flex items-center justify-between gap-3 text-sm"
+                    >
+                        <span class="font-medium">
+                            {{
+                                checkDialogStatus === 'checking'
+                                    ? t.system_updates.checking
+                                    : checkDialogStatus === 'completed'
+                                      ? t.system_updates.check_completed
+                                      : t.system_updates.statuses.failed
+                            }}
+                        </span>
+                        <span
+                            v-if="checkDialogStatus !== 'checking'"
+                            class="font-mono tabular-nums"
+                        >
+                            100%
+                        </span>
+                    </div>
+                    <div
+                        class="h-2.5 overflow-hidden rounded-full bg-muted"
+                        role="progressbar"
+                        :aria-valuenow="
+                            checkDialogStatus === 'checking' ? undefined : 100
+                        "
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                    >
+                        <div
+                            class="h-full rounded-full transition-[width] duration-500"
+                            :class="{
+                                'w-2/3 animate-pulse bg-primary':
+                                    checkDialogStatus === 'checking',
+                                'w-full bg-emerald-500':
+                                    checkDialogStatus === 'completed',
+                                'w-full bg-destructive':
+                                    checkDialogStatus === 'failed',
+                            }"
+                        />
+                    </div>
+                </div>
+
+                <div
+                    v-if="checkDialogStatus === 'completed'"
+                    class="grid grid-cols-3 gap-3"
+                >
+                    <div class="rounded-xl border bg-muted/20 p-3 text-center">
+                        <p
+                            class="font-mono text-xl font-semibold text-amber-600 dark:text-amber-300"
+                        >
+                            {{ availableUpdatesCount }}
+                        </p>
+                        <p class="text-xs text-muted-foreground">
+                            {{ t.system_updates.check_modal_available }}
+                        </p>
+                    </div>
+                    <div class="rounded-xl border bg-muted/20 p-3 text-center">
+                        <p
+                            class="font-mono text-xl font-semibold text-emerald-600 dark:text-emerald-300"
+                        >
+                            {{ currentComponentsCount }}
+                        </p>
+                        <p class="text-xs text-muted-foreground">
+                            {{ t.system_updates.check_modal_current }}
+                        </p>
+                    </div>
+                    <div class="rounded-xl border bg-muted/20 p-3 text-center">
+                        <p
+                            class="font-mono text-xl font-semibold text-muted-foreground"
+                        >
+                            {{ unknownComponentsCount }}
+                        </p>
+                        <p class="text-xs text-muted-foreground">
+                            {{ t.system_updates.check_modal_unknown }}
+                        </p>
+                    </div>
+                </div>
+
+                <Alert
+                    v-if="checkDialogStatus === 'failed'"
+                    variant="destructive"
+                >
+                    <AlertTriangle class="size-4" />
+                    <AlertDescription>
+                        {{
+                            snapshot.error ??
+                            t.system_updates.check_modal_failed_description
+                        }}
+                    </AlertDescription>
+                </Alert>
+            </div>
+
+            <DialogFooter v-if="!checkForm.processing">
+                <Button type="button" @click="closeCheckDialog">
+                    {{ t.system_updates.close }}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 
     <Dialog
         :open="selectedComponent !== null"
@@ -343,6 +565,171 @@ watchEffect(() => {
                             ? t.system_updates.starting
                             : t.system_updates.start_update
                     }}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog
+        :open="updateProgressDialogOpen && latestRun !== null"
+        @update:open="
+            (open) => {
+                if (open) updateProgressDialogOpen = true;
+                else closeUpdateProgressDialog();
+            }
+        "
+    >
+        <DialogContent
+            class="max-h-[calc(100dvh-2rem)] overflow-hidden sm:max-w-2xl"
+            :show-close-button="!runIsActive"
+        >
+            <DialogHeader v-if="latestRun">
+                <div
+                    class="flex flex-col gap-3 pr-6 sm:flex-row sm:items-start sm:justify-between"
+                >
+                    <div class="space-y-1.5">
+                        <DialogTitle>
+                            {{
+                                t.system_updates.update_modal_title.replace(
+                                    ':component',
+                                    componentName(latestRun.component),
+                                )
+                            }}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {{ t.system_updates.progress_description }}
+                        </DialogDescription>
+                    </div>
+                    <Badge
+                        variant="outline"
+                        class="gap-1.5 self-start"
+                        :class="runStatusClasses(latestRun.status)"
+                    >
+                        <component
+                            :is="runStatusIcon(latestRun.status)"
+                            class="size-3.5"
+                            :class="{
+                                'animate-spin': latestRun.status === 'running',
+                            }"
+                        />
+                        {{ t.system_updates.statuses[latestRun.status] }}
+                    </Badge>
+                </div>
+            </DialogHeader>
+
+            <div v-if="latestRun" class="min-h-0 space-y-5 overflow-y-auto">
+                <Alert v-if="updateConnectionInterrupted">
+                    <LoaderCircle class="size-4 animate-spin" />
+                    <AlertTitle>
+                        {{ t.system_updates.reconnecting_title }}
+                    </AlertTitle>
+                    <AlertDescription>
+                        {{ t.system_updates.reconnecting_description }}
+                    </AlertDescription>
+                </Alert>
+
+                <div
+                    class="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/20 px-4 py-3 text-sm"
+                >
+                    <span class="font-medium">
+                        {{ latestRun.currentVersion ?? '—' }}
+                    </span>
+                    <span class="text-muted-foreground">→</span>
+                    <span class="font-medium">
+                        {{ latestRun.targetVersion ?? '—' }}
+                    </span>
+                </div>
+
+                <div class="space-y-2">
+                    <div
+                        class="flex items-center justify-between gap-3 text-sm"
+                    >
+                        <span class="font-medium">
+                            {{
+                                t.system_updates.stages[
+                                    latestRun.stage ?? 'queued'
+                                ] ?? latestRun.stage
+                            }}
+                        </span>
+                        <span class="font-mono tabular-nums">
+                            {{ latestRun.progress }}%
+                        </span>
+                    </div>
+                    <div
+                        class="h-3 overflow-hidden rounded-full bg-muted"
+                        role="progressbar"
+                        :aria-valuenow="latestRun.progress"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                    >
+                        <div
+                            class="h-full rounded-full bg-primary transition-[width] duration-500"
+                            :class="{
+                                'bg-destructive': latestRun.status === 'failed',
+                                'bg-emerald-500':
+                                    latestRun.status === 'completed',
+                            }"
+                            :style="{ width: `${latestRun.progress}%` }"
+                        />
+                    </div>
+                    <p
+                        class="text-sm text-muted-foreground"
+                        :class="{
+                            'text-destructive': latestRun.status === 'failed',
+                        }"
+                    >
+                        {{ latestRun.message }}
+                    </p>
+                </div>
+
+                <div
+                    v-if="latestRun.steps.length"
+                    class="max-h-72 space-y-2 overflow-y-auto rounded-xl border bg-muted/15 p-3"
+                >
+                    <div
+                        v-for="(step, index) in latestRun.steps"
+                        :key="`${step.at}-${index}`"
+                        class="grid grid-cols-[auto_1fr_auto] gap-3 text-sm"
+                    >
+                        <CheckCircle2
+                            class="mt-0.5 size-4 text-muted-foreground"
+                        />
+                        <div>
+                            <p class="font-medium">
+                                {{
+                                    t.system_updates.stages[
+                                        step.stage ?? 'starting'
+                                    ] ?? step.stage
+                                }}
+                            </p>
+                            <p class="text-xs text-muted-foreground">
+                                {{ step.message }}
+                            </p>
+                        </div>
+                        <span class="font-mono text-xs text-muted-foreground">
+                            {{ step.progress }}%
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <DialogFooter v-if="latestRun">
+                <Button
+                    v-if="runIsActive"
+                    type="button"
+                    disabled
+                    class="w-full sm:w-auto"
+                >
+                    <LoaderCircle class="size-4 animate-spin" />
+                    {{ t.system_updates.update_in_progress }}
+                </Button>
+                <Button
+                    v-else
+                    type="button"
+                    class="w-full sm:w-auto"
+                    @click="closeUpdateProgressDialog"
+                >
+                    {{ t.system_updates.close }}
                 </Button>
             </DialogFooter>
         </DialogContent>

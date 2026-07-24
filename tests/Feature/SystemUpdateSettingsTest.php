@@ -38,6 +38,39 @@ test('system updates are restricted to a password confirmed super administrator'
         ->assertForbidden();
 });
 
+test('system update page displays checks and update progress in modal dialogs', function () {
+    $page = file_get_contents(base_path('resources/js/pages/settings/SystemUpdates.vue'));
+    $russianTranslations = require base_path('lang/ru/ui/system_updates.php');
+    $englishTranslations = require base_path('lang/en/ui/system_updates.php');
+    $modalTranslationKeys = [
+        'check_modal_title',
+        'check_modal_running_description',
+        'check_modal_completed_description',
+        'check_modal_failed_description',
+        'update_modal_title',
+        'update_in_progress',
+        'reconnecting_title',
+        'reconnecting_description',
+        'close',
+    ];
+
+    expect($page)
+        ->toContain('checkDialogOpen')
+        ->toContain('checkDialogStatus')
+        ->toContain('updateProgressDialogOpen')
+        ->toContain('updateConnectionInterrupted')
+        ->toContain('onHttpException')
+        ->toContain('onNetworkError')
+        ->toContain('return false')
+        ->toContain('closeUpdateProgressDialog')
+        ->toContain(':aria-valuenow="latestRun.progress"')
+        ->toContain('v-for="(step, index) in latestRun.steps"')
+        ->and($russianTranslations)
+        ->toHaveKeys($modalTranslationKeys)
+        ->and($englishTranslations)
+        ->toHaveKeys($modalTranslationKeys);
+});
+
 test('system update page remains available before its database migrations are applied', function () {
     Process::fake();
     systemUpdateDatabaseIsNotReady();
@@ -409,6 +442,8 @@ test('system updater uses an independent allowlisted root bridge with backups an
         ->toContain('chown -R root:"$APP_GROUP" "${APP_PATH}/vendor"')
         ->toContain('chown -R "$APP_USER:$APP_GROUP" "${APP_PATH}/bootstrap/cache"')
         ->toContain('migrate --force --no-interaction --isolated')
+        ->toContain("'php_reload'")
+        ->toContain('Перезапуск PHP-FPM и восстановление соединения с CRM369.')
         ->not->toContain('app_command queue:restart')
         ->toContain('health_check')
         ->toContain('flock -n 9')
