@@ -25,8 +25,11 @@ log_file=''
 previous_release=''
 release_switched='false'
 laravel_backup_path=''
+laravel_candidate_path=''
+laravel_dependencies_switched='false'
 database_backup_file=''
 database_migrations_started='false'
+maintenance_started='false'
 workers_stopped='false'
 
 usage() {
@@ -138,14 +141,22 @@ fail_update() {
         fi
 
         if [[ -f "${APP_PATH}/artisan" ]]; then
-            app_command down --retry=10 --no-interaction
+            app_command down --retry=10 --refresh=5 --no-interaction
+            maintenance_started='true'
         fi
     fi
 
     if [[ "$component" == 'laravel' && -n "$laravel_backup_path" ]]; then
-        restore_laravel_dependencies >>"$log_file" 2>&1
+        if [[ "$laravel_dependencies_switched" == 'true' ]]; then
+            restore_laravel_dependencies >>"$log_file" 2>&1
+        else
+            rm -rf -- "$laravel_backup_path"
+        fi
+
         laravel_backup_path=''
     fi
+
+    cleanup_laravel_candidate
 
     if [[ "$release_switched" == 'true' && -n "$previous_release" && -d "$previous_release" ]]; then
         if [[ ! -e "${previous_release}/.env" && -e "${SHARED_PATH}/.env" ]]; then
@@ -161,9 +172,15 @@ fail_update() {
         database_restore_failed='true'
     fi
 
-    if [[ -f "${APP_PATH}/artisan" ]]; then
+    if [[ -f "${APP_PATH}/artisan" && (
+        "$maintenance_started" == 'true'
+        || "$database_migrations_started" == 'true'
+        || "$laravel_dependencies_switched" == 'true'
+        || "$release_switched" == 'true'
+    ) ]]; then
         app_command optimize --no-interaction
         app_command up --no-interaction
+        maintenance_started='false'
         systemctl reload "php${PHP_VERSION}-fpm" >>"$log_file" 2>&1
     fi
 
@@ -190,7 +207,8 @@ composer_command() {
 }
 
 maintenance_begin() {
-    app_command down --retry=10 --no-interaction
+    app_command down --retry=10 --refresh=5 --no-interaction
+    maintenance_started='true'
     workers_stop
 }
 
@@ -208,6 +226,7 @@ maintenance_finish() {
     ensure_storage_link
     app_command optimize --no-interaction
     app_command up --no-interaction
+    maintenance_started='false'
     systemctl reload "php${PHP_VERSION}-fpm" >>"$log_file" 2>&1
 }
 
@@ -293,14 +312,23 @@ normalize_laravel_permissions() {
 }
 
 restore_laravel_dependencies() {
-    [[ "$laravel_backup_path" == /var/tmp/crm369-laravel.* && -d "$laravel_backup_path" ]] || return 1
+    [[ "$laravel_backup_path" == /var/tmp/crm369-laravel.* && -d "${laravel_backup_path}/vendor" ]] || return 1
 
     cp -a "${laravel_backup_path}/composer.json" "${laravel_backup_path}/composer.lock" "$APP_PATH/"
     rm -rf -- "${APP_PATH}/vendor"
-    cp -a "${laravel_backup_path}/vendor" "${APP_PATH}/vendor"
+    mv "${laravel_backup_path}/vendor" "${APP_PATH}/vendor"
     normalize_laravel_permissions
     app_command optimize --no-interaction
     rm -rf -- "$laravel_backup_path"
+    laravel_dependencies_switched='false'
+}
+
+cleanup_laravel_candidate() {
+    if [[ "$laravel_candidate_path" == /var/tmp/crm369-laravel-candidate.* && -d "$laravel_candidate_path" ]]; then
+        rm -rf -- "$laravel_candidate_path"
+    fi
+
+    laravel_candidate_path=''
 }
 
 apt_upgrade_packages() {
@@ -429,35 +457,45 @@ PY
 }
 
 update_laravel() {
-    laravel_backup_path="$(mktemp -d /var/tmp/crm369-laravel.XXXXXX)"
-    cp -a "${APP_PATH}/composer.json" "${APP_PATH}/composer.lock" "${APP_PATH}/vendor" "$laravel_backup_path/"
-    maintenance_begin
-    database_backup
+    laravel_candidate_path="$(mktemp -d /var/tmp/crm369-laravel-candidate.XXXXXX)"
+    cp -a "${APP_PATH}/composer.json" "${APP_PATH}/composer.lock" "$laravel_candidate_path/"
 
-    if ! composer_command update laravel/framework \
-        --working-dir="$APP_PATH" \
+    write_progress 'running' '20' 'dependencies' 'Подготовка обновлённых Laravel-зависимостей без остановки CRM369.'
+    composer_command update laravel/framework \
+        --working-dir="$laravel_candidate_path" \
         --with-all-dependencies \
         --no-dev \
         --no-interaction \
         --prefer-dist \
         --optimize-autoloader \
         --no-scripts \
-        --no-progress >>"$log_file" 2>&1; then
-        restore_laravel_dependencies
-        laravel_backup_path=''
+        --no-progress >>"$log_file" 2>&1
+    composer_command check-platform-reqs --working-dir="$laravel_candidate_path" --no-dev >>"$log_file" 2>&1
+    [[ -f "${laravel_candidate_path}/composer.lock" && -d "${laravel_candidate_path}/vendor" ]]
 
-        return 1
-    fi
+    laravel_backup_path="$(mktemp -d /var/tmp/crm369-laravel.XXXXXX)"
+    cp -a "${APP_PATH}/composer.json" "${APP_PATH}/composer.lock" "$laravel_backup_path/"
+
+    write_progress 'running' '55' 'maintenance' 'Краткое переключение зависимостей и применение миграций.'
+    maintenance_begin
+    database_backup
+
+    mv "${APP_PATH}/vendor" "${laravel_backup_path}/vendor"
+    laravel_dependencies_switched='true'
+    cp -a "${laravel_candidate_path}/composer.json" "${laravel_candidate_path}/composer.lock" "$APP_PATH/"
+    mv "${laravel_candidate_path}/vendor" "${APP_PATH}/vendor"
 
     normalize_laravel_permissions
     app_command package:discover --no-interaction
     database_migrations_started='true'
     maintenance_finish
     health_check
-    rm -rf -- "$laravel_backup_path"
-    laravel_backup_path=''
     workers_start
     database_migrations_started='false'
+    laravel_dependencies_switched='false'
+    cleanup_laravel_candidate
+    rm -rf -- "$laravel_backup_path"
+    laravel_backup_path=''
 }
 
 execute_update() {
@@ -479,7 +517,7 @@ execute_update() {
             update_application
             ;;
         laravel)
-            write_progress 'running' '20' 'backup' 'Резервное копирование базы и Laravel-зависимостей.'
+            write_progress 'running' '10' 'dependencies' 'Подготовка обновления Laravel.'
             update_laravel
             write_progress 'running' '92' 'health' 'Проверка приложения после обновления Laravel.'
             ;;
