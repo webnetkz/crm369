@@ -9,5 +9,6 @@ captures/
 .cxx/
 *.iml
 keystore.properties
+firebase.properties
 *.jks
 *.keystore

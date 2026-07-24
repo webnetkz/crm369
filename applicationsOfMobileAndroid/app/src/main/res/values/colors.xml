@@ -7,4 +7,7 @@
     <color name="portal_text_primary">#141414</color>
     <color name="portal_text_secondary">#66717A</color>
     <color name="portal_border">#DCE2E6</color>
+    <color name="portal_success">#177245</color>
+    <color name="portal_error">#B42318</color>
+    <color name="portal_primary_soft">#D9F2F4</color>
 </resources>

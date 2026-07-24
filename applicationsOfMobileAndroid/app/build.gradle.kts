@@ -8,6 +8,18 @@ plugins {
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val hasReleaseSigning = keystorePropertiesFile.exists()
+val firebaseProperties = Properties()
+val firebasePropertiesFile = rootProject.file("firebase.properties")
+
+if (firebasePropertiesFile.exists()) {
+    firebasePropertiesFile.inputStream().use { stream ->
+        firebaseProperties.load(stream)
+    }
+}
+
+fun quotedBuildConfigValue(value: String): String {
+    return "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+}
 
 if (hasReleaseSigning) {
     keystorePropertiesFile.inputStream().use { stream ->
@@ -34,8 +46,29 @@ android {
         applicationId = "com.appswebnetkz.crm369.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "2.0.0"
+
+        buildConfigField(
+            "String",
+            "FIREBASE_API_KEY",
+            quotedBuildConfigValue(firebaseProperties.getProperty("apiKey", "")),
+        )
+        buildConfigField(
+            "String",
+            "FIREBASE_APP_ID",
+            quotedBuildConfigValue(firebaseProperties.getProperty("appId", "")),
+        )
+        buildConfigField(
+            "String",
+            "FIREBASE_PROJECT_ID",
+            quotedBuildConfigValue(firebaseProperties.getProperty("projectId", "")),
+        )
+        buildConfigField(
+            "String",
+            "FIREBASE_SENDER_ID",
+            quotedBuildConfigValue(firebaseProperties.getProperty("senderId", "")),
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -61,6 +94,10 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    buildFeatures {
+        buildConfig = true
+    }
 }
 
 tasks.configureEach {
@@ -79,7 +116,9 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.activity:activity-ktx:1.10.1")
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
+    implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

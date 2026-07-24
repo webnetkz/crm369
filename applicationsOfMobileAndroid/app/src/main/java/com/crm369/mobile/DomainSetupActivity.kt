@@ -1,7 +1,7 @@
 package com.appswebnetkz.crm369
 
-import android.content.Intent
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
@@ -22,8 +22,9 @@ class DomainSetupActivity : AppCompatActivity() {
         domainPreferences = DomainPreferences(this)
 
         if (!intent.getBooleanExtra(EXTRA_FORCE_EDIT, false)) {
-            domainPreferences.getBaseUrl()?.let { savedBaseUrl ->
-                openWebView(savedBaseUrl)
+            domainPreferences.getBaseUrl()?.let {
+                AppNavigator.openAuthenticatedArea(this)
+                finish()
                 return
             }
         }
@@ -63,12 +64,12 @@ class DomainSetupActivity : AppCompatActivity() {
             return
         }
 
+        val serverChanged = domainPreferences.getBaseUrl() != normalizedBaseUrl
         domainPreferences.saveBaseUrl(normalizedBaseUrl)
-        openWebView(normalizedBaseUrl)
-    }
-
-    private fun openWebView(baseUrl: String) {
-        startActivity(WebViewActivity.newIntent(this, baseUrl))
+        if (serverChanged) {
+            SecureSessionStore(this).clear()
+        }
+        AppNavigator.openAuthenticatedArea(this)
         finish()
     }
 
