@@ -89,30 +89,28 @@ class SystemUpdatePageData
             return $run;
         }
 
+        if ($run->isActive()) {
+            $updates = [
+                'status' => $progress['status'],
+                'progress' => $progress['progress'],
+                'stage' => $progress['stage'],
+                'message' => $progress['message'],
+                'started_at' => $progress['started_at'] ?? $run->started_at,
+                'finished_at' => $progress['finished_at'],
+            ];
+
+            if (
+                $run->status !== $updates['status']
+                || $run->progress !== $updates['progress']
+                || $run->stage !== $updates['stage']
+                || $run->message !== $updates['message']
+            ) {
+                $run->update($updates);
+                $run->refresh()->load('requestedBy:id,name,last_name');
+            }
+        }
+
         $run->setAttribute('progress_steps', $progress['steps']);
-
-        if (! $run->isActive()) {
-            return $run;
-        }
-
-        $updates = [
-            'status' => $progress['status'],
-            'progress' => $progress['progress'],
-            'stage' => $progress['stage'],
-            'message' => $progress['message'],
-            'started_at' => $progress['started_at'] ?? $run->started_at,
-            'finished_at' => $progress['finished_at'],
-        ];
-
-        if (
-            $run->status !== $updates['status']
-            || $run->progress !== $updates['progress']
-            || $run->stage !== $updates['stage']
-            || $run->message !== $updates['message']
-        ) {
-            $run->update($updates);
-            $run->refresh()->load('requestedBy:id,name,last_name');
-        }
 
         return $run;
     }

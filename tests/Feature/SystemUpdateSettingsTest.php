@@ -316,25 +316,103 @@ test('stale updater processes are marked as failed when the page is opened', fun
         ->finished_at->not->toBeNull();
 });
 
+test('completed updater progress is synchronized without persisting transient steps', function () {
+    $superAdmin = User::factory()->create([
+        'email' => 'super@example.com',
+    ]);
+    $run = SystemUpdateRun::query()->create([
+        'uuid' => '019fa2c4-4b29-7e85-9a02-5e57ea58b646',
+        'requested_by_user_id' => $superAdmin->id,
+        'component' => 'ubuntu',
+        'status' => 'running',
+        'progress' => 1,
+        'stage' => 'starting',
+    ]);
+    $directory = sys_get_temp_dir().'/crm369-progress-'.bin2hex(random_bytes(5));
+    mkdir($directory, 0700, true);
+    config(['system-updates.progress_directory' => $directory]);
+    file_put_contents($directory.'/'.$run->uuid.'.json', json_encode([
+        'status' => 'completed',
+        'progress' => 100,
+        'stage' => 'completed',
+        'message' => 'Обновление успешно завершено.',
+        'started_at' => '2026-07-24T01:38:38+00:00',
+        'finished_at' => '2026-07-24T01:39:44+00:00',
+    ], JSON_THROW_ON_ERROR));
+    file_put_contents($directory.'/'.$run->uuid.'.steps', json_encode([
+        'at' => '2026-07-24T01:39:44+00:00',
+        'progress' => 100,
+        'stage' => 'completed',
+        'message' => 'Обновление успешно завершено.',
+    ], JSON_THROW_ON_ERROR).PHP_EOL);
+
+    try {
+        $this->actingAs($superAdmin)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->get(route('settings.system-updates.edit'))
+            ->assertSuccessful()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('latestRun.status', 'completed')
+                ->where('latestRun.progress', 100)
+                ->has('latestRun.steps', 1),
+            );
+
+        expect($run->refresh())
+            ->status->toBe('completed')
+            ->progress->toBe(100)
+            ->stage->toBe('completed')
+            ->finished_at->not->toBeNull();
+    } finally {
+        @unlink($directory.'/'.$run->uuid.'.json');
+        @unlink($directory.'/'.$run->uuid.'.steps');
+        @rmdir($directory);
+    }
+});
+
 test('system updater uses an independent allowlisted root bridge with backups and migrations', function () {
     $updater = file_get_contents(base_path('scripts/update-system.sh'));
     $installer = file_get_contents(base_path('scripts/install-ubuntu.sh'));
     $bridgeInspector = file_get_contents(base_path('app/Support/SystemUpdates/SystemUpdateBridgeInspector.php'));
+    $applicationUpdate = explode('update_laravel() {', explode('update_application() {', $updater, 2)[1], 2)[0];
+    $laravelUpdate = explode('execute_update() {', explode('update_laravel() {', $updater, 2)[1], 2)[0];
 
     expect($updater)
         ->toContain('systemd-run')
         ->toContain('case "$component" in')
         ->toContain('application|laravel|php|postgresql|redis|nginx|node|composer|ubuntu')
         ->toContain('pg_dump --format=custom')
+        ->toContain('pg_dump --format=custom crm369 >"$database_backup_file"')
+        ->not->toContain('pg_dump --format=custom --file=')
+        ->toContain('COMPOSER_HOME="$COMPOSER_HOME_PATH"')
+        ->toContain('composer_command update laravel/framework')
+        ->toContain('--no-scripts')
+        ->toContain('app_command package:discover --no-interaction')
+        ->toContain('normalize_laravel_permissions')
+        ->toContain('restore_laravel_dependencies')
+        ->toContain('ensure_storage_link')
+        ->toContain('ln -sfn "$storage_target" "$storage_link"')
+        ->not->toContain('app_command storage:link')
+        ->toContain('workers_stop')
+        ->toContain('workers_start')
+        ->toContain("database_migrations_started='true'")
+        ->toContain('database_restore')
+        ->toContain('runuser -u postgres -- pg_restore')
+        ->toContain('--clean')
+        ->toContain('--if-exists')
+        ->toContain('--exit-on-error')
+        ->toContain('pg_terminate_backend')
+        ->toContain('chown -R root:"$APP_GROUP" "${APP_PATH}/vendor"')
+        ->toContain('chown -R "$APP_USER:$APP_GROUP" "${APP_PATH}/bootstrap/cache"')
         ->toContain('migrate --force --no-interaction --isolated')
+        ->not->toContain('app_command queue:restart')
         ->toContain('health_check')
         ->toContain('flock -n 9')
         ->toContain('"${incoming_path}/bootstrap/cache"')
-        ->toContain('install -m 0750 -o root -g root')
+        ->toContain('install -m 0755 -o root -g root')
         ->not->toContain('sh -c')
         ->and($installer)
         ->toContain('/usr/local/sbin/crm369-updater')
-        ->toContain('install -m 0750 -o root -g root')
+        ->toContain('install -m 0755 -o root -g root')
         ->toContain('NOPASSWD: /usr/local/sbin/crm369-updater start *')
         ->toContain('visudo -cf')
         ->and($bridgeInspector)
@@ -343,6 +421,15 @@ test('system updater uses an independent allowlisted root bridge with backups an
         ->toContain('($permissions & 0100) !== 0')
         ->toContain('($permissions & 0022) === 0')
         ->not->toContain('is_executable($path)');
+
+    expect(strpos($applicationUpdate, 'maintenance_begin'))
+        ->toBeLessThan(strpos($applicationUpdate, 'database_backup'))
+        ->and(strpos($applicationUpdate, "database_migrations_started='true'"))
+        ->toBeLessThan(strpos($applicationUpdate, 'maintenance_finish'))
+        ->and(strpos($laravelUpdate, 'maintenance_begin'))
+        ->toBeLessThan(strpos($laravelUpdate, 'database_backup'))
+        ->and(strpos($laravelUpdate, "database_migrations_started='true'"))
+        ->toBeLessThan(strpos($laravelUpdate, 'maintenance_finish'));
 });
 
 /**

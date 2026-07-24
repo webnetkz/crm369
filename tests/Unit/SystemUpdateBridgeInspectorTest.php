@@ -11,6 +11,7 @@ test('secure root owned bridge metadata is accepted', function (int $permissions
         permissions: $permissions,
     ))->toBeTrue();
 })->with([
+    'root 0755' => 0100755,
     'root 0750' => 0100750,
     'root 0700' => 0100700,
 ]);

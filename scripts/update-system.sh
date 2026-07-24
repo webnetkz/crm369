@@ -7,6 +7,7 @@ readonly APP_PATH='/var/www/crm369'
 readonly RELEASES_PATH='/var/www/crm369-releases'
 readonly SHARED_PATH='/var/www/crm369-shared'
 readonly BACKUPS_PATH='/var/backups/crm369'
+readonly COMPOSER_HOME_PATH='/var/cache/crm369/composer'
 readonly STATE_PATH='/etc/crm369'
 readonly PROGRESS_PATH='/var/lib/crm369/updates'
 readonly REPOSITORY='webnetkz/crm369'
@@ -23,6 +24,10 @@ steps_file=''
 log_file=''
 previous_release=''
 release_switched='false'
+laravel_backup_path=''
+database_backup_file=''
+database_migrations_started='false'
+workers_stopped='false'
 
 usage() {
     printf 'Usage: crm369-updater start <uuid> <component> [target] [version]\n' >&2
@@ -122,8 +127,25 @@ PY
 fail_update() {
     local line_number="$1"
     local exit_code="$2"
+    local database_restore_failed='false'
 
+    trap - ERR
     set +e
+
+    if [[ "$database_migrations_started" == 'true' ]]; then
+        if [[ "$workers_stopped" != 'true' ]]; then
+            workers_stop
+        fi
+
+        if [[ -f "${APP_PATH}/artisan" ]]; then
+            app_command down --retry=10 --no-interaction
+        fi
+    fi
+
+    if [[ "$component" == 'laravel' && -n "$laravel_backup_path" ]]; then
+        restore_laravel_dependencies >>"$log_file" 2>&1
+        laravel_backup_path=''
+    fi
 
     if [[ "$release_switched" == 'true' && -n "$previous_release" && -d "$previous_release" ]]; then
         if [[ ! -e "${previous_release}/.env" && -e "${SHARED_PATH}/.env" ]]; then
@@ -133,14 +155,28 @@ fail_update() {
             ln -sfn "${SHARED_PATH}/storage" "${previous_release}/storage"
         fi
         ln -sfn "$previous_release" "$APP_PATH"
-        runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_PATH}/artisan" optimize --no-interaction >>"$log_file" 2>&1
-        runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_PATH}/artisan" up --no-interaction >>"$log_file" 2>&1
-        systemctl reload "php${PHP_VERSION}-fpm" >>"$log_file" 2>&1
-    elif [[ -f "${APP_PATH}/artisan" ]]; then
-        runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_PATH}/artisan" up --no-interaction >>"$log_file" 2>&1
     fi
 
-    write_progress 'failed' '100' 'failed' "Обновление остановлено на этапе ${component} (строка ${line_number}). Код ошибки: ${exit_code}."
+    if [[ "$database_migrations_started" == 'true' ]] && ! database_restore; then
+        database_restore_failed='true'
+    fi
+
+    if [[ -f "${APP_PATH}/artisan" ]]; then
+        app_command optimize --no-interaction
+        app_command up --no-interaction
+        systemctl reload "php${PHP_VERSION}-fpm" >>"$log_file" 2>&1
+    fi
+
+    if [[ "$workers_stopped" == 'true' ]]; then
+        workers_start
+    fi
+
+    if [[ "$database_restore_failed" == 'true' ]]; then
+        write_progress 'failed' '100' 'rollback_failed' "Обновление остановлено на этапе ${component} (строка ${line_number}). Код ошибки: ${exit_code}. Автоматическое восстановление PostgreSQL завершилось ошибкой; резервная копия: ${database_backup_file}."
+    else
+        write_progress 'failed' '100' 'failed' "Обновление остановлено на этапе ${component} (строка ${line_number}). Код ошибки: ${exit_code}. Код и база данных возвращены к предыдущему состоянию."
+    fi
+
     exit "$exit_code"
 }
 
@@ -148,17 +184,55 @@ app_command() {
     runuser -u "$APP_USER" -- /usr/bin/php8.4 "${APP_PATH}/artisan" "$@" >>"$log_file" 2>&1
 }
 
+composer_command() {
+    install -d -m 0700 -o root -g root "$COMPOSER_HOME_PATH"
+    COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_HOME="$COMPOSER_HOME_PATH" composer "$@"
+}
+
 maintenance_begin() {
     app_command down --retry=10 --no-interaction
+    workers_stop
+}
+
+ensure_storage_link() {
+    local storage_link="${APP_PATH}/public/storage"
+    local storage_target="${APP_PATH}/storage/app/public"
+
+    [[ ! -e "$storage_link" || -L "$storage_link" ]]
+    ln -sfn "$storage_target" "$storage_link"
+    chown -h root:"$APP_GROUP" "$storage_link"
 }
 
 maintenance_finish() {
     app_command migrate --force --no-interaction --isolated
-    app_command storage:link --force --no-interaction
+    ensure_storage_link
     app_command optimize --no-interaction
-    app_command queue:restart --no-interaction
     app_command up --no-interaction
     systemctl reload "php${PHP_VERSION}-fpm" >>"$log_file" 2>&1
+}
+
+workers_stop() {
+    local program=''
+
+    for program in crm369-default crm369-notifications; do
+        if supervisorctl status "$program" 2>>"$log_file" | grep -qE '^[^[:space:]]+[[:space:]]+RUNNING([[:space:]]|$)'; then
+            supervisorctl stop "$program" >>"$log_file" 2>&1
+        fi
+    done
+
+    workers_stopped='true'
+}
+
+workers_start() {
+    local program=''
+
+    for program in crm369-default crm369-notifications; do
+        if ! supervisorctl status "$program" 2>>"$log_file" | grep -qE '^[^[:space:]]+[[:space:]]+RUNNING([[:space:]]|$)'; then
+            supervisorctl start "$program" >>"$log_file" 2>&1
+        fi
+    done
+
+    workers_stopped='false'
 }
 
 health_check() {
@@ -176,9 +250,57 @@ health_check() {
 }
 
 database_backup() {
+    database_backup_file="${BACKUPS_PATH}/database-${run_uuid}.dump"
+
     install -d -m 0700 -o root -g root "$BACKUPS_PATH"
-    runuser -u postgres -- pg_dump --format=custom --file="${BACKUPS_PATH}/database-${run_uuid}.dump" crm369 >>"$log_file" 2>&1
-    chmod 0600 "${BACKUPS_PATH}/database-${run_uuid}.dump"
+    install -m 0600 -o root -g root /dev/null "$database_backup_file"
+
+    if ! runuser -u postgres -- pg_dump --format=custom crm369 >"$database_backup_file" 2>>"$log_file"; then
+        rm -f -- "$database_backup_file"
+        database_backup_file=''
+
+        return 1
+    fi
+}
+
+database_restore() {
+    [[ -n "$database_backup_file" && -f "$database_backup_file" ]] || return 1
+
+    printf 'Restoring PostgreSQL from %s\n' "$database_backup_file" >>"$log_file"
+    if ! runuser -u postgres -- psql \
+        --dbname=postgres \
+        --set=ON_ERROR_STOP=1 \
+        --command="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'crm369' AND pid <> pg_backend_pid();" >>"$log_file" 2>&1; then
+        return 1
+    fi
+
+    runuser -u postgres -- pg_restore \
+        --clean \
+        --if-exists \
+        --exit-on-error \
+        --dbname=crm369 <"$database_backup_file" >>"$log_file" 2>&1
+}
+
+normalize_laravel_permissions() {
+    chown root:"$APP_GROUP" "${APP_PATH}/composer.json" "${APP_PATH}/composer.lock"
+    chmod 0640 "${APP_PATH}/composer.json" "${APP_PATH}/composer.lock"
+    chown -R root:"$APP_GROUP" "${APP_PATH}/vendor"
+    find "${APP_PATH}/vendor" -type d -exec chmod 0750 {} +
+    find "${APP_PATH}/vendor" -type f -exec chmod 0640 {} +
+    chown -R "$APP_USER:$APP_GROUP" "${APP_PATH}/bootstrap/cache"
+    find "${APP_PATH}/bootstrap/cache" -type d -exec chmod 0770 {} +
+    find "${APP_PATH}/bootstrap/cache" -type f -exec chmod 0660 {} +
+}
+
+restore_laravel_dependencies() {
+    [[ "$laravel_backup_path" == /var/tmp/crm369-laravel.* && -d "$laravel_backup_path" ]] || return 1
+
+    cp -a "${laravel_backup_path}/composer.json" "${laravel_backup_path}/composer.lock" "$APP_PATH/"
+    rm -rf -- "${APP_PATH}/vendor"
+    cp -a "${laravel_backup_path}/vendor" "${APP_PATH}/vendor"
+    normalize_laravel_permissions
+    app_command optimize --no-interaction
+    rm -rf -- "$laravel_backup_path"
 }
 
 apt_upgrade_packages() {
@@ -210,14 +332,14 @@ update_application() {
     [[ -f "${incoming_path}/artisan" && -f "${incoming_path}/composer.lock" && -f "${incoming_path}/package-lock.json" ]]
 
     write_progress 'running' '20' 'dependencies' 'Установка PHP-зависимостей во временный release.'
-    COMPOSER_ALLOW_SUPERUSER=1 composer install \
+    composer_command install \
         --working-dir="$incoming_path" \
         --no-dev \
         --no-interaction \
         --prefer-dist \
         --optimize-autoloader \
         --no-progress >>"$log_file" 2>&1
-    composer check-platform-reqs --working-dir="$incoming_path" --no-dev >>"$log_file" 2>&1
+    composer_command check-platform-reqs --working-dir="$incoming_path" --no-dev >>"$log_file" 2>&1
 
     write_progress 'running' '32' 'frontend' 'Сборка frontend-ресурсов.'
     (
@@ -227,11 +349,11 @@ update_application() {
     )
     rm -rf -- "${incoming_path}/node_modules"
 
-    write_progress 'running' '45' 'backup' 'Создание резервной копии PostgreSQL.'
-    database_backup
-
-    write_progress 'running' '55' 'maintenance' 'Перевод CRM369 в режим обслуживания.'
+    write_progress 'running' '45' 'maintenance' 'Остановка очередей и перевод CRM369 в режим обслуживания.'
     maintenance_begin
+
+    write_progress 'running' '50' 'backup' 'Создание согласованной резервной копии PostgreSQL.'
+    database_backup
 
     if [[ -L "$APP_PATH" ]]; then
         previous_release="$(readlink -f "$APP_PATH")"
@@ -267,6 +389,7 @@ update_application() {
     release_switched='true'
 
     write_progress 'running' '70' 'migrations' 'Применение миграций базы данных.'
+    database_migrations_started='true'
     maintenance_finish
 
     write_progress 'running' '86' 'services' 'Проверка и перезапуск системных служб.'
@@ -274,7 +397,7 @@ update_application() {
     systemctl reload nginx >>"$log_file" 2>&1
     supervisorctl reread >>"$log_file" 2>&1
     supervisorctl update >>"$log_file" 2>&1
-    supervisorctl restart crm369-default crm369-notifications >>"$log_file" 2>&1
+    workers_stop
 
     write_progress 'running' '94' 'health' 'Проверка страниц /up и /login.'
     health_check
@@ -299,35 +422,42 @@ os.chmod(temporary, 0o640)
 os.replace(temporary, path)
 PY
     chown root:"$APP_GROUP" "${STATE_PATH}/version.json"
-    install -m 0750 -o root -g root "${release_path}/scripts/update-system.sh" /usr/local/sbin/crm369-updater
+    install -m 0755 -o root -g root "${release_path}/scripts/update-system.sh" /usr/local/sbin/crm369-updater
+    workers_start
+    database_migrations_started='false'
     release_switched='false'
 }
 
 update_laravel() {
-    local backup_path=''
-
-    backup_path="$(mktemp -d /var/tmp/crm369-laravel.XXXXXX)"
-    cp -a "${APP_PATH}/composer.json" "${APP_PATH}/composer.lock" "${APP_PATH}/vendor" "$backup_path/"
-    database_backup
+    laravel_backup_path="$(mktemp -d /var/tmp/crm369-laravel.XXXXXX)"
+    cp -a "${APP_PATH}/composer.json" "${APP_PATH}/composer.lock" "${APP_PATH}/vendor" "$laravel_backup_path/"
     maintenance_begin
+    database_backup
 
-    if ! COMPOSER_ALLOW_SUPERUSER=1 composer update laravel/framework \
+    if ! composer_command update laravel/framework \
         --working-dir="$APP_PATH" \
         --with-all-dependencies \
         --no-dev \
         --no-interaction \
         --prefer-dist \
         --optimize-autoloader \
+        --no-scripts \
         --no-progress >>"$log_file" 2>&1; then
-        cp -a "${backup_path}/composer.json" "${backup_path}/composer.lock" "$APP_PATH/"
-        rm -rf -- "${APP_PATH}/vendor"
-        cp -a "${backup_path}/vendor" "${APP_PATH}/vendor"
+        restore_laravel_dependencies
+        laravel_backup_path=''
+
         return 1
     fi
 
+    normalize_laravel_permissions
+    app_command package:discover --no-interaction
+    database_migrations_started='true'
     maintenance_finish
     health_check
-    rm -rf -- "$backup_path"
+    rm -rf -- "$laravel_backup_path"
+    laravel_backup_path=''
+    workers_start
+    database_migrations_started='false'
 }
 
 execute_update() {
@@ -388,8 +518,8 @@ execute_update() {
             ;;
         composer)
             write_progress 'running' '30' 'packages' 'Обновление Composer.'
-            COMPOSER_ALLOW_SUPERUSER=1 composer self-update --stable --no-interaction >>"$log_file" 2>&1
-            composer --version --no-ansi >>"$log_file" 2>&1
+            composer_command self-update --stable --no-interaction >>"$log_file" 2>&1
+            composer_command --version --no-ansi >>"$log_file" 2>&1
             ;;
         ubuntu)
             write_progress 'running' '20' 'packages' 'Обновление системных пакетов Ubuntu.'

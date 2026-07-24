@@ -525,7 +525,8 @@ install -m 0660 -o "$APP_USER" -g "$APP_GROUP" /dev/null "${APP_DIR}/.env"
     printf 'DB_PASSWORD=%s\n' "$database_password"
     printf 'DB_SSLMODE=prefer\n'
     printf '\n'
-    printf 'SESSION_DRIVER=database\n'
+    printf 'SESSION_DRIVER=redis\n'
+    printf 'SESSION_CONNECTION=default\n'
     printf 'SESSION_LIFETIME=120\n'
     printf 'SESSION_ENCRYPT=false\n'
     printf 'SESSION_PATH=/\n'
@@ -930,7 +931,7 @@ print_success "HTTPS-проверка Laravel и страницы входа у�
 
 print_info 'Установка защищённого системного updater...'
 install -d -m 0750 -o root -g "$APP_GROUP" "$INSTALL_STATE_DIR" /var/lib/crm369/updates
-install -m 0750 -o root -g root "${APP_DIR}/scripts/update-system.sh" /usr/local/sbin/crm369-updater
+install -m 0755 -o root -g root "${APP_DIR}/scripts/update-system.sh" /usr/local/sbin/crm369-updater
 
 sudoers_update_file='/etc/sudoers.d/crm369-updater'
 install -m 0440 -o root -g root /dev/null "$sudoers_update_file"
