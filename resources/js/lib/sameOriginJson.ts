@@ -53,9 +53,30 @@ const isJsonResponse = (response: Response): boolean => {
     );
 };
 
-const responseErrorMessage = async (response: Response): Promise<string> => {
+type ErrorPayload = {
+    message: string | null;
+    code: string | null;
+};
+
+export class SameOriginJsonError extends Error {
+    public constructor(
+        public readonly status: number,
+        public readonly code: string | null,
+        message: string,
+    ) {
+        super(message);
+        this.name = 'SameOriginJsonError';
+    }
+}
+
+const responseErrorPayload = async (
+    response: Response,
+): Promise<ErrorPayload> => {
     if (!isJsonResponse(response)) {
-        return `Request failed with status ${response.status}`;
+        return {
+            message: null,
+            code: null,
+        };
     }
 
     const payload = (await response.json().catch(() => null)) as unknown;
@@ -66,10 +87,15 @@ const responseErrorMessage = async (response: Response): Promise<string> => {
         typeof payload.message === 'string'
             ? payload.message
             : null;
+    const code =
+        typeof payload === 'object' &&
+        payload !== null &&
+        'code' in payload &&
+        typeof payload.code === 'string'
+            ? payload.code
+            : null;
 
-    return message
-        ? `Request failed with status ${response.status}: ${message}`
-        : `Request failed with status ${response.status}`;
+    return { message, code };
 };
 
 export async function fetchSameOriginJson<T>(
@@ -108,7 +134,14 @@ export async function fetchSameOriginJson<T>(
         });
 
         if (!response.ok) {
-            throw new Error(await responseErrorMessage(response));
+            const error = await responseErrorPayload(response);
+
+            throw new SameOriginJsonError(
+                response.status,
+                error.code,
+                error.message ??
+                    `Request failed with status ${response.status}`,
+            );
         }
 
         if (!isJsonResponse(response)) {

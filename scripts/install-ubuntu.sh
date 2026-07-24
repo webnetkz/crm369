@@ -11,7 +11,7 @@ readonly DB_USER='crm369'
 readonly GITHUB_REPOSITORY='webnetkz/crm369'
 readonly GITHUB_REF='main'
 readonly PHP_VERSION='8.4'
-readonly INSTALLER_VERSION='2026.07.24.1'
+readonly INSTALLER_VERSION='2026.07.24.2'
 readonly INSTALL_STATE_DIR='/etc/crm369'
 readonly INSTALL_STATE_FILE='/etc/crm369/installed'
 readonly INSTALL_PROGRESS_FILE='/etc/crm369/installing'
@@ -97,7 +97,7 @@ validate_resume_installation() {
         [[ "$progress_status" == 'installing' && "$progress_domain" == "$resume_domain" && "$progress_app_dir" == "$APP_DIR" ]] \
             || fail 'Файл состояния частичной установки не соответствует существующему приложению.'
         case "$progress_version" in
-            '2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4'|'2026.07.22.5'|'2026.07.24.1')
+            '2026.07.22.1'|'2026.07.22.2'|'2026.07.22.3'|'2026.07.22.4'|'2026.07.22.5'|'2026.07.24.1'|'2026.07.24.2')
                 ;;
             *)
                 fail "Версия частичной установки ${progress_version:-неизвестна} несовместима с установщиком ${INSTALLER_VERSION}."
@@ -540,6 +540,7 @@ install -m 0660 -o "$APP_USER" -g "$APP_GROUP" /dev/null "${APP_DIR}/.env"
     printf 'NOTIFICATION_QUEUE_CONNECTION=redis\n'
     printf 'NOTIFICATION_QUEUE=notifications\n'
     printf 'CACHE_STORE=database\n'
+    printf 'CACHE_LIMITER_STORE=redis\n'
     printf 'NOTIFICATION_CACHE_STORE=redis\n'
     printf 'CHAT_CACHE_STORE=redis\n'
     printf '\n'
@@ -558,6 +559,15 @@ install -m 0660 -o "$APP_USER" -g "$APP_GROUP" /dev/null "${APP_DIR}/.env"
     printf 'FCM_SERVICE_ACCOUNT_PATH=\n'
     printf 'FCM_CONNECT_TIMEOUT_SECONDS=5\n'
     printf 'FCM_TIMEOUT_SECONDS=10\n'
+    printf '\n'
+    printf 'CONFERENCE_STUN_URLS=stun:stun.cloudflare.com:3478\n'
+    printf 'CONFERENCE_TURN_URLS=\n'
+    printf 'CONFERENCE_TURN_USERNAME=\n'
+    printf 'CONFERENCE_TURN_CREDENTIAL=\n'
+    printf 'CONFERENCE_TURN_SECRET=\n'
+    printf 'CONFERENCE_TURN_CREDENTIAL_TTL_SECONDS=3600\n'
+    printf 'CONFERENCE_PRESENCE_TIMEOUT_SECONDS=120\n'
+    printf 'CONFERENCE_MAX_PARTICIPANTS=12\n'
     printf 'CHAT_SHARED_TTL_SECONDS=60\n'
     printf 'CHAT_SIDEBAR_TTL_SECONDS=60\n'
     printf 'CHAT_UNREAD_TTL_SECONDS=60\n'

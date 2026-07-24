@@ -14,7 +14,7 @@ class StoreConferenceSignalRequest extends ConferenceParticipantRequest
             ...$this->participantCredentialRules(),
             'target_participant_id' => ['required', 'integer'],
             'type' => ['required', 'string', Rule::in(['offer', 'answer', 'ice-candidate'])],
-            'payload' => ['required', 'array', 'max:8'],
+            'payload' => ['required', 'array:type,sdp,candidate,sdpMid,sdpMLineIndex', 'max:5'],
             'payload.type' => ['nullable', 'string', Rule::in(['offer', 'answer'])],
             'payload.sdp' => ['nullable', 'string', 'max:60000'],
             'payload.candidate' => ['nullable', 'string', 'max:8192'],
@@ -34,12 +34,25 @@ class StoreConferenceSignalRequest extends ConferenceParticipantRequest
                 return;
             }
 
-            if (in_array($type, ['offer', 'answer'], true)
-                && (($payload['type'] ?? null) !== $type || ! is_string($payload['sdp'] ?? null))) {
-                $validator->errors()->add('payload', __('ui.conferences.invalid_signal'));
+            if (in_array($type, ['offer', 'answer'], true)) {
+                if (
+                    array_diff(array_keys($payload), ['type', 'sdp']) !== []
+                    || ($payload['type'] ?? null) !== $type
+                    || ! is_string($payload['sdp'] ?? null)
+                ) {
+                    $validator->errors()->add('payload', __('ui.conferences.invalid_signal'));
+                }
+
+                return;
             }
 
-            if ($type === 'ice-candidate' && ! is_string($payload['candidate'] ?? null)) {
+            if (
+                $type === 'ice-candidate'
+                && (
+                    array_diff(array_keys($payload), ['candidate', 'sdpMid', 'sdpMLineIndex']) !== []
+                    || ! is_string($payload['candidate'] ?? null)
+                )
+            ) {
                 $validator->errors()->add('payload', __('ui.conferences.invalid_signal'));
             }
         }];

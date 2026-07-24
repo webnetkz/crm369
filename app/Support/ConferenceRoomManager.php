@@ -8,16 +8,22 @@ use App\Models\ConferenceParticipant;
 use App\Models\ConferenceSignal;
 use App\Models\User;
 use Carbon\CarbonInterface;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ConferenceRoomManager
 {
+    public function __construct(
+        private ConferenceIceServerProvider $iceServerProvider,
+    ) {}
+
     /** @return array<string, mixed> */
     public function join(Conference $conference, ?User $user, ?string $requestedDisplayName): array
     {
-        abort_if($conference->ended_at !== null, 410, __('ui.conferences.ended_notice'));
+        $this->ensureConferenceIsActive($conference);
 
         $displayName = $user ? $this->userDisplayName($user) : $requestedDisplayName;
 
@@ -30,24 +36,47 @@ class ConferenceRoomManager
         $this->cleanExpiredRoomState($conference);
 
         $token = Str::random(64);
-        $participant = ConferenceParticipant::query()->create([
-            'conference_id' => $conference->id,
-            'user_id' => $user?->id,
-            'display_name' => $displayName,
-            'access_token_hash' => hash('sha256', $token),
-            'is_guest' => $user === null,
-            'joined_at' => now(),
-            'last_seen_at' => now(),
-        ]);
+        $participant = DB::transaction(function () use ($conference, $user, $displayName, $token): ConferenceParticipant {
+            Conference::query()
+                ->whereKey($conference->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        if ($user !== null) {
-            $conference->invitations()
-                ->where('user_id', $user->id)
-                ->update([
-                    'joined_at' => now(),
-                    'last_opened_at' => now(),
-                ]);
-        }
+            $activeParticipantCount = ConferenceParticipant::query()
+                ->where('conference_id', $conference->id)
+                ->whereNull('left_at')
+                ->where('last_seen_at', '>=', $this->presenceCutoff())
+                ->count();
+
+            if ($activeParticipantCount >= max(2, (int) config('conference.max_participants', 12))) {
+                $this->throwRoomError(
+                    'participant_limit_reached',
+                    422,
+                    __('ui.conferences.participant_limit_reached'),
+                );
+            }
+
+            $participant = ConferenceParticipant::query()->create([
+                'conference_id' => $conference->id,
+                'user_id' => $user?->id,
+                'display_name' => $displayName,
+                'access_token_hash' => hash('sha256', $token),
+                'is_guest' => $user === null,
+                'joined_at' => now(),
+                'last_seen_at' => now(),
+            ]);
+
+            if ($user !== null) {
+                $conference->invitations()
+                    ->where('user_id', $user->id)
+                    ->update([
+                        'joined_at' => now(),
+                        'last_opened_at' => now(),
+                    ]);
+            }
+
+            return $participant;
+        });
 
         $messages = $this->recentMessages($conference);
 
@@ -58,9 +87,9 @@ class ConferenceRoomManager
             ],
             'participants' => $this->activeParticipants($conference),
             'messages' => $messages->map(fn (ConferenceMessage $message): array => $this->serializeMessage($message))->all(),
-            'signal_cursor' => (int) (ConferenceSignal::query()->where('conference_id', $conference->id)->max('id') ?? 0),
+            'signal_cursor' => 0,
             'message_cursor' => (int) ($messages->last()?->id ?? 0),
-            'ice_servers' => array_values((array) config('conference.ice_servers', [])),
+            ...$this->iceServerProvider->forParticipant($participant),
             'poll_interval_ms' => (int) config('conference.poll_interval_ms', 1200),
         ];
     }
@@ -73,7 +102,7 @@ class ConferenceRoomManager
         int $signalCursor,
         int $messageCursor,
     ): array {
-        abort_if($conference->ended_at !== null, 410, __('ui.conferences.ended_notice'));
+        $this->ensureConferenceIsActive($conference);
 
         $participant = $this->authenticatedParticipant($conference, $participantId, $participantToken);
         $participant->update(['last_seen_at' => now()]);
@@ -105,6 +134,7 @@ class ConferenceRoomManager
             'messages' => $messages->map(fn (ConferenceMessage $message): array => $this->serializeMessage($message))->all(),
             'signal_cursor' => (int) ($signals->last()?->id ?? $signalCursor),
             'message_cursor' => (int) ($messages->last()?->id ?? $messageCursor),
+            ...$this->iceServerProvider->forParticipant($participant),
         ];
     }
 
@@ -117,7 +147,7 @@ class ConferenceRoomManager
         string $type,
         array $payload,
     ): ConferenceSignal {
-        abort_if($conference->ended_at !== null, 410, __('ui.conferences.ended_notice'));
+        $this->ensureConferenceIsActive($conference);
 
         $participant = $this->authenticatedParticipant($conference, $participantId, $participantToken);
         abort_if($participant->id === $targetParticipantId, 422, __('ui.conferences.invalid_signal'));
@@ -144,7 +174,7 @@ class ConferenceRoomManager
         string $participantToken,
         string $body,
     ): ConferenceMessage {
-        abort_if($conference->ended_at !== null, 410, __('ui.conferences.ended_notice'));
+        $this->ensureConferenceIsActive($conference);
 
         $participant = $this->authenticatedParticipant($conference, $participantId, $participantToken);
 
@@ -160,10 +190,38 @@ class ConferenceRoomManager
     {
         $participant = $this->authenticatedParticipant($conference, $participantId, $participantToken, false);
 
-        $participant->update([
-            'left_at' => now(),
-            'last_seen_at' => now(),
-        ]);
+        DB::transaction(function () use ($participant): void {
+            $participant->update([
+                'left_at' => now(),
+                'last_seen_at' => now(),
+            ]);
+
+            $participant->sentSignals()->delete();
+            $participant->receivedSignals()->delete();
+        });
+    }
+
+    public function end(Conference $conference): void
+    {
+        DB::transaction(function () use ($conference): void {
+            if ($conference->ended_at === null) {
+                $conference->update([
+                    'ended_at' => now(),
+                ]);
+            }
+
+            ConferenceParticipant::query()
+                ->where('conference_id', $conference->id)
+                ->whereNull('left_at')
+                ->update([
+                    'left_at' => now(),
+                    'last_seen_at' => now(),
+                ]);
+
+            ConferenceSignal::query()
+                ->where('conference_id', $conference->id)
+                ->delete();
+        });
     }
 
     private function authenticatedParticipant(
@@ -179,7 +237,13 @@ class ConferenceRoomManager
         abort_unless($participant->tokenMatches($participantToken), 403);
 
         if ($mustBeActive) {
-            abort_if($participant->left_at !== null || $participant->last_seen_at->lt($this->presenceCutoff()), 410);
+            if ($participant->left_at !== null || $participant->last_seen_at->lt($this->presenceCutoff())) {
+                $this->throwRoomError(
+                    'participant_expired',
+                    410,
+                    __('ui.conferences.participant_expired'),
+                );
+            }
         }
 
         return $participant;
@@ -255,6 +319,25 @@ class ConferenceRoomManager
     private function presenceCutoff(): CarbonInterface
     {
         return now()->subSeconds((int) config('conference.presence_timeout_seconds', 30));
+    }
+
+    private function ensureConferenceIsActive(Conference $conference): void
+    {
+        if ($conference->ended_at !== null) {
+            $this->throwRoomError(
+                'conference_ended',
+                410,
+                __('ui.conferences.ended_notice'),
+            );
+        }
+    }
+
+    private function throwRoomError(string $code, int $status, string $message): never
+    {
+        throw new HttpResponseException(response()->json([
+            'message' => $message,
+            'code' => $code,
+        ], $status));
     }
 
     private function userDisplayName(User $user): string

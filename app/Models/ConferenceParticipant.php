@@ -36,6 +36,9 @@ class ConferenceParticipant extends Model
     /** @use HasFactory<ConferenceParticipantFactory> */
     use HasFactory;
 
+    /** @var list<string> */
+    protected $hidden = ['access_token_hash'];
+
     /** @return array<string, string> */
     protected function casts(): array
     {

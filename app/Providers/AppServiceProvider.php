@@ -202,6 +202,33 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('conference-room-realtime', function (Request $request): array {
+            $subject = $this->conferenceParticipantRateLimitSubject($request);
+
+            return [
+                Limit::perMinute(600)->by('conference-realtime:'.$subject),
+                Limit::perMinute(6000)->by('conference-realtime-ip:'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('conference-room-message', function (Request $request): array {
+            $subject = $this->conferenceParticipantRateLimitSubject($request);
+
+            return [
+                Limit::perMinute(120)->by('conference-message:'.$subject),
+                Limit::perMinute(1200)->by('conference-message-ip:'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('conference-room-leave', function (Request $request): array {
+            $subject = $this->conferenceParticipantRateLimitSubject($request);
+
+            return [
+                Limit::perMinute(30)->by('conference-leave:'.$subject),
+                Limit::perMinute(600)->by('conference-leave-ip:'.$request->ip()),
+            ];
+        });
+
         Date::use(CarbonImmutable::class);
 
         DB::prohibitDestructiveCommands(
@@ -217,5 +244,18 @@ class AppServiceProvider extends ServiceProvider
                 ->uncompromised()
             : null,
         );
+    }
+
+    private function conferenceParticipantRateLimitSubject(Request $request): string
+    {
+        $participantId = (string) $request->input('participant_id', '');
+        $participantToken = (string) $request->input('participant_token', '');
+        $conference = (string) $request->route('conference', '');
+
+        if ($participantId === '' || $participantToken === '' || $conference === '') {
+            return 'ip:'.$request->ip();
+        }
+
+        return 'participant:'.$conference.':'.$participantId.':'.hash('sha256', $participantToken);
     }
 }

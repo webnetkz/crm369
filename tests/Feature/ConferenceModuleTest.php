@@ -224,11 +224,26 @@ test('conference owners can invite more users and end conferences', function () 
     expect($firstInvitee->notifications()->count())->toBe(1)
         ->and($secondInvitee->notifications()->count())->toBe(1);
 
+    $firstParticipant = ConferenceParticipant::factory()->create([
+        'conference_id' => $conference->id,
+    ]);
+    $secondParticipant = ConferenceParticipant::factory()->create([
+        'conference_id' => $conference->id,
+    ]);
+    ConferenceSignal::factory()->create([
+        'conference_id' => $conference->id,
+        'sender_participant_id' => $firstParticipant->id,
+        'recipient_participant_id' => $secondParticipant->id,
+    ]);
+
     $this->actingAs($creator)
         ->patch(route('conferences.end', $conference))
         ->assertRedirect();
 
-    expect($conference->fresh()->ended_at)->not->toBeNull();
+    expect($conference->fresh()->ended_at)->not->toBeNull()
+        ->and($firstParticipant->fresh()->left_at)->not->toBeNull()
+        ->and($secondParticipant->fresh()->left_at)->not->toBeNull()
+        ->and(ConferenceSignal::query()->where('conference_id', $conference->id)->exists())->toBeFalse();
 });
 
 test('conference routes return service unavailable when the conference tables are missing', function () {
@@ -271,7 +286,7 @@ test('guests can join a local room exchange signals and use local chat', functio
     $firstJoin = $this->postJson($joinUrl, ['display_name' => 'Guest One'])
         ->assertCreated()
         ->assertJsonPath('participant.display_name', 'Guest One')
-        ->assertJsonPath('ice_servers', [])
+        ->assertJsonPath('ice_servers.0.urls.0', 'stun:stun.cloudflare.com:3478')
         ->json();
 
     $secondJoin = $this->postJson($joinUrl, ['display_name' => 'Guest Two'])
@@ -281,18 +296,35 @@ test('guests can join a local room exchange signals and use local chat', functio
 
     expect($firstJoin['participant']['token'])->toHaveLength(64)
         ->and($secondJoin['participant']['token'])->toHaveLength(64)
+        ->and($firstJoin['signal_cursor'])->toBe(0)
+        ->and($secondJoin['signal_cursor'])->toBe(0)
         ->and(ConferenceParticipant::query()->count())->toBe(2);
 
-    $this->postJson(route('conferences.public.room.signals.store', [
+    $signalUrl = route('conferences.public.room.signals.store', [
         'conference' => $conference->public_token,
-    ]), [
+    ]);
+    $sessionDescription = "v=0\r\na=ssrc:123456789 cname:conference-test\r\n";
+
+    $this->postJson($signalUrl, [
+        'participant_id' => $firstJoin['participant']['id'],
+        'participant_token' => $firstJoin['participant']['token'],
+        'target_participant_id' => $secondJoin['participant']['id'],
+        'type' => 'ice-candidate',
+        'payload' => [
+            'candidate' => 'candidate-before-offer',
+            'sdpMid' => '0',
+            'sdpMLineIndex' => 0,
+        ],
+    ])->assertCreated();
+
+    $this->postJson($signalUrl, [
         'participant_id' => $firstJoin['participant']['id'],
         'participant_token' => $firstJoin['participant']['token'],
         'target_participant_id' => $secondJoin['participant']['id'],
         'type' => 'offer',
         'payload' => [
             'type' => 'offer',
-            'sdp' => 'local-session-description',
+            'sdp' => $sessionDescription,
         ],
     ])->assertCreated();
 
@@ -313,12 +345,17 @@ test('guests can join a local room exchange signals and use local chat', functio
         'message_cursor' => 0,
     ])
         ->assertSuccessful()
-        ->assertJsonPath('signals.0.type', 'offer')
-        ->assertJsonPath('signals.0.sender_participant_id', $firstJoin['participant']['id'])
+        ->assertJsonPath('signals.0.type', 'ice-candidate')
+        ->assertJsonPath('signals.1.type', 'offer')
+        ->assertJsonPath('signals.1.sender_participant_id', $firstJoin['participant']['id'])
+        ->assertJsonPath('signals.1.payload.sdp', $sessionDescription)
         ->assertJsonPath('messages.0.body', 'Локальное сообщение');
 
-    expect(ConferenceSignal::query()->count())->toBe(1)
-        ->and(ConferenceMessage::query()->count())->toBe(1);
+    $storedOffer = ConferenceSignal::query()->where('type', 'offer')->firstOrFail();
+
+    expect(ConferenceSignal::query()->count())->toBe(2)
+        ->and(ConferenceMessage::query()->count())->toBe(1)
+        ->and($storedOffer->payload['sdp'])->toBe($sessionDescription);
 
     $this->postJson(route('conferences.public.room.leave', [
         'conference' => $conference->public_token,
@@ -328,7 +365,95 @@ test('guests can join a local room exchange signals and use local chat', functio
     ])->assertSuccessful();
 
     expect(ConferenceParticipant::query()->findOrFail($firstJoin['participant']['id'])->left_at)
-        ->not->toBeNull();
+        ->not->toBeNull()
+        ->and(ConferenceSignal::query()->count())->toBe(0);
+});
+
+test('expired conference signals are pruned while active signals remain', function () {
+    $conference = Conference::factory()->create();
+    $sender = ConferenceParticipant::factory()->create([
+        'conference_id' => $conference->id,
+    ]);
+    $recipient = ConferenceParticipant::factory()->create([
+        'conference_id' => $conference->id,
+    ]);
+
+    $expiredSignal = ConferenceSignal::factory()->create([
+        'conference_id' => $conference->id,
+        'sender_participant_id' => $sender->id,
+        'recipient_participant_id' => $recipient->id,
+        'expires_at' => now()->subSecond(),
+    ]);
+    $activeSignal = ConferenceSignal::factory()->create([
+        'conference_id' => $conference->id,
+        'sender_participant_id' => $sender->id,
+        'recipient_participant_id' => $recipient->id,
+        'expires_at' => now()->addMinute(),
+    ]);
+
+    $this->artisan('model:prune', [
+        '--model' => [ConferenceSignal::class],
+    ])->assertSuccessful();
+
+    expect($expiredSignal->fresh())->toBeNull()
+        ->and($activeSignal->fresh())->not->toBeNull();
+});
+
+test('conference turn secret generates expiring participant credentials without exposing the secret', function () {
+    config([
+        'conference.stun_urls' => ['stun:stun.example.test:3478'],
+        'conference.turn_urls' => [
+            'turn:turn.example.test:3478?transport=udp',
+            'turns:turn.example.test:443?transport=tcp',
+        ],
+        'conference.turn_username' => '',
+        'conference.turn_credential' => '',
+        'conference.turn_secret' => 'server-only-turn-secret',
+        'conference.turn_credential_ttl_seconds' => 600,
+    ]);
+
+    $conference = Conference::factory()->create([
+        'allow_external_guests' => true,
+    ]);
+
+    $join = $this->postJson(route('conferences.public.room.join', [
+        'conference' => $conference->public_token,
+    ]), [
+        'display_name' => 'TURN guest',
+    ])->assertCreated()->json();
+
+    $turnServer = $join['ice_servers'][1];
+    [$expiresAt, $participantName] = explode(':', $turnServer['username'], 2);
+
+    expect($turnServer['urls'])->toBe([
+        'turn:turn.example.test:3478?transport=udp',
+        'turns:turn.example.test:443?transport=tcp',
+    ])
+        ->and($join['ice_servers_expires_at'])->toBe((int) $expiresAt)
+        ->and((int) $expiresAt)->toBeGreaterThan(now()->addMinutes(7)->timestamp)
+        ->and($participantName)->toBe('conference-'.$join['participant']['id'])
+        ->and($turnServer['credential'])->toBe(base64_encode(hash_hmac(
+            'sha1',
+            $turnServer['username'],
+            'server-only-turn-secret',
+            true,
+        )))
+        ->and(json_encode($join))->not->toContain('server-only-turn-secret');
+
+    config(['conference.presence_timeout_seconds' => 600]);
+    $this->travel(3)->minutes();
+
+    $sync = $this->postJson(route('conferences.public.room.sync', [
+        'conference' => $conference->public_token,
+    ]), [
+        'participant_id' => $join['participant']['id'],
+        'participant_token' => $join['participant']['token'],
+        'signal_cursor' => 0,
+        'message_cursor' => 0,
+    ])->assertSuccessful()->json();
+
+    expect($sync['ice_servers'][1]['username'])->not->toBe($turnServer['username'])
+        ->and($sync['ice_servers_expires_at'])->toBeGreaterThan((int) $expiresAt);
 });
 
 test('local room rejects private guests ended meetings and cross room signaling', function () {
@@ -343,7 +468,9 @@ test('local room rejects private guests ended meetings and cross room signaling'
 
     $this->postJson(route('conferences.public.room.join', [
         'conference' => $endedConference->public_token,
-    ]), ['display_name' => 'Late guest'])->assertStatus(410);
+    ]), ['display_name' => 'Late guest'])
+        ->assertStatus(410)
+        ->assertJsonPath('code', 'conference_ended');
 
     $firstConference = Conference::factory()->create(['allow_external_guests' => true]);
     $secondConference = Conference::factory()->create(['allow_external_guests' => true]);
@@ -365,6 +492,47 @@ test('local room rejects private guests ended meetings and cross room signaling'
         'type' => 'offer',
         'payload' => ['type' => 'offer', 'sdp' => 'cross-room'],
     ])->assertNotFound();
+});
+
+test('local room expires stale participants with a machine readable response and limits room size', function () {
+    config([
+        'conference.presence_timeout_seconds' => 120,
+        'conference.max_participants' => 2,
+    ]);
+
+    $conference = Conference::factory()->create([
+        'allow_external_guests' => true,
+    ]);
+    $joinUrl = route('conferences.public.room.join', [
+        'conference' => $conference->public_token,
+    ]);
+
+    $firstParticipant = $this->postJson($joinUrl, [
+        'display_name' => 'First participant',
+    ])->assertCreated()->json('participant');
+
+    $this->postJson($joinUrl, [
+        'display_name' => 'Second participant',
+    ])->assertCreated();
+
+    $this->postJson($joinUrl, [
+        'display_name' => 'Third participant',
+    ])
+        ->assertUnprocessable()
+        ->assertJsonPath('code', 'participant_limit_reached');
+
+    $this->travel(121)->seconds();
+
+    $this->postJson(route('conferences.public.room.sync', [
+        'conference' => $conference->public_token,
+    ]), [
+        'participant_id' => $firstParticipant['id'],
+        'participant_token' => $firstParticipant['token'],
+        'signal_cursor' => 0,
+        'message_cursor' => 0,
+    ])
+        ->assertStatus(410)
+        ->assertJsonPath('code', 'participant_expired');
 });
 
 test('invited users and super admins can access private local conferences', function () {

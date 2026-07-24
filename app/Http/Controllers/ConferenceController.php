@@ -8,6 +8,7 @@ use App\Models\Conference;
 use App\Models\User;
 use App\Support\ConferenceInvitationManager;
 use App\Support\ConferencePageData;
+use App\Support\ConferenceRoomManager;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -81,8 +82,11 @@ class ConferenceController extends Controller
         ));
     }
 
-    public function end(Request $request, string $conference): RedirectResponse
-    {
+    public function end(
+        Request $request,
+        string $conference,
+        ConferenceRoomManager $roomManager,
+    ): RedirectResponse {
         $this->ensureConferencesTablesExist();
 
         $user = $request->user();
@@ -91,11 +95,7 @@ class ConferenceController extends Controller
         $managedConference = $this->findConference($conference);
         abort_unless($managedConference->canBeManagedBy($user), 403);
 
-        if ($managedConference->ended_at === null) {
-            $managedConference->update([
-                'ended_at' => now(),
-            ]);
-        }
+        $roomManager->end($managedConference);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.conferences.ended_success')]);
 

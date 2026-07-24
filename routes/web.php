@@ -226,16 +226,16 @@ Route::prefix('conferences/public/{conference}/room')
             ->middleware('throttle:20,1,conference-room-join')
             ->name('join');
         Route::post('sync', [PublicConferenceRoomController::class, 'sync'])
-            ->middleware('throttle:1200,1,conference-room-realtime')
+            ->middleware('throttle:conference-room-realtime')
             ->name('sync');
         Route::post('signals', [PublicConferenceRoomController::class, 'signal'])
-            ->middleware('throttle:1200,1,conference-room-realtime')
+            ->middleware('throttle:conference-room-realtime')
             ->name('signals.store');
         Route::post('messages', [PublicConferenceRoomController::class, 'message'])
-            ->middleware('throttle:120,1,conference-room-message')
+            ->middleware('throttle:conference-room-message')
             ->name('messages.store');
         Route::post('leave', [PublicConferenceRoomController::class, 'leave'])
-            ->middleware('throttle:120,1,conference-room-leave')
+            ->middleware('throttle:conference-room-leave')
             ->name('leave');
     });
 Route::get('edo/public/{edoDocument:public_token}', [PublicEdoSigningController::class, 'show'])

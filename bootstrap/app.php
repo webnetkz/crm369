@@ -24,7 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
-        $middleware->trimStrings(except: ['body']);
+        $middleware->trimStrings(except: ['body', 'payload.sdp']);
         $middleware->preventRequestForgery(except: [
             'portal-webhooks/*',
         ]);
