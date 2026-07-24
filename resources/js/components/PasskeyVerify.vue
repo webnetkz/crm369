@@ -51,7 +51,8 @@ const { verify, isLoading, error, isSupported } = usePasskeyVerify({
                 <KeyRound v-else class="h-4 w-4" />
                 {{
                     isLoading
-                        ? (props.loadingLabel ?? t.passkeys.loading_authentication)
+                        ? (props.loadingLabel ??
+                          t.passkeys.loading_authentication)
                         : (props.label ?? t.passkeys.sign_in)
                 }}
             </Button>
@@ -67,7 +68,7 @@ const { verify, isLoading, error, isSupported } = usePasskeyVerify({
             </div>
             <div class="relative flex justify-center text-xs uppercase">
                 <span class="bg-background px-2 text-muted-foreground">
-                    {{ props.separator ?? 'Or continue with email' }}
+                    {{ props.separator ?? t.passkeys.continue_with_email }}
                 </span>
             </div>
         </div>

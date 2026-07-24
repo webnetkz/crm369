@@ -231,6 +231,20 @@ test('settings pages use localized file picker component', function () {
         ->toContain('type="file"');
 });
 
+test('passkey email separator uses localized message', function () {
+    $component = file_get_contents(resource_path('js/components/PasskeyVerify.vue'));
+    $russianTranslations = require lang_path('ru/ui/passkeys.php');
+    $englishTranslations = require lang_path('en/ui/passkeys.php');
+
+    expect($component)
+        ->toContain('t.passkeys.continue_with_email')
+        ->not->toContain("'Or continue with email'")
+        ->and($russianTranslations['continue_with_email'])
+        ->toBe('Или продолжить с помощью электронной почты')
+        ->and($englishTranslations['continue_with_email'])
+        ->toBe('Or continue with email');
+});
+
 test('language tabs are rendered on profile page instead of appearance page', function () {
     $profilePage = file_get_contents(resource_path('js/pages/settings/Profile.vue'));
     $appearancePage = file_get_contents(resource_path('js/pages/settings/Appearance.vue'));

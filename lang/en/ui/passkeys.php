@@ -2,6 +2,7 @@
 
 return [
     'add' => 'Add passkey',
+    'continue_with_email' => 'Or continue with email',
     'delete' => 'Delete key',
     'delete_confirm' => 'Are you sure you want to delete the key “:name”? You will no longer be able to use it to sign in.',
     'delete_title' => 'Delete passkey',
