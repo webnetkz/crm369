@@ -264,8 +264,13 @@ private fun PortalWebView(
                 }
 
                 setDownloadListener { downloadUrl, userAgent, contentDisposition, mimeType, _ ->
-                    enqueueDownload(viewContext, downloadUrl, userAgent, contentDisposition, mimeType)
-                    messenger.show(downloadStarted)
+                    // DownloadManager throws for non-HTTP(S) URLs (blob:/data: exports) and bad destinations.
+                    try {
+                        enqueueDownload(viewContext, downloadUrl, userAgent, contentDisposition, mimeType)
+                        messenger.show(downloadStarted)
+                    } catch (exception: Exception) {
+                        messenger.showError(exception)
+                    }
                 }
 
                 view = this

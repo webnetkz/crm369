@@ -24,6 +24,7 @@ class ApiEdoDocumentResource extends JsonResource
             'external_reference' => $document->external_reference,
             'counterparty_name' => $document->counterparty_name,
             'counterparty_identifier' => $document->counterparty_identifier,
+            'counterparty_email' => $document->counterparty_email,
             'content' => $document->content,
             'document_source' => $document->document_source,
             'source_file_entry_id' => $document->source_file_entry_id,

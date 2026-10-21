@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.appswebnetkz.crm369.feature.knowledge
 
 import android.net.Uri

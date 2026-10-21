@@ -97,7 +97,6 @@ fun EdoFormScreen(documentId: Long?) {
     val source = state.string("document_source").ifBlank { EdoDocument.SOURCE_TEXT }
     val current = existing
     val sourceOptions = EdoDocument.SOURCES.map { value -> Option(value, edoSourceLabel(value)) }
-    val emailHint = if (current != null && current.counterpartyEmail == null) stringResource(R.string.edo_email_edit_hint) else null
     val specs = buildList {
         add(FieldSpec.Text("title", stringResource(R.string.edo_title_label), required = true, maxLength = 255))
         add(FieldSpec.Text("external_reference", stringResource(R.string.edo_external_reference), maxLength = 255))
@@ -110,7 +109,7 @@ fun EdoFormScreen(documentId: Long?) {
                 hint = stringResource(R.string.edo_identifier_hint),
             ),
         )
-        add(FieldSpec.Email("counterparty_email", stringResource(R.string.edo_counterparty_email), hint = emailHint))
+        add(FieldSpec.Email("counterparty_email", stringResource(R.string.edo_counterparty_email)))
         add(FieldSpec.Select("document_source", stringResource(R.string.edo_document_source), sourceOptions, required = true))
         if (source == EdoDocument.SOURCE_TEXT) {
             add(FieldSpec.Multiline("content", stringResource(R.string.edo_content), required = true, minLines = 6))

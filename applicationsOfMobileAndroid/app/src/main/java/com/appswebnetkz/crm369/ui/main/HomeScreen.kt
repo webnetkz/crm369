@@ -206,7 +206,8 @@ private fun visibleWidgets(configuration: JsonObject?): List<String> {
     val active = dashboards.firstOrNull { it.str("id") == activeId } ?: dashboards.firstOrNull() ?: return defaults
     val widgets = active.objects("widgets")
     if (widgets.isEmpty()) return defaults
-    return widgets.filter { it.boolOr("visible", true) }.mapNotNull { it.text("id") }
+    // distinct(): every widget id becomes a LazyColumn key, and a duplicated key crashes the list.
+    return widgets.filter { it.boolOr("visible", true) }.mapNotNull { it.text("id") }.distinct()
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.dashboardItems(data: JsonObject) {

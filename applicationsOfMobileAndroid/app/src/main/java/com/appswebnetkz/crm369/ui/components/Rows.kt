@@ -37,6 +37,7 @@ import com.appswebnetkz.crm369.ui.theme.AppIcons
  * Standard list row (Material 3 ListItem): optional leading content (Avatar / Icon), title,
  * subtitle, overline and trailing content. Clickable when [onClick] is set.
  */
+@OptIn(ExperimentalMaterial3Api::class) // ListItem was experimental in earlier material3 releases
 @Composable
 fun ListRow(
     title: String,

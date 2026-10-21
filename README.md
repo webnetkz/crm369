@@ -76,7 +76,7 @@ cd /var/www/crm369 && sudo -u www-data php8.4 artisan optimize
 
 ## Native Android API and Firebase push notifications
 
-The native Android application uses the `/api/mobile/v1` API. Mobile sessions are stored as hashed bearer tokens and expire after 365 days by default. System and chat push notifications use Firebase Cloud Messaging HTTP v1 and the existing `notifications` queue worker.
+The native Android application lives in [applicationsOfMobileAndroid](applicationsOfMobileAndroid/README.md) and uses the `/api/mobile/v1` API. One application build works with any CRM369 installation: the user enters the portal domain, the application discovers it through the public `GET /api/mobile/v1/portal` endpoint and signs in. Mobile sessions are stored as hashed bearer tokens and expire after 365 days by default. Administration pages and conference rooms open inside the application through a single-use web-session link (`POST /api/mobile/v1/web-session`). System and chat push notifications use Firebase Cloud Messaging HTTP v1 and the existing `notifications` queue worker.
 
 To enable real push delivery, create a Firebase service account with access to Firebase Cloud Messaging and store its JSON credentials outside the application directory. For example:
 
@@ -92,7 +92,12 @@ FCM_PROJECT_ID=your-firebase-project-id
 FCM_SERVICE_ACCOUNT_PATH=/etc/crm369/firebase-service-account.json
 FCM_CONNECT_TIMEOUT_SECONDS=5
 FCM_TIMEOUT_SECONDS=10
+FCM_ANDROID_APP_ID=1:000000000000:android:0000000000000000
+FCM_ANDROID_API_KEY=your-android-client-api-key
+FCM_SENDER_ID=000000000000
 ```
+
+The last three values are the public client options of the Android application (package `com.appswebnetkz.crm369.android`) registered in the same Firebase project: `mobilesdk_app_id`, `api_key.current_key` and `project_number` from its `google-services.json`. The portal hands them to the application at sign-in, so the application does not need a `google-services.json` of its own.
 
 Apply migrations, rebuild Laravel's cache, and restart the notification worker:
 

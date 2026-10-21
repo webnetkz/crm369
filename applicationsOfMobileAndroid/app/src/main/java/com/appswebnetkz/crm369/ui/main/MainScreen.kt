@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -76,6 +77,7 @@ private fun buildTabs(bootstrap: Bootstrap?): List<MainTab> {
  * Main screen with the bottom navigation (like Bitrix24): Home, Chats, Tasks, CRM, Menu.
  * Tabs depend on the user's abilities from `GET bootstrap`.
  */
+@OptIn(ExperimentalMaterial3Api::class) // BadgedBox/Badge were experimental in earlier material3 releases
 @Composable
 fun MainScreen(initialTab: String?) {
     val container = LocalAppContainer.current

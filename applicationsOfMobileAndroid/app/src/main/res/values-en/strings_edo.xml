@@ -26,7 +26,6 @@
     <string name="edo_counterparty_identifier">Counterparty BIN/IIN</string>
     <string name="edo_identifier_hint">12 digits</string>
     <string name="edo_counterparty_email">Counterparty email</string>
-    <string name="edo_email_edit_hint">The server does not return the saved email: leaving this field empty removes the counterparty email.</string>
     <string name="edo_document_source">Document source</string>
     <string name="edo_content">Document text</string>
     <string name="edo_upload_label">Document file</string>

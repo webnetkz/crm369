@@ -1310,6 +1310,7 @@ test('edo documents can be listed created shown updated shared and deleted with 
         ->assertJsonPath('message', trans('ui.edo.created_success', [], 'en'))
         ->assertJsonPath('data.title', 'Supply agreement')
         ->assertJsonPath('data.counterparty_identifier', '123456789012')
+        ->assertJsonPath('data.counterparty_email', 'legal@acme.test')
         ->assertJsonPath('data.document_source', EdoDocument::SOURCE_UPLOAD)
         ->assertJsonPath('data.document_file.original_name', 'supply-agreement.pdf')
         ->assertJsonPath('data.document_file.size_bytes', 15)

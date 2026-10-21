@@ -26,7 +26,6 @@
     <string name="edo_counterparty_identifier">БИН/ИИН контрагента</string>
     <string name="edo_identifier_hint">12 цифр</string>
     <string name="edo_counterparty_email">Email контрагента</string>
-    <string name="edo_email_edit_hint">Сервер не возвращает сохранённый email: если оставить поле пустым, email контрагента будет удалён.</string>
     <string name="edo_document_source">Источник документа</string>
     <string name="edo_content">Текст документа</string>
     <string name="edo_upload_label">Файл документа</string>

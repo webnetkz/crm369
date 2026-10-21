@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -230,6 +231,7 @@ fun ContactDetailScreen(contactId: Long) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class) // AssistChip was experimental in earlier material3 releases
 @Composable
 private fun QuickActions(contact: Contact) {
     val navigator = LocalNavigator.current
