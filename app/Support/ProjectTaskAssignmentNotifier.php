@@ -9,6 +9,11 @@ use Illuminate\Support\Facades\Lang;
 
 class ProjectTaskAssignmentNotifier
 {
+    public function sendForNewTask(ProjectTask $task, User $actor): void
+    {
+        $this->sendForAssignmentChanges($task, $actor, notifyActor: true);
+    }
+
     /**
      * @param  array<int, int>  $previousCoAssigneeUserIds
      */
@@ -17,6 +22,7 @@ class ProjectTaskAssignmentNotifier
         User $actor,
         ?int $previousAssigneeUserId = null,
         array $previousCoAssigneeUserIds = [],
+        bool $notifyActor = false,
     ): void {
         $task->load([
             'assignee:id,name,last_name,email,language,has_selected_language',
@@ -25,12 +31,14 @@ class ProjectTaskAssignmentNotifier
 
         $assignee = $task->assignee;
 
-        if (
-            $assignee instanceof User
-            && $assignee->id !== $previousAssigneeUserId
-            && ! $assignee->is($actor)
-        ) {
-            $this->sendManualAssignmentNotification($assignee, $task, $actor);
+        if ($assignee instanceof User && $assignee->id !== $previousAssigneeUserId) {
+            if ($assignee->is($actor) && $notifyActor) {
+                $this->sendTaskCreatedNotification($assignee, $task);
+            }
+
+            if (! $assignee->is($actor)) {
+                $this->sendManualAssignmentNotification($assignee, $task, $actor);
+            }
         }
 
         $task->coAssignees
@@ -71,6 +79,20 @@ class ProjectTaskAssignmentNotifier
             message: Lang::get('ui.notifications.task_assigned_message', [
                 'title' => $task->title,
                 'user' => $this->displayName($actor),
+            ], $locale),
+            actionUrl: route('projects.workspace.tasks.show', $task),
+            actionLabel: Lang::get('ui.notifications.open_target', [], $locale),
+        ));
+    }
+
+    private function sendTaskCreatedNotification(User $assignee, ProjectTask $task): void
+    {
+        $locale = $assignee->resolvedLanguage();
+
+        $assignee->notify(new SystemNotification(
+            title: Lang::get('ui.notifications.task_created_title', [], $locale),
+            message: Lang::get('ui.notifications.task_created_message', [
+                'title' => $task->title,
             ], $locale),
             actionUrl: route('projects.workspace.tasks.show', $task),
             actionLabel: Lang::get('ui.notifications.open_target', [], $locale),

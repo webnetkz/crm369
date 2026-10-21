@@ -31,6 +31,8 @@ return [
     'review_registered_user' => 'Review user',
     'task_due_soon_message' => 'The task ":title" is due in less than 24 hours.',
     'task_due_soon_title' => 'Task due soon',
+    'task_created_message' => 'A new task ":title" was created for you.',
+    'task_created_title' => 'New task created',
     'task_assigned_from_form_message' => 'A new task ":title" was created for you from the form ":form".',
     'task_assigned_message' => ':user assigned the task ":title" to you.',
     'task_assigned_title' => 'New assigned task',

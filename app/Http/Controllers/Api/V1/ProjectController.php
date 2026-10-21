@@ -113,7 +113,7 @@ class ProjectController extends Controller
 
         $task = $this->createTask($request, $project);
         $task->coAssignees()->sync($request->coAssigneeUserIds());
-        $taskAssignmentNotifier->sendForAssignmentChanges($task, $user);
+        $taskAssignmentNotifier->sendForNewTask($task, $user);
 
         return response()->json([
             'message' => __('ui.projects.task_created_success'),

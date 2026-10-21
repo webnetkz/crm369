@@ -246,7 +246,7 @@ class ProjectController extends Controller
         $task = $this->createTask($request, $visibleProject);
         $task->coAssignees()->sync($request->coAssigneeUserIds());
         $taskConversationManager->ensureForTask($task, $request->user());
-        $taskAssignmentNotifier->sendForAssignmentChanges($task, $request->user());
+        $taskAssignmentNotifier->sendForNewTask($task, $request->user());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.projects.task_created_success')]);
 
@@ -272,7 +272,7 @@ class ProjectController extends Controller
         $task = $this->createTask($request, $project);
         $task->coAssignees()->sync($request->coAssigneeUserIds());
         $taskConversationManager->ensureForTask($task, $request->user());
-        $taskAssignmentNotifier->sendForAssignmentChanges($task, $request->user());
+        $taskAssignmentNotifier->sendForNewTask($task, $request->user());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.projects.task_created_success')]);
 

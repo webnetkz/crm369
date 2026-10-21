@@ -31,6 +31,8 @@ return [
     'review_registered_user' => 'Открыть пользователя',
     'task_due_soon_message' => 'Срок задачи ":title" наступит меньше чем через 24 часа.',
     'task_due_soon_title' => 'Срок задачи скоро',
+    'task_created_message' => 'Для вас создана новая задача ":title".',
+    'task_created_title' => 'Создана новая задача',
     'task_assigned_from_form_message' => 'Для вас создана задача ":title" из формы ":form".',
     'task_assigned_message' => ':user назначил(а) вам задачу ":title".',
     'task_assigned_title' => 'Новая назначенная задача',

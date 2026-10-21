@@ -711,6 +711,40 @@ test('new task assignees and co assignees receive notifications without repeats 
     Notification::assertSentTimes(SystemNotification::class, 2);
 });
 
+test('task creator receives a notification when creating a task for themselves', function () {
+    $creator = User::factory()->create();
+
+    Notification::fake();
+
+    $this->actingAs($creator)
+        ->post(route('projects.workspace.tasks.store'), [
+            'project_id' => null,
+            'parent_task_id' => null,
+            'title' => 'Prepare weekly summary',
+            'description' => 'Summarize the completed work.',
+            'status' => ProjectTask::STATUS_TODO,
+            'importance' => ProjectTask::IMPORTANCE_NORMAL,
+            'complexity' => 3,
+            'due_at' => null,
+            'sort_order' => 0,
+            'assignee_user_id' => $creator->id,
+            'co_assignee_user_ids' => [],
+        ])
+        ->assertRedirect();
+
+    Notification::assertSentTo(
+        $creator,
+        SystemNotification::class,
+        fn (SystemNotification $notification): bool => $notification->toArray($creator)['title']
+            === __('ui.notifications.task_created_title', [], $creator->resolvedLanguage())
+            && $notification->toArray($creator)['message']
+            === __('ui.notifications.task_created_message', [
+                'title' => 'Prepare weekly summary',
+            ], $creator->resolvedLanguage()),
+    );
+    Notification::assertSentTimes(SystemNotification::class, 1);
+});
+
 test('user can create a standalone task directly in the workspace', function () {
     $creator = User::factory()->create();
     $assignee = User::factory()->create();
