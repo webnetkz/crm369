@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Contacts module, English. Keep the key set identical to values/strings_contacts.xml. -->
+<resources>
+    <string name="contacts_title">Contacts</string>
+    <string name="contacts_total">Total: %1$d</string>
+    <string name="contacts_search">Name, company, email, phone</string>
+    <string name="contacts_filter">Filter</string>
+    <string name="contacts_new">New contact</string>
+    <string name="contacts_edit">Edit contact</string>
+    <string name="contacts_empty">No contacts yet</string>
+    <string name="contacts_empty_search">Try changing the search query or filters.</string>
+
+    <string name="contacts_type">Contact type</string>
+    <string name="contacts_type_all">All types</string>
+    <string name="contacts_type_person">Person</string>
+    <string name="contacts_type_company">Company</string>
+
+    <string name="contacts_blacklist_all">All contacts</string>
+    <string name="contacts_blacklist_only">Blacklisted only</string>
+    <string name="contacts_blacklist_exclude">Without blacklist</string>
+    <string name="contacts_blacklisted">Blacklisted</string>
+    <string name="contacts_blacklist_switch">Blacklist</string>
+    <string name="contacts_blacklist_hint">Mark a contact when your team should avoid working with them or keep them under separate control.</string>
+
+    <string name="contacts_full_name">Full name</string>
+    <string name="contacts_company_name">Company name</string>
+    <string name="contacts_contact_person">Contact person</string>
+    <string name="contacts_position">Position</string>
+    <string name="contacts_phone">Phone</string>
+    <string name="contacts_email">Email</string>
+    <string name="contacts_notes">General note</string>
+    <string name="contacts_choose_photo">Choose photo</string>
+
+    <string name="contacts_section_contacts">Contact details</string>
+    <string name="contacts_section_requisites">Requisites</string>
+    <string name="contacts_iin">IIN</string>
+    <string name="contacts_bin">BIN</string>
+    <string name="contacts_digits_hint">Exactly 12 digits</string>
+    <string name="contacts_legal_address">Legal address</string>
+    <string name="contacts_actual_address">Actual address</string>
+    <string name="contacts_bank_name">Bank</string>
+    <string name="contacts_bank_bik">BIK</string>
+    <string name="contacts_iban">IIC / IBAN</string>
+    <string name="contacts_kbe">KBe</string>
+
+    <string name="contacts_call">Call</string>
+    <string name="contacts_whatsapp">WhatsApp</string>
+    <string name="contacts_write_email">Email</string>
+
+    <string name="contacts_comments">Work history</string>
+    <string name="contacts_comments_empty">No history entries for this contact yet.</string>
+    <string name="contacts_comment_placeholder">A call, meeting, agreement or next step</string>
+
+    <string name="contacts_created">Created</string>
+    <string name="contacts_updated">Last update</string>
+    <string name="contacts_created_message">Contact created</string>
+    <string name="contacts_saved_message">Contact updated</string>
+    <string name="contacts_deleted">Contact deleted</string>
+    <string name="contacts_delete_title">Delete contact?</string>
+    <string name="contacts_delete_text">The contact and its history will be deleted permanently.</string>
+</resources>

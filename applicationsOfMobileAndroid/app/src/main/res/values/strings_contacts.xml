@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Contacts module (reference feature). English: values-en/strings_contacts.xml. -->
+<resources>
+    <string name="contacts_title">Контакты</string>
+    <string name="contacts_total">Всего: %1$d</string>
+    <string name="contacts_search">Имя, компания, email, телефон</string>
+    <string name="contacts_filter">Фильтр</string>
+    <string name="contacts_new">Новый контакт</string>
+    <string name="contacts_edit">Редактирование контакта</string>
+    <string name="contacts_empty">Контактов пока нет</string>
+    <string name="contacts_empty_search">Попробуйте изменить запрос или фильтры.</string>
+
+    <string name="contacts_type">Тип контакта</string>
+    <string name="contacts_type_all">Все типы</string>
+    <string name="contacts_type_person">Физическое лицо</string>
+    <string name="contacts_type_company">Юридическое лицо</string>
+
+    <string name="contacts_blacklist_all">Все контакты</string>
+    <string name="contacts_blacklist_only">Только чёрный список</string>
+    <string name="contacts_blacklist_exclude">Без чёрного списка</string>
+    <string name="contacts_blacklisted">В чёрном списке</string>
+    <string name="contacts_blacklist_switch">Чёрный список</string>
+    <string name="contacts_blacklist_hint">Пометьте контакт, если с ним нельзя работать или его нужно отдельно отслеживать.</string>
+
+    <string name="contacts_full_name">ФИО</string>
+    <string name="contacts_company_name">Название компании</string>
+    <string name="contacts_contact_person">Контактное лицо</string>
+    <string name="contacts_position">Должность</string>
+    <string name="contacts_phone">Телефон</string>
+    <string name="contacts_email">Email</string>
+    <string name="contacts_notes">Общий комментарий</string>
+    <string name="contacts_choose_photo">Выбрать фото</string>
+
+    <string name="contacts_section_contacts">Контактные данные</string>
+    <string name="contacts_section_requisites">Реквизиты</string>
+    <string name="contacts_iin">ИИН</string>
+    <string name="contacts_bin">БИН</string>
+    <string name="contacts_digits_hint">Ровно 12 цифр</string>
+    <string name="contacts_legal_address">Юридический адрес</string>
+    <string name="contacts_actual_address">Фактический адрес</string>
+    <string name="contacts_bank_name">Банк</string>
+    <string name="contacts_bank_bik">БИК</string>
+    <string name="contacts_iban">ИИК / IBAN</string>
+    <string name="contacts_kbe">КБе</string>
+
+    <string name="contacts_call">Позвонить</string>
+    <string name="contacts_whatsapp">WhatsApp</string>
+    <string name="contacts_write_email">Написать</string>
+
+    <string name="contacts_comments">История работы</string>
+    <string name="contacts_comments_empty">История по контакту пока пуста.</string>
+    <string name="contacts_comment_placeholder">Звонок, встреча, договорённость или следующий шаг</string>
+
+    <string name="contacts_created">Создан</string>
+    <string name="contacts_updated">Последнее изменение</string>
+    <string name="contacts_created_message">Контакт создан</string>
+    <string name="contacts_saved_message">Контакт обновлён</string>
+    <string name="contacts_deleted">Контакт удалён</string>
+    <string name="contacts_delete_title">Удалить контакт?</string>
+    <string name="contacts_delete_text">Контакт и его история будут удалены без возможности восстановления.</string>
+</resources>

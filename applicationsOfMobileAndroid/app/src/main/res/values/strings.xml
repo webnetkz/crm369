@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Core strings (default locale: Russian). English translations live in values-en/strings.xml.
+    Feature strings live in strings_<feature>.xml with the <feature>_ prefix.
+-->
+<resources>
+    <string name="app_name">CRM369</string>
+
+    <!-- Common actions -->
+    <string name="action_back">Назад</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_clear">Очистить</string>
+    <string name="action_close">Закрыть</string>
+    <string name="action_confirm">Подтвердить</string>
+    <string name="action_delete">Удалить</string>
+    <string name="action_done">Готово</string>
+    <string name="action_edit">Изменить</string>
+    <string name="action_ok">ОК</string>
+    <string name="action_refresh">Обновить</string>
+    <string name="action_retry">Повторить</string>
+    <string name="action_save">Сохранить</string>
+    <string name="action_search">Поиск</string>
+    <string name="action_send">Отправить</string>
+
+    <!-- Errors -->
+    <string name="error_forbidden">Недостаточно прав для этого действия.</string>
+    <string name="error_network">Нет соединения с порталом. Проверьте интернет и попробуйте ещё раз.</string>
+    <string name="error_not_found">Запись не найдена или была удалена.</string>
+    <string name="error_rate_limited">Слишком много запросов. Подождите немного и повторите.</string>
+    <string name="error_scanner_unavailable">Сканер штрихкодов недоступен на этом устройстве. Обновите сервисы Google Play.</string>
+    <string name="error_server">Ошибка сервера (%1$d). Попробуйте позже.</string>
+    <string name="error_session_expired">Сессия истекла. Войдите снова.</string>
+    <string name="error_unknown">Что-то пошло не так. Попробуйте ещё раз.</string>
+    <string name="error_unknown_status">Ошибка запроса (%1$d).</string>
+    <string name="error_validation">Проверьте правильность заполнения полей.</string>
+
+    <!-- States -->
+    <string name="state_error_title">Не удалось загрузить данные</string>
+    <string name="state_forbidden_title">Нет доступа</string>
+    <string name="state_not_found_title">Ничего не найдено</string>
+    <string name="state_offline_title">Нет подключения</string>
+
+    <!-- Forms and files -->
+    <string name="form_required">Обязательное поле</string>
+    <string name="file_open_with">Открыть с помощью</string>
+    <string name="file_share">Поделиться</string>
+
+    <!-- Portal address (onboarding) -->
+    <string name="portal_title">Подключение к порталу</string>
+    <string name="portal_subtitle">Введите адрес вашего портала CRM369 — домен, на котором установлена CRM.</string>
+    <string name="portal_address_label">Адрес портала</string>
+    <string name="portal_address_placeholder">crm.example.kz</string>
+    <string name="portal_address_hint">Например, crm.company.kz или https://crm.company.kz</string>
+    <string name="portal_connect">Продолжить</string>
+    <string name="portal_recent">Недавние порталы</string>
+    <string name="portal_forget">Убрать из списка</string>
+    <string name="portal_error_invalid_address">Введите корректный адрес портала.</string>
+    <string name="portal_error_unreachable">Не удалось подключиться к порталу. Проверьте адрес и интернет-соединение.</string>
+    <string name="portal_error_not_crm369">По этому адресу не найден портал CRM369 с мобильным API.</string>
+    <string name="portal_error_unsupported">Версия портала не поддерживается приложением. Обновите CRM369 на сервере или приложение.</string>
+    <string name="portal_error_server">Портал временно недоступен. Попробуйте позже.</string>
+
+    <!-- Login -->
+    <string name="login_title">Вход в аккаунт</string>
+    <string name="login_email">Электронная почта</string>
+    <string name="login_password">Пароль</string>
+    <string name="login_show_password">Показать пароль</string>
+    <string name="login_submit">Войти</string>
+    <string name="login_confirm">Подтвердить</string>
+    <string name="login_forgot_password">Забыли пароль?</string>
+    <string name="login_change_portal">Сменить портал</string>
+    <string name="login_two_factor_title">Двухфакторная аутентификация</string>
+    <string name="login_two_factor_hint">Введите код аутентификации из приложения-аутентификатора.</string>
+    <string name="login_two_factor_recovery_hint">Введите один из аварийных кодов восстановления.</string>
+    <string name="login_code">Код аутентификации</string>
+    <string name="login_recovery_code">Код восстановления</string>
+    <string name="login_use_code">Войти с кодом аутентификации</string>
+    <string name="login_use_recovery_code">Войти с кодом восстановления</string>
+    <string name="login_back_to_password">Вернуться к вводу пароля</string>
+    <string name="login_error_email_not_verified">Электронная почта не подтверждена. Подтвердите её по ссылке из письма и войдите снова.</string>
+    <string name="login_error_two_factor_setup">Администратор требует включить двухфакторную аутентификацию. Настройте её в веб-версии портала, затем войдите в приложение.</string>
+    <string name="login_open_portal_in_browser">Открыть портал в браузере</string>
+
+    <!-- Accounts -->
+    <string name="accounts_title">Мои порталы</string>
+    <string name="accounts_add">Добавить портал</string>
+    <string name="accounts_active">Текущий</string>
+    <string name="accounts_signed_out">Требуется вход</string>
+    <string name="accounts_remove">Удалить</string>
+    <string name="accounts_remove_title">Удалить портал?</string>
+    <string name="accounts_remove_text">Вы выйдете из портала «%1$s» на этом устройстве. Данные на сервере не изменятся.</string>
+
+    <!-- Main tabs -->
+    <string name="tab_home">Главная</string>
+    <string name="tab_chats">Чаты</string>
+    <string name="tab_tasks">Задачи</string>
+    <string name="tab_crm">CRM</string>
+    <string name="tab_menu">Меню</string>
+
+    <!-- Home -->
+    <string name="home_shortcuts">Разделы</string>
+    <string name="home_metrics">Показатели</string>
+    <string name="home_dashboard_unavailable">Панель управления сейчас недоступна.</string>
+
+    <!-- Menu -->
+    <string name="menu_title">Меню</string>
+    <string name="menu_modules">Модули</string>
+    <string name="menu_links">Ссылки</string>
+    <string name="menu_admin">Администрирование</string>
+    <string name="menu_application">Приложение</string>
+    <string name="menu_switch_portal">Сменить портал</string>
+    <string name="menu_full_version">Полная версия портала</string>
+    <string name="menu_full_version_hint">Открыть веб-интерфейс CRM внутри приложения</string>
+
+    <!-- Modules (titles match the web sidebar) -->
+    <string name="module_news">Новости</string>
+    <string name="module_notifications">Уведомления</string>
+    <string name="module_dashboard">Панель управления</string>
+    <string name="module_company_structure">Структура компании</string>
+    <string name="module_projects">Задачи и проекты</string>
+    <string name="module_tasks">Задачи</string>
+    <string name="module_calendar">Календарь</string>
+    <string name="module_chats">Чаты</string>
+    <string name="module_conferences">Конференции</string>
+    <string name="module_knowledge_bases">База знаний</string>
+    <string name="module_funnels">Воронки</string>
+    <string name="module_forms">Формы</string>
+    <string name="module_contacts">Контакты</string>
+    <string name="module_directories">Справочники</string>
+    <string name="module_edo">Подписание документов</string>
+    <string name="module_files">Файлы</string>
+    <string name="module_production">Производство</string>
+    <string name="module_procurement">Закупки и поставщики</string>
+    <string name="module_warehouses">Склады</string>
+    <string name="module_qr">QR</string>
+    <string name="module_tsd">ТСД</string>
+    <string name="module_equipment">Оборудование</string>
+    <string name="module_documentation">Документация</string>
+
+    <!-- Administration (opened in the in-app browser) -->
+    <string name="admin_users">Пользователи</string>
+    <string name="admin_groups">Группы</string>
+    <string name="admin_rights">Права</string>
+    <string name="admin_portal">Портал</string>
+    <string name="admin_modules">Модули</string>
+    <string name="admin_business_processes">Бизнес-процессы</string>
+    <string name="admin_integrations">Интеграции</string>
+    <string name="admin_one_c">Интеграция с 1С</string>
+    <string name="admin_api">API</string>
+    <string name="admin_webhooks">Веб-хуки</string>
+    <string name="admin_menu">Меню</string>
+    <string name="admin_logs">Логи</string>
+    <string name="admin_system_security">Безопасность системы</string>
+    <string name="admin_system_updates">Обновление системы</string>
+
+    <!-- Notifications -->
+    <string name="notifications_title">Уведомления</string>
+    <string name="notifications_empty">Уведомлений пока нет</string>
+    <string name="notifications_filter_all">Все</string>
+    <string name="notifications_filter_unread">Непрочитанные</string>
+    <string name="notifications_filter_read">Прочитанные</string>
+    <string name="notifications_read_all">Отметить все как прочитанные</string>
+    <string name="notification_channel_updates">Обновления CRM</string>
+    <string name="notification_channel_updates_description">Уведомления о задачах, сообщениях, документах и других событиях портала</string>
+
+    <!-- Profile -->
+    <string name="profile_title">Профиль</string>
+    <string name="profile_edit_title">Редактирование профиля</string>
+    <string name="profile_name">Имя</string>
+    <string name="profile_last_name">Фамилия</string>
+    <string name="profile_middle_name">Отчество</string>
+    <string name="profile_email">Электронная почта</string>
+    <string name="profile_phone">Телефон</string>
+    <string name="profile_phone_hint">В международном формате, например +7 700 000 0000</string>
+    <string name="profile_position">Должность</string>
+    <string name="profile_contacts">Контакты</string>
+    <string name="profile_change_photo">Сменить фото</string>
+    <string name="profile_saved">Профиль сохранён</string>
+    <string name="profile_email_change_warning">После смены email потребуется подтвердить новый адрес по ссылке из письма — приложение выйдет из этого портала до подтверждения.</string>
+    <string name="profile_email_changed">Профиль сохранён. Подтвердите новый email по ссылке из письма и войдите снова.</string>
+    <string name="profile_security">Безопасность</string>
+    <string name="profile_security_hint">Двухфакторная аутентификация, ключи доступа и активные сессии</string>
+    <string name="profile_change_password">Сменить пароль</string>
+    <string name="profile_logout">Выйти</string>
+    <string name="profile_logout_title">Выйти из портала?</string>
+    <string name="profile_logout_text">Push-уведомления этого портала перестанут приходить на устройство.</string>
+
+    <!-- Password -->
+    <string name="password_current">Текущий пароль</string>
+    <string name="password_new">Новый пароль</string>
+    <string name="password_confirmation">Повторите новый пароль</string>
+    <string name="password_hint">На рабочем портале — не менее 12 символов: строчные и заглавные буквы, цифры и спецсимволы</string>
+    <string name="password_submit">Сменить пароль</string>
+    <string name="password_changed">Пароль изменён</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_language">Язык</string>
+    <string name="settings_language_system">Как в системе</string>
+    <string name="settings_language_ru">Русский</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_theme">Оформление</string>
+    <string name="settings_theme_system">Как в системе</string>
+    <string name="settings_theme_light">Светлая тема</string>
+    <string name="settings_theme_dark">Тёмная тема</string>
+    <string name="settings_notifications">Уведомления</string>
+    <string name="settings_notifications_on">Уведомления разрешены</string>
+    <string name="settings_notifications_off">Уведомления отключены в настройках Android</string>
+    <string name="settings_push_configured">Push-уведомления настроены на портале</string>
+    <string name="settings_push_not_configured">Push-уведомления не настроены на портале</string>
+    <string name="settings_about">О приложении</string>
+    <string name="settings_version">Версия</string>
+    <string name="settings_portal">Портал</string>
+    <string name="settings_device">Устройство</string>
+
+    <!-- In-app browser -->
+    <string name="web_title_default">CRM369</string>
+    <string name="web_open_in_browser">Открыть в браузере</string>
+    <string name="web_download_started">Загрузка началась</string>
+</resources>
