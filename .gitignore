@@ -51,6 +51,24 @@ pnpm-debug.log*
 /.gradle-local/
 /applicationsOfMobile/
 
+# Native Android application build output and local signing material
+/applicationsOfMobileAndroid/.gradle/
+/applicationsOfMobileAndroid/.kotlin/
+/applicationsOfMobileAndroid/build/
+/applicationsOfMobileAndroid/*/build/
+/applicationsOfMobileAndroid/captures/
+/applicationsOfMobileAndroid/local.properties
+/applicationsOfMobileAndroid/keystore.properties
+/applicationsOfMobileAndroid/firebase.properties
+/applicationsOfMobileAndroid/**/*.jks
+/applicationsOfMobileAndroid/**/*.keystore
+
+# Native iOS application build output
+/applicationsOfMobileIos/DerivedData/
+/applicationsOfMobileIos/build/
+xcuserdata/
+*.xcuserstate
+
 # Local agent and editor configuration
 /.agents/
 /.codex/

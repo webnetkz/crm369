@@ -4,10 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Concerns\EnsuresConferenceTablesAreReady;
 use App\Http\Requests\StoreConferenceInvitationRequest;
-use App\Models\Conference;
-use App\Support\ConferenceInvitationManager;
+use App\Support\ConferenceManager;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ConferenceInvitationController extends Controller
@@ -17,21 +15,17 @@ class ConferenceInvitationController extends Controller
     public function store(
         StoreConferenceInvitationRequest $request,
         string $conference,
-        ConferenceInvitationManager $invitationManager,
+        ConferenceManager $conferenceManager,
     ): RedirectResponse {
         $this->ensureConferencesTablesExist();
 
         $user = $request->user();
         abort_unless($user !== null, 403);
 
-        $managedConference = Conference::query()->findOrFail($conference);
+        $managedConference = $conferenceManager->findConference($conference);
         abort_unless($managedConference->canBeManagedBy($user), 403);
 
-        $invitedCount = DB::transaction(fn (): int => $invitationManager->inviteUsers(
-            $managedConference,
-            $request->invitedUserIds(),
-            $user,
-        ));
+        $invitedCount = $conferenceManager->invite($managedConference, $request->invitedUserIds(), $user);
 
         Inertia::flash('toast', [
             'type' => $invitedCount > 0 ? 'success' : 'info',

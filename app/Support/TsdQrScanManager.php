@@ -61,6 +61,6 @@ class TsdQrScanManager
             return now();
         }
 
-        return now()->parse($scannedAt);
+        return now()->parse($scannedAt)->setTimezone((string) config('app.timezone', 'UTC'));
     }
 }

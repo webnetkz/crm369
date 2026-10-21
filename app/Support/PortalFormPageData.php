@@ -11,6 +11,27 @@ use Illuminate\Support\Collection;
 
 class PortalFormPageData
 {
+    public function __construct(private readonly PortalFormManager $formManager) {}
+
+    /**
+     * The forms workspace of the viewer with the requested form (and its latest submissions) opened
+     * when the viewer may manage it.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildForViewer(User $viewer, int $requestedFormId = 0): array
+    {
+        $forms = $this->formManager->visibleFormsQuery($viewer)->get();
+        /** @var PortalForm|null $activeForm */
+        $activeForm = $requestedFormId > 0 ? $forms->firstWhere('id', $requestedFormId) : null;
+
+        if ($activeForm) {
+            $this->formManager->loadRecentSubmissions($activeForm);
+        }
+
+        return $this->build($viewer, $forms, $activeForm);
+    }
+
     /**
      * @param  Collection<int, PortalForm>  $forms
      * @return array<string, mixed>
@@ -68,6 +89,23 @@ class PortalFormPageData
     }
 
     /**
+     * A single form: its list card (counters, last submission time) merged with the page's active form
+     * (owner, target user, fields and the loaded submissions) and whether the viewer may manage it.
+     *
+     * @return array<string, mixed>
+     */
+    public function formDetail(User $viewer, PortalForm $form): array
+    {
+        return [
+            ...$this->formListItem($form),
+            ...$this->activeForm($form),
+            'can' => [
+                'manage' => $viewer->id === $form->owner_user_id || $viewer->isSuperAdmin(),
+            ],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function formListItem(PortalForm $form): array
@@ -84,10 +122,20 @@ class PortalFormPageData
             'submissions_count' => $form->submissions_count ?? $form->submissions->count(),
             'style_settings' => PortalForm::normalizeStyleSettings($form->style_settings),
             'completion_settings' => PortalForm::normalizeCompletionSettings($form->completion_settings),
-            'last_submission_at' => is_string($form->submissions_max_created_at)
-                ? Carbon::parse($form->submissions_max_created_at)->toISOString()
-                : null,
+            'last_submission_at' => $this->lastSubmissionAt($form),
         ];
+    }
+
+    /**
+     * The creation time of the latest submission, loaded by the forms query as the "submissions_max_created_at" aggregate.
+     */
+    private function lastSubmissionAt(PortalForm $form): ?string
+    {
+        $lastSubmissionAt = $form->getAttribute('submissions_max_created_at');
+
+        return is_string($lastSubmissionAt)
+            ? Carbon::parse($lastSubmissionAt)->toISOString()
+            : null;
     }
 
     /**

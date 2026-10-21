@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\ChatMessage;
 use App\Models\ChatMessageAttachment;
+use App\Support\ChatMessageData;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,6 +20,7 @@ class ApiChatMessageResource extends JsonResource
         /** @var ChatMessage $message */
         $message = $this->resource;
         $viewer = $request->user();
+        $chatMessageData = app(ChatMessageData::class);
         $message->loadMissing(['user', 'attachments']);
         $isDeleted = $message->wasDeleted();
 
@@ -45,36 +47,12 @@ class ApiChatMessageResource extends JsonResource
                         'mime_type' => $attachment->mime_type,
                         'extension' => $attachment->extension,
                         'size_bytes' => $attachment->size_bytes,
-                        'download_url' => route('chats.attachments.download', $attachment),
-                        'preview_url' => $this->previewUrl($attachment),
-                        'audio_url' => $this->audioUrl($attachment),
+                        'download_url' => $chatMessageData->downloadUrl($attachment),
+                        'preview_url' => $chatMessageData->previewUrl($attachment),
+                        'audio_url' => $chatMessageData->audioUrl($attachment),
                     ])
                     ->values()
                     ->all(),
         ];
-    }
-
-    private function previewUrl(ChatMessageAttachment $attachment): ?string
-    {
-        $mimeType = strtolower((string) $attachment->mime_type);
-
-        if (! str_starts_with($mimeType, 'image/')) {
-            return null;
-        }
-
-        if (in_array($mimeType, ['image/svg', 'image/svg+xml'], true)) {
-            return null;
-        }
-
-        return route('chats.attachments.preview', $attachment);
-    }
-
-    private function audioUrl(ChatMessageAttachment $attachment): ?string
-    {
-        if (! str_starts_with(strtolower((string) $attachment->mime_type), 'audio/')) {
-            return null;
-        }
-
-        return route('chats.attachments.preview', $attachment);
     }
 }

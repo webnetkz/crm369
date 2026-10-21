@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreTsdQrScanRequest;
 use App\Http\Resources\ApiResolvedQrCodeResource;
 use App\Http\Resources\ApiTsdQrScanResource;
+use App\Models\PortalSetting;
 use App\Models\TsdQrScan;
+use App\Models\User;
 use App\Support\QrCodeResolver;
 use App\Support\TsdQrScanManager;
 use Illuminate\Http\JsonResponse;
@@ -40,7 +42,7 @@ class TsdController extends Controller
         QrCodeResolver $qrCodeResolver,
     ): JsonResponse {
         $user = $request->user();
-        abort_unless($user !== null, 401);
+        abort_unless($user instanceof User, 401);
 
         $scan = $scanManager->create(
             payload: $request->scanPayload(),
@@ -53,9 +55,26 @@ class TsdController extends Controller
         return response()->json([
             'message' => __('ui.tsd.created_success'),
             'data' => (new ApiTsdQrScanResource($scan))->resolve(),
-            'resolved' => ($resolvedQrCode = $qrCodeResolver->resolve($scan->qr_code)) !== null
-                ? (new ApiResolvedQrCodeResource($resolvedQrCode))->resolve()
-                : null,
+            'resolved' => $this->resolvedWarehouseQrCode($user, $scan->qr_code, $qrCodeResolver),
         ], 201);
+    }
+
+    /**
+     * The warehouse position of the scanned QR code. Like the web scanner, it is only
+     * resolved for users who can open the warehouses module.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function resolvedWarehouseQrCode(User $user, string $qrCode, QrCodeResolver $qrCodeResolver): ?array
+    {
+        if (! PortalSetting::current()->isModuleEnabled('warehouses') || ! $user->canAccessWarehouses()) {
+            return null;
+        }
+
+        $resolvedQrCode = $qrCodeResolver->resolve($qrCode);
+
+        return $resolvedQrCode !== null
+            ? (new ApiResolvedQrCodeResource($resolvedQrCode))->resolve()
+            : null;
     }
 }

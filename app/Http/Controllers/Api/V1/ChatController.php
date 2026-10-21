@@ -15,6 +15,7 @@ use App\Support\ChatMessageSender;
 use App\Support\ChatSidebarData;
 use App\Support\DirectConversationManager;
 use App\Support\GeneralChatManager;
+use App\Support\TaskConversationManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -64,10 +65,21 @@ class ChatController
         ChatConversation $chatConversation,
         ChatMessageSender $chatMessageSender,
         GeneralChatManager $generalChatManager,
+        TaskConversationManager $taskConversationManager,
     ): JsonResponse {
         $user = ApiRequestContext::subject($request);
-        $generalChatManager->ensureParticipant($chatConversation, $user);
-        abort_unless($chatConversation->isAccessibleBy($user), 403);
+
+        if ($chatConversation->type === ChatConversation::TYPE_TASK) {
+            $chatConversation->loadMissing('task.coAssignees:id');
+            $task = $chatConversation->task;
+
+            abort_unless($task !== null && $chatConversation->isAccessibleBy($user), 403);
+
+            $chatConversation = $taskConversationManager->ensureForTask($task, $user)->fresh() ?? $chatConversation;
+        } else {
+            $generalChatManager->ensureParticipant($chatConversation, $user);
+            abort_unless($chatConversation->isAccessibleBy($user), 403);
+        }
 
         $message = $chatMessageSender->send($chatConversation, $user, $request);
 

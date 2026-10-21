@@ -33,6 +33,9 @@ class ApiEdoDocumentResource extends JsonResource
                     'mime_type' => $document->document_file_mime_type,
                     'size_bytes' => $document->document_file_size_bytes,
                     'download_url' => route('edo.file.download', $document),
+                    ...($request->routeIs('mobile.v1.*')
+                        ? ['mobile_download_url' => route('mobile.v1.edo.file.download', $document)]
+                        : []),
                 ]
                 : null,
             'status' => $document->status,

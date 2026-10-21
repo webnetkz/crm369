@@ -102,10 +102,15 @@ class ChatMessageData
             'mimeType' => $attachment->mime_type,
             'extension' => $attachment->extension,
             'sizeBytes' => $attachment->size_bytes,
-            'downloadUrl' => route('chats.attachments.download', $attachment),
+            'downloadUrl' => $this->downloadUrl($attachment),
             'previewUrl' => $this->previewUrl($attachment),
             'audioUrl' => $this->audioUrl($attachment),
         ];
+    }
+
+    public function downloadUrl(ChatMessageAttachment $attachment): string
+    {
+        return route($this->attachmentRouteName('download'), $attachment);
     }
 
     public function previewUrl(ChatMessageAttachment $attachment): ?string
@@ -114,7 +119,7 @@ class ChatMessageData
             return null;
         }
 
-        return route('chats.attachments.preview', $attachment);
+        return route($this->attachmentRouteName('preview'), $attachment);
     }
 
     public function audioUrl(ChatMessageAttachment $attachment): ?string
@@ -123,7 +128,7 @@ class ChatMessageData
             return null;
         }
 
-        return route('chats.attachments.preview', $attachment);
+        return route($this->attachmentRouteName('preview'), $attachment);
     }
 
     public function isPreviewableImage(ChatMessageAttachment $attachment): bool
@@ -142,6 +147,17 @@ class ChatMessageData
     public function isInlinePreviewable(ChatMessageAttachment $attachment): bool
     {
         return $this->isPreviewableImage($attachment) || $this->isPreviewableAudio($attachment);
+    }
+
+    /**
+     * Native mobile clients authenticate with a bearer token instead of the web session,
+     * so the attachment links they receive point to the mobile API.
+     */
+    private function attachmentRouteName(string $action): string
+    {
+        return request()->routeIs('mobile.v1.*')
+            ? 'mobile.v1.chats.attachments.'.$action
+            : 'chats.attachments.'.$action;
     }
 
     /**

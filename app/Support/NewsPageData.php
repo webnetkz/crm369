@@ -3,11 +3,42 @@
 namespace App\Support;
 
 use App\Models\News;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Storage;
 
 class NewsPageData
 {
+    /**
+     * Build the page for the viewer: news managers see drafts, everybody else only published news.
+     * A selected news item that is not visible to the viewer results in a 404 response.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildForViewer(User $viewer, ?News $selectedNews, bool $shouldOpenCreate): array
+    {
+        $canManage = $viewer->can('manage-news');
+        $newsItems = News::query()
+            ->with('creator:id,name,last_name')
+            ->when(! $canManage, fn (Builder $query) => $query->where('is_published', true))
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->get();
+
+        if ($selectedNews !== null) {
+            $selectedNews = $newsItems->firstWhere('id', $selectedNews->id);
+            abort_unless($selectedNews !== null, 404);
+        }
+
+        return $this->build(
+            $newsItems,
+            $selectedNews,
+            $canManage,
+            $shouldOpenCreate && $canManage,
+        );
+    }
+
     /**
      * @param  Collection<int, News>  $newsItems
      * @return array<string, mixed>
@@ -47,9 +78,11 @@ class NewsPageData
     }
 
     /**
+     * Serialize a single news item with its content and author, exactly like the page's active news.
+     *
      * @return array<string, mixed>
      */
-    private function serializeActiveItem(News $news): array
+    public function serializeActiveItem(News $news): array
     {
         return [
             ...$this->serializeListItem($news),

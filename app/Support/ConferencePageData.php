@@ -11,6 +11,87 @@ use Illuminate\Support\Collection;
 class ConferencePageData
 {
     /**
+     * The conferences page of the viewer.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildIndexForViewer(User $viewer): array
+    {
+        return $this->buildIndex($this->visibleConferences($viewer), $this->availableUsers());
+    }
+
+    /**
+     * The meeting room page of a conference visible to the viewer.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildShowForViewer(Conference $conference, User $viewer): array
+    {
+        $this->loadDetailRelations($conference);
+
+        return $this->buildShow(
+            $conference,
+            $this->visibleConferences($viewer),
+            $this->availableUsers(),
+            $viewer,
+        );
+    }
+
+    /**
+     * A conference serialized like the meeting room page's conference.
+     *
+     * @return array<string, mixed>
+     */
+    public function detail(Conference $conference, User $viewer): array
+    {
+        $this->loadDetailRelations($conference);
+
+        return $this->serializeDetailItem($conference, $viewer);
+    }
+
+    /**
+     * The conferences the user created or was invited to (every conference for super administrators), newest first.
+     *
+     * @return EloquentCollection<int, Conference>
+     */
+    public function visibleConferences(User $user): EloquentCollection
+    {
+        return Conference::query()
+            ->visibleTo($user)
+            ->with([
+                'creator:id,name,last_name,email',
+                'invitations.user:id,name,last_name,email,avatar_path,avatar_scale,avatar_position_x,avatar_position_y',
+            ])
+            ->orderByDesc('starts_at')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    /**
+     * Active users that can be invited to a conference.
+     *
+     * @return EloquentCollection<int, User>
+     */
+    public function availableUsers(): EloquentCollection
+    {
+        return User::query()
+            ->select([
+                'id',
+                'name',
+                'last_name',
+                'email',
+                'avatar_path',
+                'avatar_scale',
+                'avatar_position_x',
+                'avatar_position_y',
+            ])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->orderBy('last_name')
+            ->get();
+    }
+
+    /**
      * @param  EloquentCollection<int, Conference>  $conferences
      * @param  EloquentCollection<int, User>  $availableUsers
      * @return array<string, mixed>
@@ -182,6 +263,14 @@ class ConferencePageData
                 ->values()
                 ->all(),
         ];
+    }
+
+    private function loadDetailRelations(Conference $conference): void
+    {
+        $conference->load([
+            'creator:id,name,last_name,email',
+            'invitations.user:id,name,last_name,email,avatar_path,avatar_scale,avatar_position_x,avatar_position_y',
+        ]);
     }
 
     /**

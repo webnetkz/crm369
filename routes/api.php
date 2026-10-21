@@ -1,7 +1,23 @@
 <?php
 
+use App\Http\Controllers\Api\Mobile\V1\MobileBootstrapController;
+use App\Http\Controllers\Api\Mobile\V1\MobileChatController;
+use App\Http\Controllers\Api\Mobile\V1\MobileConferenceController;
+use App\Http\Controllers\Api\Mobile\V1\MobileContactCommentController;
+use App\Http\Controllers\Api\Mobile\V1\MobileCrmFunnelController;
+use App\Http\Controllers\Api\Mobile\V1\MobileDashboardController;
 use App\Http\Controllers\Api\Mobile\V1\MobileDeviceController;
+use App\Http\Controllers\Api\Mobile\V1\MobileEdoDocumentController;
+use App\Http\Controllers\Api\Mobile\V1\MobileFileController;
+use App\Http\Controllers\Api\Mobile\V1\MobileNewsController;
+use App\Http\Controllers\Api\Mobile\V1\MobilePasswordController;
+use App\Http\Controllers\Api\Mobile\V1\MobilePortalController;
+use App\Http\Controllers\Api\Mobile\V1\MobilePortalFormController;
+use App\Http\Controllers\Api\Mobile\V1\MobileProductionController;
+use App\Http\Controllers\Api\Mobile\V1\MobileProjectTaskController;
 use App\Http\Controllers\Api\Mobile\V1\MobileSessionController;
+use App\Http\Controllers\Api\Mobile\V1\MobileWarehouseController;
+use App\Http\Controllers\Api\Mobile\V1\MobileWebSessionController;
 use App\Http\Controllers\Api\V1\CalendarController;
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\CompanyStructureController as ApiCompanyStructureController;
@@ -22,10 +38,27 @@ use App\Http\Controllers\Api\V1\TsdController as ApiTsdController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\UserGroupController;
 use App\Http\Controllers\Api\V1\WarehouseController;
+use App\Http\Controllers\WarehouseController as WebWarehouseController;
 use App\Http\Middleware\ResolveApiSubjectUser;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('mobile/v1')->name('mobile.v1.')->group(function (): void {
+/*
+|--------------------------------------------------------------------------
+| Native mobile API
+|--------------------------------------------------------------------------
+|
+| Endpoints consumed by the native Android application. The application is
+| bound to a portal domain, discovers the portal through the public portal
+| endpoint, signs in with a persistent bearer session and then uses the
+| authenticated module endpoints. Module endpoints mirror the web
+| application's module, gate, and visibility rules.
+|
+*/
+
+Route::prefix('mobile/v1')->name('mobile.v1.')->middleware('mobile.language')->group(function (): void {
+    Route::get('portal', [MobilePortalController::class, 'show'])
+        ->middleware('throttle:mobile-portal')
+        ->name('portal');
     Route::post('login', [MobileSessionController::class, 'store'])
         ->middleware('throttle:mobile-login')
         ->name('login');
@@ -33,13 +66,55 @@ Route::prefix('mobile/v1')->name('mobile.v1.')->group(function (): void {
         ->middleware('throttle:mobile-two-factor')
         ->name('two-factor.challenge');
 
-    Route::middleware(['auth:mobile', 'throttle:mobile-api'])->group(function (): void {
+    Route::middleware(['auth:mobile', 'mobile.language', 'throttle:mobile-api'])->whereNumber([
+        'chatConversation',
+        'chatMessage',
+        'contact',
+        'conference',
+        'crmDeal',
+        'crmFunnel',
+        'crmFunnelStage',
+        'edoDocument',
+        'equipmentItem',
+        'fileDirectory',
+        'fileDirectoryPermission',
+        'fileEntry',
+        'knowledgeBase',
+        'knowledgeBaseArticle',
+        'portalForm',
+        'project',
+        'projectTask',
+        'projectTaskStage',
+        'purchaseOrder',
+        'purchaseRequest',
+        'referenceDirectory',
+        'referenceDirectoryRecord',
+        'supplier',
+        'user',
+        'warehouse',
+        'warehouseFloor',
+    ])->group(function (): void {
         Route::get('me', [MobileSessionController::class, 'show'])->name('me');
         Route::delete('logout', [MobileSessionController::class, 'destroy'])->name('logout');
         Route::put('device', [MobileDeviceController::class, 'store'])->name('device.store');
+        Route::delete('device', [MobileDeviceController::class, 'destroy'])->name('device.destroy');
+        Route::get('bootstrap', [MobileBootstrapController::class, 'show'])->name('bootstrap');
+        Route::post('web-session', [MobileWebSessionController::class, 'store'])
+            ->middleware('throttle:mobile-web-session')
+            ->name('web-session.store');
 
         Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
         Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
+        Route::patch('profile/language', [ProfileController::class, 'updateLanguage'])->name('profile.language.update');
+        Route::patch('profile/appearance', [ProfileController::class, 'updateAppearance'])->name('profile.appearance.update');
+        Route::put('profile/password', [MobilePasswordController::class, 'update'])
+            ->middleware('throttle:6,1')
+            ->name('profile.password.update');
+
+        Route::get('dashboard', [MobileDashboardController::class, 'show'])->name('dashboard.show');
+        Route::patch('dashboard/configuration', [MobileDashboardController::class, 'updateConfiguration'])->name('dashboard.configuration.update');
+
+        Route::get('menu', [MenuController::class, 'index'])->name('menu.index');
 
         Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::patch('notifications/read-all', [NotificationController::class, 'updateAll'])->name('notifications.read-all');
@@ -48,9 +123,20 @@ Route::prefix('mobile/v1')->name('mobile.v1.')->group(function (): void {
         Route::middleware(['module.enabled:chats', 'can:access-chats'])->group(function (): void {
             Route::get('chats', [ChatController::class, 'index'])->name('chats.index');
             Route::post('chats/direct', [ChatController::class, 'storeDirect'])->name('chats.direct.store');
+            Route::get('chats/users/{user}/profile', [MobileChatController::class, 'showUserProfile'])
+                ->whereNumber('user')
+                ->name('chats.users.show');
+            Route::get('chats/attachments/{chatMessageAttachment}/preview', [MobileChatController::class, 'previewAttachment'])
+                ->whereNumber('chatMessageAttachment')
+                ->name('chats.attachments.preview');
+            Route::get('chats/attachments/{chatMessageAttachment}/download', [MobileChatController::class, 'downloadAttachment'])
+                ->whereNumber('chatMessageAttachment')
+                ->name('chats.attachments.download');
             Route::post('chats/{chatConversation}/messages', [ChatController::class, 'storeMessage'])->name('chats.messages.store');
             Route::patch('chats/{chatConversation}/messages/{chatMessage}', [ChatController::class, 'updateMessage'])->name('chats.messages.update');
             Route::delete('chats/{chatConversation}/messages/{chatMessage}', [ChatController::class, 'destroyMessage'])->name('chats.messages.destroy');
+            Route::patch('chats/{chatConversation}/messages/{chatMessage}/pin', [MobileChatController::class, 'pin'])->name('chats.messages.pin');
+            Route::delete('chats/{chatConversation}/messages/{chatMessage}/pin', [MobileChatController::class, 'unpin'])->name('chats.messages.unpin');
         });
 
         Route::middleware(['module.enabled:calendar', 'can:access-calendar'])->group(function (): void {
@@ -67,6 +153,58 @@ Route::prefix('mobile/v1')->name('mobile.v1.')->group(function (): void {
             Route::get('contacts/{contact}', [ContactController::class, 'show'])->name('contacts.show');
             Route::post('contacts', [ContactController::class, 'store'])->name('contacts.store');
             Route::patch('contacts/{contact}', [ContactController::class, 'update'])->name('contacts.update');
+            Route::delete('contacts/{contact}', [ContactController::class, 'destroy'])->name('contacts.destroy');
+            Route::get('contacts/{contact}/comments', [MobileContactCommentController::class, 'index'])->name('contacts.comments.index');
+            Route::post('contacts/{contact}/comments', [MobileContactCommentController::class, 'store'])->name('contacts.comments.store');
+        });
+
+        Route::middleware(['module.enabled:directories', 'can:access-directories'])->group(function (): void {
+            Route::get('directories', [ApiReferenceDirectoryController::class, 'index'])->name('directories.index');
+            Route::get('directories/{referenceDirectory}', [ApiReferenceDirectoryController::class, 'show'])->name('directories.show');
+            Route::get('directories/{referenceDirectory}/export', [ApiReferenceDirectoryController::class, 'exportCsv'])->name('directories.export');
+            Route::get('directories/{referenceDirectory}/template', [ApiReferenceDirectoryController::class, 'downloadCsvTemplate'])->name('directories.template');
+        });
+
+        Route::middleware(['module.enabled:directories', 'can:manage-directories'])->group(function (): void {
+            Route::post('directories', [ApiReferenceDirectoryController::class, 'store'])->name('directories.store');
+            Route::patch('directories/{referenceDirectory}', [ApiReferenceDirectoryController::class, 'update'])->name('directories.update');
+            Route::delete('directories/{referenceDirectory}', [ApiReferenceDirectoryController::class, 'destroy'])->name('directories.destroy');
+            Route::post('directories/{referenceDirectory}/import', [ApiReferenceDirectoryController::class, 'importCsv'])->name('directories.import');
+            Route::post('directories/{referenceDirectory}/records', [ApiReferenceDirectoryController::class, 'storeRecord'])->name('directories.records.store');
+            Route::patch('directories/{referenceDirectory}/records/{referenceDirectoryRecord}', [ApiReferenceDirectoryController::class, 'updateRecord'])->name('directories.records.update');
+            Route::delete('directories/{referenceDirectory}/records/{referenceDirectoryRecord}', [ApiReferenceDirectoryController::class, 'destroyRecord'])->name('directories.records.destroy');
+        });
+
+        Route::middleware(['module.enabled:edo', 'can:access-edo'])->group(function (): void {
+            Route::get('edo/documents', [ApiEdoDocumentController::class, 'index'])->name('edo.index');
+            Route::post('edo/documents', [ApiEdoDocumentController::class, 'store'])->name('edo.store');
+            Route::get('edo/documents/{edoDocument}', [ApiEdoDocumentController::class, 'show'])->name('edo.show');
+            Route::patch('edo/documents/{edoDocument}', [ApiEdoDocumentController::class, 'update'])->name('edo.update');
+            Route::delete('edo/documents/{edoDocument}', [ApiEdoDocumentController::class, 'destroy'])->name('edo.destroy');
+            Route::post('edo/documents/{edoDocument}/public-link', [ApiEdoDocumentController::class, 'issuePublicLink'])->name('edo.public-link.store');
+            Route::get('edo/documents/{edoDocument}/file', [MobileEdoDocumentController::class, 'downloadFile'])->name('edo.file.download');
+        });
+
+        Route::middleware(['module.enabled:files', 'can:access-files'])->group(function (): void {
+            Route::get('files', [MobileFileController::class, 'index'])->name('files.index');
+            Route::post('files/directories', [MobileFileController::class, 'storeDirectory'])->name('files.directories.store');
+            Route::delete('files/directories/{fileDirectory}', [MobileFileController::class, 'destroyDirectory'])->name('files.directories.destroy');
+            Route::post('files/directories/{fileDirectory}/permissions', [MobileFileController::class, 'storePermission'])->name('files.directories.permissions.store');
+            Route::delete('files/directories/{fileDirectory}/permissions/{fileDirectoryPermission}', [MobileFileController::class, 'destroyPermission'])->name('files.directories.permissions.destroy');
+            Route::post('files/entries', [MobileFileController::class, 'storeEntry'])->name('files.entries.store');
+            Route::get('files/entries/{fileEntry}/download', [MobileFileController::class, 'download'])->name('files.entries.download');
+            Route::delete('files/entries/{fileEntry}', [MobileFileController::class, 'destroyEntry'])->name('files.entries.destroy');
+        });
+
+        Route::middleware(['module.enabled:news', 'can:access-news'])->group(function (): void {
+            Route::get('news', [MobileNewsController::class, 'index'])->name('news.index');
+            Route::get('news/{news}', [MobileNewsController::class, 'show'])->name('news.show');
+        });
+
+        Route::middleware(['module.enabled:news', 'can:manage-news'])->group(function (): void {
+            Route::post('news', [MobileNewsController::class, 'store'])->name('news.store');
+            Route::patch('news/{news}', [MobileNewsController::class, 'update'])->name('news.update');
+            Route::delete('news/{news}', [MobileNewsController::class, 'destroy'])->name('news.destroy');
         });
 
         Route::middleware(['module.enabled:knowledge-bases', 'can:access-knowledge-bases'])->group(function (): void {
@@ -75,23 +213,119 @@ Route::prefix('mobile/v1')->name('mobile.v1.')->group(function (): void {
             Route::get('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'showArticle'])->name('knowledge-bases.articles.show');
         });
 
+        Route::middleware(['module.enabled:knowledge-bases', 'can:manage-knowledge-bases'])->group(function (): void {
+            Route::post('knowledge-bases', [KnowledgeBaseController::class, 'store'])->name('knowledge-bases.store');
+            Route::patch('knowledge-bases/{knowledgeBase}', [KnowledgeBaseController::class, 'update'])->name('knowledge-bases.update');
+            Route::delete('knowledge-bases/{knowledgeBase}', [KnowledgeBaseController::class, 'destroy'])->name('knowledge-bases.destroy');
+            Route::post('knowledge-bases/{knowledgeBase}/articles', [KnowledgeBaseController::class, 'storeArticle'])->name('knowledge-bases.articles.store');
+            Route::patch('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'updateArticle'])->name('knowledge-bases.articles.update');
+            Route::delete('knowledge-bases/{knowledgeBase}/articles/{knowledgeBaseArticle}', [KnowledgeBaseController::class, 'destroyArticle'])->name('knowledge-bases.articles.destroy');
+        });
+
+        Route::middleware('module.enabled:funnels')->group(function (): void {
+            Route::get('funnels', [MobileCrmFunnelController::class, 'index'])->name('funnels.index');
+            Route::post('funnels', [MobileCrmFunnelController::class, 'store'])->name('funnels.store');
+            Route::get('funnels/{crmFunnel}', [MobileCrmFunnelController::class, 'show'])->name('funnels.show');
+            Route::patch('funnels/{crmFunnel}', [MobileCrmFunnelController::class, 'update'])->name('funnels.update');
+            Route::delete('funnels/{crmFunnel}', [MobileCrmFunnelController::class, 'destroy'])->name('funnels.destroy');
+            Route::post('funnels/{crmFunnel}/stages', [MobileCrmFunnelController::class, 'storeStage'])->name('funnels.stages.store');
+            Route::patch('funnels/{crmFunnel}/stages/{crmFunnelStage}', [MobileCrmFunnelController::class, 'updateStage'])->name('funnels.stages.update');
+            Route::delete('funnels/{crmFunnel}/stages/{crmFunnelStage}', [MobileCrmFunnelController::class, 'destroyStage'])->name('funnels.stages.destroy');
+            Route::post('funnels/{crmFunnel}/deals', [MobileCrmFunnelController::class, 'storeDeal'])->name('funnels.deals.store');
+            Route::get('funnels/{crmFunnel}/deals/{crmDeal}', [MobileCrmFunnelController::class, 'showDeal'])->name('funnels.deals.show');
+            Route::patch('funnels/{crmFunnel}/deals/{crmDeal}', [MobileCrmFunnelController::class, 'updateDeal'])->name('funnels.deals.update');
+            Route::patch('funnels/{crmFunnel}/deals/{crmDeal}/move', [MobileCrmFunnelController::class, 'moveDeal'])->name('funnels.deals.move');
+            Route::delete('funnels/{crmFunnel}/deals/{crmDeal}', [MobileCrmFunnelController::class, 'destroyDeal'])->name('funnels.deals.destroy');
+        });
+
+        Route::middleware(['module.enabled:forms', 'can:access-forms'])->group(function (): void {
+            Route::get('forms', [MobilePortalFormController::class, 'index'])->name('forms.index');
+            Route::post('forms', [MobilePortalFormController::class, 'store'])->name('forms.store');
+            Route::get('forms/{portalForm}', [MobilePortalFormController::class, 'show'])->name('forms.show');
+            Route::patch('forms/{portalForm}', [MobilePortalFormController::class, 'update'])->name('forms.update');
+            Route::delete('forms/{portalForm}', [MobilePortalFormController::class, 'destroy'])->name('forms.destroy');
+        });
+
+        Route::middleware(['module.enabled:conferences', 'can:access-conferences'])->group(function (): void {
+            Route::get('conferences', [MobileConferenceController::class, 'index'])->name('conferences.index');
+            Route::post('conferences', [MobileConferenceController::class, 'store'])->name('conferences.store');
+            Route::get('conferences/{conference}', [MobileConferenceController::class, 'show'])->name('conferences.show');
+            Route::post('conferences/{conference}/invitations', [MobileConferenceController::class, 'storeInvitation'])->name('conferences.invitations.store');
+            Route::patch('conferences/{conference}/end', [MobileConferenceController::class, 'end'])->name('conferences.end');
+        });
+
         Route::middleware(['module.enabled:projects', 'can:access-projects'])->group(function (): void {
             Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
-            Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+            Route::post('projects', [ProjectController::class, 'store'])->name('projects.store');
+            Route::get('projects/workspace', [MobileProjectTaskController::class, 'workspace'])->name('projects.workspace');
+            Route::get('projects/{project}', [ProjectController::class, 'show'])->whereNumber('project')->name('projects.show');
+            Route::patch('projects/{project}', [ProjectController::class, 'update'])->whereNumber('project')->name('projects.update');
+            Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->whereNumber('project')->name('projects.destroy');
+
+            Route::post('task-stages', [MobileProjectTaskController::class, 'storeStage'])->name('task-stages.store');
+            Route::patch('task-stages/move', [MobileProjectTaskController::class, 'moveStages'])->name('task-stages.move');
+            Route::patch('task-stages/{projectTaskStage}', [MobileProjectTaskController::class, 'updateStage'])->whereNumber('projectTaskStage')->name('task-stages.update');
+
+            Route::get('tasks', [MobileProjectTaskController::class, 'index'])->name('tasks.index');
             Route::post('tasks', [ProjectController::class, 'storeTask'])->name('tasks.store');
-            Route::get('tasks/{projectTask}', [ProjectController::class, 'showTask'])->name('tasks.show');
-            Route::patch('tasks/{projectTask}', [ProjectController::class, 'updateTask'])->name('tasks.update');
+            Route::get('tasks/{projectTask}', [ProjectController::class, 'showTask'])->whereNumber('projectTask')->name('tasks.show');
+            Route::patch('tasks/{projectTask}', [ProjectController::class, 'updateTask'])->whereNumber('projectTask')->name('tasks.update');
+            Route::delete('tasks/{projectTask}', [ProjectController::class, 'destroyTask'])->whereNumber('projectTask')->name('tasks.destroy');
+            Route::patch('tasks/{projectTask}/move', [MobileProjectTaskController::class, 'move'])->whereNumber('projectTask')->name('tasks.move');
+            Route::get('tasks/{projectTask}/conversation', [MobileProjectTaskController::class, 'conversation'])->whereNumber('projectTask')->name('tasks.conversation.show');
+        });
+
+        Route::middleware(['module.enabled:production', 'can:access-production'])->group(function (): void {
+            Route::get('production', [MobileProductionController::class, 'index'])->name('production.index');
+            Route::get('production/{section}', [MobileProductionController::class, 'show'])->name('production.show');
+        });
+
+        Route::middleware(['module.enabled:procurement', 'can:access-procurement'])->prefix('procurement')->name('procurement.')->group(function (): void {
+            Route::get('/', [ApiProcurementController::class, 'index'])->name('index');
+            Route::post('requests', [ApiProcurementController::class, 'storeRequest'])->name('requests.store');
+            Route::patch('requests/{purchaseRequest}/decision', [ApiProcurementController::class, 'decideRequest'])
+                ->middleware('can:approve-procurement-budget')
+                ->name('requests.decision.update');
+            Route::post('suppliers', [ApiProcurementController::class, 'storeSupplier'])
+                ->middleware('can:manage-procurement')
+                ->name('suppliers.store');
+            Route::patch('suppliers/{supplier}', [ApiProcurementController::class, 'updateSupplier'])
+                ->middleware('can:manage-procurement')
+                ->name('suppliers.update');
+            Route::post('quotations', [ApiProcurementController::class, 'storeQuotation'])
+                ->middleware('can:manage-procurement')
+                ->name('quotations.store');
+            Route::post('orders', [ApiProcurementController::class, 'storeOrder'])
+                ->middleware('can:manage-procurement-orders')
+                ->name('orders.store');
+            Route::patch('orders/{purchaseOrder}/send', [ApiProcurementController::class, 'sendOrder'])
+                ->middleware('can:manage-procurement-orders')
+                ->name('orders.send');
+            Route::post('receipts', [ApiProcurementController::class, 'storeReceipt'])
+                ->middleware('can:receive-procurement-orders')
+                ->name('receipts.store');
+            Route::post('returns', [ApiProcurementController::class, 'storeReturn'])
+                ->middleware('can:return-procurement-goods')
+                ->name('returns.store');
         });
 
         Route::middleware(['module.enabled:warehouses', 'can:access-warehouses'])->group(function (): void {
             Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
-            Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show'])->name('warehouses.show');
-            Route::get('warehouses/{warehouse}/items', [WarehouseController::class, 'items'])->name('warehouses.items');
+            Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
+            Route::post('warehouses/scan', [MobileWarehouseController::class, 'scan'])->name('warehouses.scan');
+            Route::get('warehouses/qr/{qrCode}', [WebWarehouseController::class, 'qr'])->name('warehouses.qr.show');
+            Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show'])->whereNumber('warehouse')->name('warehouses.show');
+            Route::get('warehouses/{warehouse}/items', [WarehouseController::class, 'items'])->whereNumber('warehouse')->name('warehouses.items');
+            Route::get('warehouses/{warehouse}/floors/{warehouseFloor}', [MobileWarehouseController::class, 'floor'])
+                ->whereNumber(['warehouse', 'warehouseFloor'])
+                ->name('warehouses.floors.show');
         });
 
         Route::middleware(['module.enabled:equipment', 'can:access-equipment'])->group(function (): void {
             Route::get('equipment', [EquipmentController::class, 'index'])->name('equipment.index');
+            Route::post('equipment', [EquipmentController::class, 'store'])->name('equipment.store');
             Route::get('equipment/{equipmentItem}', [EquipmentController::class, 'show'])->name('equipment.show');
+            Route::patch('equipment/{equipmentItem}', [EquipmentController::class, 'update'])->name('equipment.update');
         });
 
         Route::middleware(['module.enabled:tsd', 'can:access-tsd'])->group(function (): void {

@@ -53,4 +53,6 @@ return [
     'remove_attachment' => 'Убрать вложение',
     'direct_chat_ready' => 'Личный чат готов.',
     'message_sent' => 'Сообщение отправлено.',
+    'message_pinned' => 'Сообщение закреплено.',
+    'message_unpinned' => 'Сообщение откреплено.',
 ];

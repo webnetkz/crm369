@@ -140,14 +140,7 @@ class ProjectPageData
             ],
             'taskOptions' => [
                 'statuses' => $taskStages
-                    ->map(fn (array $stage): array => [
-                        'id' => $stage['id'],
-                        'value' => $stage['slug'],
-                        'label' => $this->stageDisplayName($stage),
-                        'color' => $stage['color'],
-                        'is_completed' => $stage['is_completed'],
-                        'sort_order' => $stage['sort_order'],
-                    ])
+                    ->map(fn (array $stage): array => $this->statusOption($stage))
                     ->values()
                     ->all(),
                 'importances' => collect(ProjectTask::availableImportances())
@@ -172,6 +165,60 @@ class ProjectPageData
     }
 
     /**
+     * The kanban stages in board order, shaped like the task status options of the page.
+     *
+     * @return array<int, array{id: int|null, value: string, label: string, color: string, is_completed: bool, sort_order: int}>
+     */
+    public function taskStatusOptions(): array
+    {
+        return $this->taskStages()
+            ->map(fn (array $stage): array => $this->statusOption($stage))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * A kanban stage shaped like the task status options of the page.
+     *
+     * @return array{id: int|null, value: string, label: string, color: string, is_completed: bool, sort_order: int}
+     */
+    public function taskStatusOption(ProjectTaskStage $stage): array
+    {
+        return $this->statusOption($this->stageAttributes($stage));
+    }
+
+    /**
+     * @param  array{id: int|null, slug: string, name: string|null, color: string, is_completed: bool, sort_order: int}  $stage
+     * @return array{id: int|null, value: string, label: string, color: string, is_completed: bool, sort_order: int}
+     */
+    private function statusOption(array $stage): array
+    {
+        return [
+            'id' => $stage['id'],
+            'value' => $stage['slug'],
+            'label' => $this->stageDisplayName($stage),
+            'color' => $stage['color'],
+            'is_completed' => $stage['is_completed'],
+            'sort_order' => $stage['sort_order'],
+        ];
+    }
+
+    /**
+     * @return array{id: int|null, slug: string, name: string|null, color: string, is_completed: bool, sort_order: int}
+     */
+    private function stageAttributes(ProjectTaskStage $stage): array
+    {
+        return [
+            'id' => $stage->id,
+            'slug' => $stage->slug,
+            'name' => $stage->name,
+            'color' => $stage->color,
+            'is_completed' => $stage->is_completed,
+            'sort_order' => $stage->sort_order,
+        ];
+    }
+
+    /**
      * @return Collection<int, array{id: int|null, slug: string, name: string|null, color: string, is_completed: bool, sort_order: int}>
      */
     private function taskStages(): Collection
@@ -180,14 +227,7 @@ class ProjectPageData
             $stages = ProjectTaskStage::query()
                 ->ordered()
                 ->get()
-                ->map(fn (ProjectTaskStage $stage): array => [
-                    'id' => $stage->id,
-                    'slug' => $stage->slug,
-                    'name' => $stage->name,
-                    'color' => $stage->color,
-                    'is_completed' => $stage->is_completed,
-                    'sort_order' => $stage->sort_order,
-                ]);
+                ->map(fn (ProjectTaskStage $stage): array => $this->stageAttributes($stage));
 
             if ($stages->isNotEmpty()) {
                 return $stages;

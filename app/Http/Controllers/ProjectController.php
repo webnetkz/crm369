@@ -18,21 +18,21 @@ use App\Models\User;
 use App\Support\CsvDelimiter;
 use App\Support\ProjectPageData;
 use App\Support\ProjectTaskAssignmentNotifier;
+use App\Support\ProjectTaskBoardManager;
 use App\Support\ProjectTaskChangeLogger;
 use App\Support\ProjectTaskCsvService;
 use App\Support\TaskConversationManager;
-use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProjectController extends Controller
 {
+    public function __construct(private ProjectTaskBoardManager $boardManager) {}
+
     public function index(Request $request, ProjectPageData $pageData): Response
     {
         return Inertia::render('projects/Index', $pageData->build($request->user()));
@@ -342,36 +342,22 @@ class ProjectController extends Controller
         return $this->redirectForTask($request, $visibleTask->fresh(['project']));
     }
 
-    public function moveWorkspaceTask(
-        MoveProjectTaskRequest $request,
-        ProjectTask $projectTask,
-        ProjectTaskChangeLogger $taskChangeLogger,
-    ): RedirectResponse {
+    public function moveWorkspaceTask(MoveProjectTaskRequest $request, ProjectTask $projectTask): RedirectResponse
+    {
         $visibleTask = $this->visibleTask($request, $projectTask);
         abort_unless($request->user()->canManageTask($visibleTask), 403);
 
-        $beforeState = $taskChangeLogger->snapshot($visibleTask);
-        $visibleTask->update([
-            'status' => $request->status(),
-            'completed_at' => $this->completedAtForStatus($visibleTask, $request->status()),
-            'updated_by_user_id' => $request->user()->id,
-        ]);
-        $taskChangeLogger->syncConversationAndLogChanges($beforeState, $visibleTask, $request->user());
+        $this->boardManager->moveTask($visibleTask, $request->status(), $request->user());
 
         return back();
     }
 
     public function storeTaskStage(StoreProjectTaskStageRequest $request): RedirectResponse
     {
-        $name = (string) $request->validated('name');
-
-        ProjectTaskStage::query()->create([
-            'slug' => $this->uniqueTaskStageSlug($name),
-            'name' => $name,
-            'color' => (string) $request->validated('color'),
-            'is_completed' => false,
-            'sort_order' => $this->nextTaskStageSortOrder(),
-        ]);
+        $this->boardManager->createStage(
+            (string) $request->validated('name'),
+            (string) $request->validated('color'),
+        );
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.projects.stage_created_success')]);
 
@@ -394,17 +380,7 @@ class ProjectController extends Controller
 
     public function moveTaskStages(MoveProjectTaskStagesRequest $request): RedirectResponse
     {
-        ProjectTaskStage::query()
-            ->whereIn('id', $request->stageIds())
-            ->get()
-            ->keyBy('id')
-            ->pipe(function ($stagesById) use ($request): void {
-                foreach ($request->stageIds() as $index => $stageId) {
-                    $stagesById[$stageId]?->update([
-                        'sort_order' => $index,
-                    ]);
-                }
-            });
+        $this->boardManager->reorderStages($request->stageIds());
 
         return back();
     }
@@ -457,7 +433,7 @@ class ProjectController extends Controller
             'complexity' => $request->validated('complexity'),
             'due_at' => $request->dueAt(),
             'due_reminder_sent_at' => null,
-            'completed_at' => $this->completedAtForStatus(null, $request->validated('status')),
+            'completed_at' => $this->boardManager->completedAtForStatus(null, $request->validated('status')),
             'sort_order' => $request->validated('sort_order'),
             'updated_by_user_id' => $request->user()->id,
         ]);
@@ -481,7 +457,7 @@ class ProjectController extends Controller
             'due_reminder_sent_at' => $task->dueReminderNeedsReset($dueAt, $assigneeUserId)
                 ? null
                 : $task->due_reminder_sent_at,
-            'completed_at' => $this->completedAtForStatus($task, $request->validated('status')),
+            'completed_at' => $this->boardManager->completedAtForStatus($task, $request->validated('status')),
             'sort_order' => $request->validated('sort_order'),
             'updated_by_user_id' => $request->user()->id,
         ]);
@@ -506,54 +482,7 @@ class ProjectController extends Controller
 
     private function taskDisplayMode(Request $request): string
     {
-        $taskDisplayMode = $request->string('view')->value();
-
-        if ($this->isValidTaskDisplayMode($taskDisplayMode)) {
-            $this->persistTaskDisplayMode($request, $taskDisplayMode);
-
-            return $taskDisplayMode;
-        }
-
-        if (! $this->canPersistTaskDisplayMode()) {
-            return ProjectPageData::VIEW_LIST;
-        }
-
-        $preferredTaskDisplayMode = $request->user()?->task_display_mode;
-
-        return $this->isValidTaskDisplayMode($preferredTaskDisplayMode)
-            ? $preferredTaskDisplayMode
-            : ProjectPageData::VIEW_LIST;
-    }
-
-    private function isValidTaskDisplayMode(?string $taskDisplayMode): bool
-    {
-        return in_array($taskDisplayMode, [
-            ProjectPageData::VIEW_LIST,
-            ProjectPageData::VIEW_KANBAN,
-            ProjectPageData::VIEW_GANTT,
-        ], true);
-    }
-
-    private function persistTaskDisplayMode(Request $request, string $taskDisplayMode): void
-    {
-        $user = $request->user();
-
-        if (
-            $user === null
-            || ! $this->canPersistTaskDisplayMode()
-            || $user->task_display_mode === $taskDisplayMode
-        ) {
-            return;
-        }
-
-        $user->forceFill([
-            'task_display_mode' => $taskDisplayMode,
-        ])->save();
-    }
-
-    private function canPersistTaskDisplayMode(): bool
-    {
-        return Schema::hasColumn('users', 'task_display_mode');
+        return $this->boardManager->taskDisplayMode($request->user(), $request->string('view')->value());
     }
 
     private function visibleProject(Request $request, Project $project): Project
@@ -585,47 +514,6 @@ class ProjectController extends Controller
                 'coAssignees:id,name,last_name,email,avatar_path,avatar_scale',
             ])
             ->findOrFail($projectTask->id);
-    }
-
-    private function completedAtForStatus(?ProjectTask $task, string $status): ?CarbonInterface
-    {
-        if (! ProjectTaskStage::isCompletedSlug($status)) {
-            return null;
-        }
-
-        return $task?->completed_at ?? now();
-    }
-
-    private function nextTaskStageSortOrder(): int
-    {
-        $completedStage = ProjectTaskStage::query()
-            ->where('is_completed', true)
-            ->ordered()
-            ->first();
-
-        if (! $completedStage) {
-            return (int) ((ProjectTaskStage::query()->max('sort_order') ?? -1) + 1);
-        }
-
-        ProjectTaskStage::query()
-            ->where('sort_order', '>=', $completedStage->sort_order)
-            ->increment('sort_order');
-
-        return $completedStage->sort_order;
-    }
-
-    private function uniqueTaskStageSlug(string $name): string
-    {
-        $baseSlug = Str::slug($name, '_');
-        $slug = $baseSlug !== '' ? $baseSlug : 'stage';
-        $suffix = 1;
-
-        while (ProjectTaskStage::query()->where('slug', $slug)->exists()) {
-            $slug = $baseSlug !== '' ? $baseSlug.'_'.$suffix : 'stage_'.$suffix;
-            $suffix++;
-        }
-
-        return $slug;
     }
 
     /**

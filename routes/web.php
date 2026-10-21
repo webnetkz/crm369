@@ -20,6 +20,7 @@ use App\Http\Controllers\GoodsReceiptController;
 use App\Http\Controllers\KnowledgeBaseController;
 use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\MobileNotificationFeedController;
+use App\Http\Controllers\MobileWebSessionLoginController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationPageController;
@@ -247,6 +248,11 @@ Route::post('edo/public/{edoDocument:public_token}', [PublicEdoSigningController
 Route::get('edo/public/{edoDocument:public_token}/download', [PublicEdoSigningController::class, 'download'])
     ->middleware('module.enabled:edo')
     ->name('edo.public.download');
+
+Route::get('mobile/web-session/{token}', MobileWebSessionLoginController::class)
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->middleware('throttle:30,1')
+    ->name('mobile.web-session.consume');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('mobile/notifications/feed', MobileNotificationFeedController::class)->name('mobile.notifications.feed');

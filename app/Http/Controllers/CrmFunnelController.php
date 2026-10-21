@@ -12,6 +12,7 @@ use App\Http\Requests\UpdateCrmFunnelStageRequest;
 use App\Models\CrmDeal;
 use App\Models\CrmFunnel;
 use App\Models\CrmFunnelStage;
+use App\Support\CrmFunnelBoardManager;
 use App\Support\CrmFunnelPageData;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class CrmFunnelController extends Controller
         return Inertia::render('funnels/Index', $pageData->build($request->user(), $visibleFunnel));
     }
 
-    public function store(StoreCrmFunnelRequest $request): RedirectResponse
+    public function store(StoreCrmFunnelRequest $request, CrmFunnelBoardManager $boardManager): RedirectResponse
     {
         $user = $request->user();
 
@@ -43,7 +44,7 @@ class CrmFunnelController extends Controller
         ]);
 
         $funnel->groups()->sync($request->groupIds());
-        $this->createDefaultStages($funnel);
+        $boardManager->createDefaultStages($funnel);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.funnels.funnel_created_success')]);
 
@@ -79,13 +80,16 @@ class CrmFunnelController extends Controller
         return redirect()->route('funnels.index');
     }
 
-    public function storeStage(StoreCrmFunnelStageRequest $request, CrmFunnel $crmFunnel): RedirectResponse
-    {
+    public function storeStage(
+        StoreCrmFunnelStageRequest $request,
+        CrmFunnel $crmFunnel,
+        CrmFunnelBoardManager $boardManager,
+    ): RedirectResponse {
         $visibleFunnel = $this->visibleFunnel($request, $crmFunnel);
 
         $visibleFunnel->stages()->create([
             ...$request->stagePayload(),
-            'sort_order' => $request->sortOrder() ?? (($visibleFunnel->stages()->max('sort_order') ?? -1) + 1),
+            'sort_order' => $request->sortOrder() ?? $boardManager->nextStageSortOrder($visibleFunnel),
         ]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.funnels.stage_created_success')]);
@@ -128,15 +132,18 @@ class CrmFunnelController extends Controller
         return back();
     }
 
-    public function storeDeal(StoreCrmDealRequest $request, CrmFunnel $crmFunnel): RedirectResponse
-    {
+    public function storeDeal(
+        StoreCrmDealRequest $request,
+        CrmFunnel $crmFunnel,
+        CrmFunnelBoardManager $boardManager,
+    ): RedirectResponse {
         $visibleFunnel = $this->visibleFunnel($request, $crmFunnel);
 
         CrmDeal::query()->create([
             ...$request->dealPayload($visibleFunnel),
             'created_by_user_id' => $request->user()->id,
             'updated_by_user_id' => $request->user()->id,
-            'sort_order' => $request->sortOrder() ?? $this->nextDealSortOrder($visibleFunnel, (int) $request->validated('crm_funnel_stage_id')),
+            'sort_order' => $request->sortOrder() ?? $boardManager->nextDealSortOrder($visibleFunnel, (int) $request->validated('crm_funnel_stage_id')),
         ]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('ui.funnels.deal_created_success')]);
@@ -160,14 +167,18 @@ class CrmFunnelController extends Controller
         return back();
     }
 
-    public function moveDeal(MoveCrmDealRequest $request, CrmFunnel $crmFunnel, CrmDeal $crmDeal): RedirectResponse
-    {
+    public function moveDeal(
+        MoveCrmDealRequest $request,
+        CrmFunnel $crmFunnel,
+        CrmDeal $crmDeal,
+        CrmFunnelBoardManager $boardManager,
+    ): RedirectResponse {
         $visibleFunnel = $this->visibleFunnel($request, $crmFunnel);
         $visibleDeal = $this->visibleDeal($visibleFunnel, $crmDeal);
 
         $visibleDeal->update([
             'crm_funnel_stage_id' => $request->stageId(),
-            'sort_order' => $request->sortOrder() ?? $this->nextDealSortOrder($visibleFunnel, $request->stageId()),
+            'sort_order' => $request->sortOrder() ?? $boardManager->nextDealSortOrder($visibleFunnel, $request->stageId()),
             'updated_by_user_id' => $request->user()->id,
         ]);
 
@@ -205,34 +216,5 @@ class CrmFunnelController extends Controller
         abort_unless($deal->crm_funnel_id === $funnel->id, 404);
 
         return $deal;
-    }
-
-    private function nextDealSortOrder(CrmFunnel $funnel, int $stageId): int
-    {
-        return (int) (($funnel->deals()->where('crm_funnel_stage_id', $stageId)->max('sort_order') ?? -1) + 1);
-    }
-
-    private function createDefaultStages(CrmFunnel $funnel): void
-    {
-        $funnel->stages()->createMany([
-            [
-                'name' => __('ui.funnels.default_stage_new'),
-                'color' => '#64748B',
-                'type' => CrmFunnelStage::TYPE_OPEN,
-                'sort_order' => 0,
-            ],
-            [
-                'name' => __('ui.funnels.default_stage_in_progress'),
-                'color' => '#2563EB',
-                'type' => CrmFunnelStage::TYPE_OPEN,
-                'sort_order' => 1,
-            ],
-            [
-                'name' => __('ui.funnels.default_stage_won'),
-                'color' => '#16A34A',
-                'type' => CrmFunnelStage::TYPE_WON,
-                'sort_order' => 2,
-            ],
-        ]);
     }
 }

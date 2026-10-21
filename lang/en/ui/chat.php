@@ -53,4 +53,6 @@ return [
     'remove_attachment' => 'Remove attachment',
     'direct_chat_ready' => 'Direct chat is ready.',
     'message_sent' => 'Message sent.',
+    'message_pinned' => 'Message pinned.',
+    'message_unpinned' => 'Message unpinned.',
 ];

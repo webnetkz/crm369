@@ -23,6 +23,7 @@ class FirebaseCloudMessagingClient
             'type' => $message['type'],
             'action_path' => $message['action_path'] ?? '',
             'entity_id' => $message['entity_id'] ?? '',
+            'portal_url' => rtrim((string) config('app.url'), '/'),
         ])->map(fn (mixed $value): string => (string) $value)->all();
 
         $response = Http::withToken($this->accessTokenProvider->accessToken())

@@ -44,6 +44,11 @@ return [
         'service_account_path' => env('FCM_SERVICE_ACCOUNT_PATH'),
         'connect_timeout_seconds' => (int) env('FCM_CONNECT_TIMEOUT_SECONDS', 5),
         'timeout_seconds' => (int) env('FCM_TIMEOUT_SECONDS', 10),
+        'android' => [
+            'application_id' => env('FCM_ANDROID_APP_ID'),
+            'api_key' => env('FCM_ANDROID_API_KEY'),
+            'sender_id' => env('FCM_SENDER_ID'),
+        ],
     ],
 
 ];

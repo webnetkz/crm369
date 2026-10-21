@@ -11,6 +11,29 @@ use Illuminate\Support\Collection;
 
 class FilePageData
 {
+    public function __construct(
+        private readonly FileWorkspaceManager $workspaceManager,
+        private readonly FileAccessManager $accessManager,
+    ) {}
+
+    /**
+     * The files workspace of the viewer opened on the requested directory when it is readable,
+     * otherwise on the first readable root directory.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildForViewer(User $viewer, int $requestedDirectoryId = 0): array
+    {
+        $directories = $this->workspaceManager->directories();
+
+        return $this->build(
+            $viewer,
+            $directories,
+            $this->workspaceManager->activeDirectory($viewer, $directories, $requestedDirectoryId),
+            $this->accessManager,
+        );
+    }
+
     /**
      * @param  Collection<int, FileDirectory>  $directories
      * @return array<string, mixed>

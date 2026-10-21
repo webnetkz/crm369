@@ -23,13 +23,19 @@ use App\Models\Supplier;
 use App\Support\ProcurementPageData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use stdClass;
 
 class ProcurementController extends Controller
 {
     public function index(Request $request, ProcurementPageData $procurementPageData): JsonResponse
     {
+        $pageData = $procurementPageData->index($request->user());
+
         return response()->json([
-            'data' => $procurementPageData->index($request->user()),
+            'data' => [
+                ...$pageData,
+                'summary' => $this->summary($pageData['summary']),
+            ],
         ]);
     }
 
@@ -136,5 +142,22 @@ class ProcurementController extends Controller
             'message' => __('ui.procurement.return_created_success'),
             'data' => $return,
         ], 201);
+    }
+
+    /**
+     * The summary with its totals per currency always encoded as JSON objects, even before the first receipt.
+     *
+     * @param  array<string, mixed>  $summary
+     * @return array<string, mixed>
+     */
+    private function summary(array $summary): array
+    {
+        foreach (['month_receipts', 'potential_savings'] as $totalsPerCurrency) {
+            $totals = $summary[$totalsPerCurrency] ?? null;
+
+            $summary[$totalsPerCurrency] = is_array($totals) && $totals !== [] ? $totals : new stdClass;
+        }
+
+        return $summary;
     }
 }

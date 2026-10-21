@@ -28,18 +28,7 @@ class CrmFunnelPageData
             : $funnels->first();
 
         if ($resolvedFunnel) {
-            $resolvedFunnel->load([
-                'groups:id,name,description',
-                'stages' => fn ($query) => $query
-                    ->with([
-                        'deals' => fn ($dealQuery) => $dealQuery
-                            ->with(['responsibleUser:id,name,last_name,email'])
-                            ->orderBy('sort_order')
-                            ->orderByDesc('updated_at'),
-                    ])
-                    ->orderBy('sort_order')
-                    ->orderBy('id'),
-            ]);
+            $this->loadBoardRelations($resolvedFunnel);
         }
 
         return [
@@ -58,19 +47,7 @@ class CrmFunnelPageData
                 ->values()
                 ->all(),
             'activeFunnel' => $resolvedFunnel ? $this->activeFunnel($resolvedFunnel) : null,
-            'availableUsers' => User::query()
-                ->select(['id', 'name', 'last_name', 'email'])
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get()
-                ->map(fn (User $user): array => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'last_name' => $user->last_name,
-                    'email' => $user->email,
-                ])
-                ->values()
-                ->all(),
+            'availableUsers' => $this->availableUsers(),
             'availableGroups' => $viewer->canManageFunnels()
                 ? UserGroup::query()
                     ->withCount('users')
@@ -110,6 +87,110 @@ class CrmFunnelPageData
     }
 
     /**
+     * Active users that can be chosen as the responsible user of a deal.
+     *
+     * @return array<int, array{id: int, name: string, last_name: string|null, email: string}>
+     */
+    public function availableUsers(): array
+    {
+        return User::query()
+            ->select(['id', 'name', 'last_name', 'email'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (User $user): array => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'last_name' => $user->last_name,
+                'email' => $user->email,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Serialize a funnel board (settings, stages with their deals and statistics) exactly like the page's active funnel.
+     *
+     * @return array<string, mixed>
+     */
+    public function board(CrmFunnel $funnel): array
+    {
+        $this->loadBoardRelations($funnel);
+
+        return $this->activeFunnel($funnel);
+    }
+
+    /**
+     * Serialize a board stage with its deals.
+     *
+     * @return array{id: int, name: string, color: string|null, type: string, sort_order: int, deals_count: int, deals: array<int, array<string, mixed>>}
+     */
+    public function stage(CrmFunnelStage $stage): array
+    {
+        return [
+            'id' => $stage->id,
+            'name' => $stage->name,
+            'color' => $stage->color,
+            'type' => $stage->type,
+            'sort_order' => $stage->sort_order,
+            'deals_count' => $stage->deals->count(),
+            'deals' => $stage->deals
+                ->map(fn (CrmDeal $deal): array => $this->deal($deal))
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * Serialize a deal card of the board.
+     *
+     * @return array<string, mixed>
+     */
+    public function deal(CrmDeal $deal): array
+    {
+        return [
+            'id' => $deal->id,
+            'crm_funnel_stage_id' => $deal->crm_funnel_stage_id,
+            'title' => $deal->title,
+            'company_name' => $deal->company_name,
+            'contact_name' => $deal->contact_name,
+            'contact_phone' => $deal->contact_phone,
+            'contact_email' => $deal->contact_email,
+            'amount' => $deal->amount !== null ? (float) $deal->amount : null,
+            'currency' => $deal->currency,
+            'expected_close_at' => $deal->expected_close_at?->toDateString(),
+            'description' => $deal->description,
+            'custom_fields' => $deal->custom_fields ?? [],
+            'sort_order' => $deal->sort_order,
+            'responsible_user' => $deal->responsibleUser
+                ? [
+                    'id' => $deal->responsibleUser->id,
+                    'name' => $deal->responsibleUser->name,
+                    'last_name' => $deal->responsibleUser->last_name,
+                    'email' => $deal->responsibleUser->email,
+                ]
+                : null,
+            'updated_at' => $deal->updated_at?->toISOString(),
+        ];
+    }
+
+    private function loadBoardRelations(CrmFunnel $funnel): void
+    {
+        $funnel->load([
+            'groups:id,name,description',
+            'stages' => fn ($query) => $query
+                ->with([
+                    'deals' => fn ($dealQuery) => $dealQuery
+                        ->with(['responsibleUser:id,name,last_name,email'])
+                        ->orderBy('sort_order')
+                        ->orderByDesc('updated_at'),
+                ])
+                ->orderBy('sort_order')
+                ->orderBy('id'),
+        ]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function activeFunnel(CrmFunnel $funnel): array
@@ -135,41 +216,7 @@ class CrmFunnelPageData
                 ->values()
                 ->all(),
             'stages' => $funnel->stages
-                ->map(fn (CrmFunnelStage $stage): array => [
-                    'id' => $stage->id,
-                    'name' => $stage->name,
-                    'color' => $stage->color,
-                    'type' => $stage->type,
-                    'sort_order' => $stage->sort_order,
-                    'deals_count' => $stage->deals->count(),
-                    'deals' => $stage->deals
-                        ->map(fn (CrmDeal $deal): array => [
-                            'id' => $deal->id,
-                            'crm_funnel_stage_id' => $deal->crm_funnel_stage_id,
-                            'title' => $deal->title,
-                            'company_name' => $deal->company_name,
-                            'contact_name' => $deal->contact_name,
-                            'contact_phone' => $deal->contact_phone,
-                            'contact_email' => $deal->contact_email,
-                            'amount' => $deal->amount !== null ? (float) $deal->amount : null,
-                            'currency' => $deal->currency,
-                            'expected_close_at' => $deal->expected_close_at?->toDateString(),
-                            'description' => $deal->description,
-                            'custom_fields' => $deal->custom_fields ?? [],
-                            'sort_order' => $deal->sort_order,
-                            'responsible_user' => $deal->responsibleUser
-                                ? [
-                                    'id' => $deal->responsibleUser->id,
-                                    'name' => $deal->responsibleUser->name,
-                                    'last_name' => $deal->responsibleUser->last_name,
-                                    'email' => $deal->responsibleUser->email,
-                                ]
-                                : null,
-                            'updated_at' => $deal->updated_at?->toISOString(),
-                        ])
-                        ->values()
-                        ->all(),
-                ])
+                ->map(fn (CrmFunnelStage $stage): array => $this->stage($stage))
                 ->values()
                 ->all(),
             'stats' => [

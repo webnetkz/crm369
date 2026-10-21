@@ -202,6 +202,20 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('mobile-portal', fn (Request $request): Limit => Limit::perMinute(60)->by('mobile-portal:'.$request->ip()));
+
+        RateLimiter::for('mobile-web-session', function (Request $request): array {
+            $mobileAccessToken = $request->attributes->get('mobile_access_token');
+            $subject = $mobileAccessToken instanceof MobileAccessToken
+                ? 'token:'.$mobileAccessToken->id
+                : 'ip:'.$request->ip();
+
+            return [
+                Limit::perMinute(30)->by('mobile-web-session-minute:'.$subject),
+                Limit::perHour(300)->by('mobile-web-session-hour:'.$subject),
+            ];
+        });
+
         RateLimiter::for('conference-room-realtime', function (Request $request): array {
             $subject = $this->conferenceParticipantRateLimitSubject($request);
 

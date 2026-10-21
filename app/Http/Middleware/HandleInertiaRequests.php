@@ -2,14 +2,13 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\KnowledgeBase;
-use App\Models\MenuItem;
 use App\Models\PortalSetting;
 use App\Models\User;
 use App\Support\ChatSidebarData;
 use App\Support\ManagedUserProfileData;
+use App\Support\NavigationMenuData;
 use App\Support\NotificationRuntimeCache;
-use Illuminate\Database\Eloquent\Builder;
+use App\Support\UserAbilityData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Lang;
@@ -60,108 +59,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user()
                     ? $this->serializeAuthUser($request->user())
                     : null,
-                'isSuperAdmin' => $request->user()?->isSuperAdmin() ?? false,
-                'canViewUsers' => $request->user()?->canViewUsers() ?? false,
-                'canImpersonateUsers' => $request->user()?->canImpersonateUsers() ?? false,
-                'canAccessCompanyStructure' => $this->moduleEnabled('company-structure')
-                    ? ($request->user()?->canAccessCompanyStructure() ?? false)
-                    : false,
-                'canAccessNews' => $this->moduleEnabled('news')
-                    ? ($request->user()?->canAccessNews() ?? false)
-                    : false,
-                'canAccessProjects' => $this->moduleEnabled('projects')
-                    ? ($request->user()?->canAccessProjects() ?? false)
-                    : false,
-                'canAccessChats' => $this->moduleEnabled('chats')
-                    ? ($request->user()?->canAccessChats() ?? false)
-                    : false,
-                'canAccessConferences' => $this->moduleEnabled('conferences')
-                    ? ($request->user()?->canAccessConferences() ?? false)
-                    : false,
-                'canAccessCalendar' => $this->moduleEnabled('calendar')
-                    ? ($request->user()?->canAccessCalendar() ?? false)
-                    : false,
-                'canAccessKnowledgeBases' => $this->moduleEnabled('knowledge-bases')
-                    ? ($request->user()?->canAccessKnowledgeBases() ?? false)
-                    : false,
-                'canAccessForms' => $this->moduleEnabled('forms')
-                    ? ($request->user()?->canAccessForms() ?? false)
-                    : false,
-                'canAccessEdo' => $this->moduleEnabled('edo')
-                    ? ($request->user()?->canAccessEdo() ?? false)
-                    : false,
-                'canAccessFiles' => $this->moduleEnabled('files')
-                    ? ($request->user()?->canAccessFiles() ?? false)
-                    : false,
-                'canAccessProduction' => $this->moduleEnabled('production')
-                    ? ($request->user()?->canAccessProduction() ?? false)
-                    : false,
-                'canAccessProcurement' => $this->moduleEnabled('procurement')
-                    ? ($request->user()?->canAccessProcurement() ?? false)
-                    : false,
-                'canManageProcurement' => $this->moduleEnabled('procurement')
-                    ? ($request->user()?->canManageProcurement() ?? false)
-                    : false,
-                'canApproveProcurementBudget' => $this->moduleEnabled('procurement')
-                    ? ($request->user()?->canApproveProcurementBudget() ?? false)
-                    : false,
-                'canManageProcurementOrders' => $this->moduleEnabled('procurement')
-                    ? ($request->user()?->canManageProcurementOrders() ?? false)
-                    : false,
-                'canReceiveProcurementOrders' => $this->moduleEnabled('procurement')
-                    ? ($request->user()?->canReceiveProcurementOrders() ?? false)
-                    : false,
-                'canReturnProcurementGoods' => $this->moduleEnabled('procurement')
-                    ? ($request->user()?->canReturnProcurementGoods() ?? false)
-                    : false,
-                'canAccessWarehouses' => $this->moduleEnabled('warehouses')
-                    ? ($request->user()?->canAccessWarehouses() ?? false)
-                    : false,
-                'canAccessEquipment' => $this->moduleEnabled('equipment')
-                    ? ($request->user()?->canAccessEquipment() ?? false)
-                    : false,
-                'canAccessTsd' => $this->moduleEnabled('tsd')
-                    ? ($request->user()?->canAccessTsd() ?? false)
-                    : false,
-                'canAccessDirectories' => $this->moduleEnabled('directories')
-                    ? ($request->user()?->canAccessDirectories() ?? false)
-                    : false,
-                'canManageDirectories' => $this->moduleEnabled('directories')
-                    ? ($request->user()?->canManageDirectories() ?? false)
-                    : false,
-                'canManageApiTokens' => $this->moduleEnabled('api')
-                    ? ($request->user()?->canManageApiTokens() ?? false)
-                    : false,
-                'canManageWebhooks' => $this->moduleEnabled('webhooks')
-                    ? ($request->user()?->canManageWebhooks() ?? false)
-                    : false,
-                'canManageMessengerIntegrations' => $this->moduleEnabled('integrations')
-                    ? ($request->user()?->canManageMessengerIntegrations() ?? false)
-                    : false,
-                'canManageBusinessProcesses' => $this->moduleEnabled('business-processes')
-                    ? ($request->user()?->canManageBusinessProcesses() ?? false)
-                    : false,
-                'canAccessContacts' => $this->moduleEnabled('contacts')
-                    ? ($request->user()?->canAccessContacts() ?? false)
-                    : false,
-                'canAccessPersonContacts' => $this->moduleEnabled('contacts')
-                    ? ($request->user()?->canAccessPersonContacts() ?? false)
-                    : false,
-                'canAccessCompanyContacts' => $this->moduleEnabled('contacts')
-                    ? ($request->user()?->canAccessCompanyContacts() ?? false)
-                    : false,
-                'canManageKnowledgeBases' => $this->moduleEnabled('knowledge-bases')
-                    ? ($request->user()?->canManageKnowledgeBases() ?? false)
-                    : false,
-                'canManageNews' => $this->moduleEnabled('news')
-                    ? ($request->user()?->canManageNews() ?? false)
-                    : false,
-                'canAccessFunnels' => $this->moduleEnabled('funnels') && $this->crmFunnelsEnabled()
-                    ? ($request->user()?->canAccessFunnels() ?? false)
-                    : false,
-                'canManageFunnels' => $this->moduleEnabled('funnels') && $this->crmFunnelsEnabled()
-                    ? ($request->user()?->canManageFunnels() ?? false)
-                    : false,
+                ...app(UserAbilityData::class)->build($request->user()),
                 'isImpersonating' => $impersonator !== null,
                 'impersonator' => $impersonator
                     ? [
@@ -284,70 +182,7 @@ class HandleInertiaRequests extends Middleware
      */
     private function menuProps(): array
     {
-        $user = request()->user();
-
-        if (! $this->hasTable('menu_items') || ! $user) {
-            return [
-                'hiddenItems' => [],
-                'customItems' => [],
-                'knowledgeBases' => [],
-                'order' => [],
-            ];
-        }
-
-        return [
-            'hiddenItems' => MenuItem::hiddenBuiltInKeysForUser($user),
-            'customItems' => MenuItem::visibleCustomItemsForUser($user)
-                ->map(fn (MenuItem $item): array => [
-                    'id' => $item->id,
-                    'title' => $item->title,
-                    'icon' => $item->icon,
-                    'url' => $item->url,
-                    'opensInNewTab' => $item->opens_in_new_tab,
-                ])
-                ->values()
-                ->all(),
-            'knowledgeBases' => $this->knowledgeBaseMenuItems($user),
-            'order' => $user->menuItemOrder(),
-        ];
-    }
-
-    /**
-     * @return array<int, array{id: int, title: string}>
-     */
-    private function knowledgeBaseMenuItems(User $user): array
-    {
-        if (
-            ! $this->moduleEnabled('knowledge-bases')
-            || ! $user->canAccessKnowledgeBases()
-            || ! $this->hasTable('knowledge_bases')
-            || ! $this->hasTable('knowledge_base_group')
-            || ! $this->hasTable('user_groups')
-        ) {
-            return [];
-        }
-
-        $canManage = $user->canManageKnowledgeBases();
-
-        return KnowledgeBase::query()
-            ->select(['id', 'title'])
-            ->when(! $canManage, fn (Builder $query) => $query
-                ->where('is_published', true)
-                ->where(function (Builder $visibilityQuery) use ($user): void {
-                    $visibilityQuery->whereDoesntHave('groups');
-
-                    if (is_numeric($user->user_group_id)) {
-                        $visibilityQuery->orWhereHas('groups', fn (Builder $groupQuery) => $groupQuery->where('user_groups.id', (int) $user->user_group_id));
-                    }
-                }))
-            ->orderBy('title')
-            ->get()
-            ->map(fn (KnowledgeBase $knowledgeBase): array => [
-                'id' => $knowledgeBase->id,
-                'title' => $knowledgeBase->title,
-            ])
-            ->values()
-            ->all();
+        return app(NavigationMenuData::class)->build(request()->user());
     }
 
     /**
@@ -378,12 +213,6 @@ class HandleInertiaRequests extends Middleware
         return User::query()
             ->select(['id', 'name', 'email'])
             ->find((int) $impersonatorId);
-    }
-
-    private function crmFunnelsEnabled(): bool
-    {
-        return $this->hasTable('crm_funnels')
-            && $this->hasTable('crm_funnel_user_group');
     }
 
     private function moduleEnabled(string $module): bool

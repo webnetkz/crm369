@@ -15,6 +15,8 @@ use App\Models\ProjectTaskStage;
 use App\Support\ApiRequestContext;
 use App\Support\ProjectPageData;
 use App\Support\ProjectTaskAssignmentNotifier;
+use App\Support\ProjectTaskChangeLogger;
+use App\Support\TaskConversationManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -101,6 +103,7 @@ class ProjectController extends Controller
 
     public function storeTask(
         StoreProjectTaskRequest $request,
+        TaskConversationManager $taskConversationManager,
         ProjectTaskAssignmentNotifier $taskAssignmentNotifier,
     ): JsonResponse {
         $user = ApiRequestContext::subject($request);
@@ -113,6 +116,7 @@ class ProjectController extends Controller
 
         $task = $this->createTask($request, $project);
         $task->coAssignees()->sync($request->coAssigneeUserIds());
+        $taskConversationManager->ensureForTask($task, $user);
         $taskAssignmentNotifier->sendForNewTask($task, $user);
 
         return response()->json([
@@ -137,6 +141,7 @@ class ProjectController extends Controller
     public function updateTask(
         UpdateProjectTaskRequest $request,
         ProjectTask $projectTask,
+        ProjectTaskChangeLogger $taskChangeLogger,
         ProjectTaskAssignmentNotifier $taskAssignmentNotifier,
     ): JsonResponse {
         $visibleTask = $this->visibleTask($request, $projectTask);
@@ -150,16 +155,16 @@ class ProjectController extends Controller
             abort_unless($user->canWorkOnProject($targetProject), 403);
         }
 
-        $previousAssigneeUserId = $visibleTask->assignee_user_id;
-        $previousCoAssigneeUserIds = $visibleTask->coAssignees->pluck('id')->all();
+        $beforeState = $taskChangeLogger->snapshot($visibleTask);
 
         $this->fillTask($visibleTask, $request, $targetProject);
         $visibleTask->coAssignees()->sync($request->coAssigneeUserIds());
+        $taskChangeLogger->syncConversationAndLogChanges($beforeState, $visibleTask, $user);
         $taskAssignmentNotifier->sendForAssignmentChanges(
             $visibleTask,
             $user,
-            $previousAssigneeUserId,
-            $previousCoAssigneeUserIds,
+            $beforeState['assignee_user_id'],
+            $beforeState['co_assignee_ids'],
         );
 
         return response()->json([
