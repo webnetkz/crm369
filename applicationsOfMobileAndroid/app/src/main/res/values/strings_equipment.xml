@@ -1,3 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="equipment_title">Оборудование</string>
+    <string name="equipment_total">Всего: %1$d</string>
+    <string name="equipment_scan">Сканировать QR</string>
+    <string name="equipment_new">Добавить оборудование</string>
+    <string name="equipment_edit">Редактировать оборудование</string>
+    <string name="equipment_search">Название, QR-код, сотрудник или email</string>
+    <string name="equipment_all_stages">Все стадии (%1$d)</string>
+    <string name="equipment_status_count">%1$s (%2$d)</string>
+    <string name="equipment_empty_title">Оборудование пока не добавлено</string>
+    <string name="equipment_empty_description">Создайте первую позицию, чтобы вести учёт, выдачу и обслуживание оборудования.</string>
+    <string name="equipment_search_empty_title">Поиск не дал результатов</string>
+    <string name="equipment_search_empty_description">Попробуйте изменить запрос или стадию.</string>
+    <string name="equipment_issued_to_value">Выдано: %1$s</string>
+    <string name="equipment_responsible_value">Ответственный: %1$s</string>
+    <string name="equipment_scan_not_found">Оборудование с QR-кодом «%1$s» не найдено</string>
+    <string name="equipment_details_title">Информация об оборудовании</string>
+    <string name="equipment_status">Стадия</string>
+    <string name="equipment_issued_to">Выдано сотруднику</string>
+    <string name="equipment_responsible">Ответственный сотрудник</string>
+    <string name="equipment_not_issued">Не выдано</string>
+    <string name="equipment_not_assigned">Не назначен</string>
+    <string name="equipment_qr_code">QR-код</string>
+    <string name="equipment_copy_qr">Скопировать QR</string>
+    <string name="equipment_qr_copied">QR-код скопирован.</string>
+    <string name="equipment_created">Создано</string>
+    <string name="equipment_last_updated">Последнее обновление</string>
+    <string name="equipment_name">Наименование оборудования</string>
+    <string name="equipment_name_placeholder">Например, Ноутбук Lenovo ThinkPad</string>
+    <string name="equipment_qr_code_placeholder">Если поле оставить пустым, код сгенерируется автоматически</string>
+    <string name="equipment_qr_code_edit_hint">Текущий код сохраняется. Если его изменить, напечатанные наклейки перестанут подходить</string>
+    <string name="equipment_status_on_balance">На балансе</string>
+    <string name="equipment_status_issued">Выдача сотруднику</string>
+    <string name="equipment_status_maintenance">Назначение тех. обслуживания</string>
+    <string name="equipment_status_repair">Ремонт</string>
+    <string name="equipment_status_written_off">Списание</string>
+    <string name="equipment_created_success">Оборудование добавлено.</string>
+    <string name="equipment_updated_success">Оборудование обновлено.</string>
 </resources>

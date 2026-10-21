@@ -1,3 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="directories_total">Directories: %1$d</string>
+    <string name="directories_new">New directory</string>
+    <string name="directories_create">Create directory</string>
+    <string name="directories_edit">Edit directory</string>
+    <string name="directories_delete">Delete directory</string>
+    <string name="directories_actions">Actions</string>
+    <string name="directories_empty">No directories yet</string>
+    <string name="directories_empty_message">Create a directory with the columns you need, then add records that follow its schema.</string>
+    <string name="directories_records_count">Records: %1$d</string>
+    <string name="directories_columns_count">Columns: %1$d</string>
+    <string name="directories_csv_badge">CSV</string>
+
+    <string name="directories_search_records">Search records</string>
+    <string name="directories_records_empty">This directory has no records yet.</string>
+    <string name="directories_records_not_found">No matching records.</string>
+    <string name="directories_record_number">Record #%1$d</string>
+    <string name="directories_updated_at">Updated: %1$s</string>
+    <string name="directories_boolean_true">✓ Yes</string>
+    <string name="directories_boolean_false">✗ No</string>
+
+    <string name="directories_add_record">Add record</string>
+    <string name="directories_edit_record">Edit record</string>
+    <string name="directories_record_form_hint">Fill in the values for each column of the directory.</string>
+    <string name="directories_record_missing">Record not found</string>
+    <string name="directories_record_created">Record created.</string>
+    <string name="directories_record_saved">Record updated.</string>
+    <string name="directories_record_deleted">Record deleted.</string>
+    <string name="directories_record_delete_title">Delete the record?</string>
+
+    <string name="directories_name">Name</string>
+    <string name="directories_slug">Slug</string>
+    <string name="directories_slug_hint">Optional, for example suppliers</string>
+    <string name="directories_description">Description</string>
+    <string name="directories_csv_enabled">Allow CSV import and export</string>
+    <string name="directories_csv_enabled_hint">Turn off if the directory must be edited manually only.</string>
+    <string name="directories_columns_title">Columns</string>
+    <string name="directories_columns_hint">Changing a column key detaches the values already stored in that column.</string>
+    <string name="directories_column_number">Column %1$d</string>
+    <string name="directories_column_label">Column label</string>
+    <string name="directories_column_key">Column key</string>
+    <string name="directories_column_key_hint">For example company_name. Leave empty to generate it from the label.</string>
+    <string name="directories_column_type">Field type</string>
+    <string name="directories_column_required">Required field</string>
+    <string name="directories_add_column">Add column</string>
+    <string name="directories_remove_column">Remove column</string>
+    <string name="directories_type_text">Text</string>
+    <string name="directories_type_textarea">Multiline text</string>
+    <string name="directories_type_number">Number</string>
+    <string name="directories_type_date">Date</string>
+    <string name="directories_type_boolean">Yes / No</string>
+    <string name="directories_created_message">Directory created.</string>
+    <string name="directories_saved_message">Directory updated.</string>
+    <string name="directories_deleted">Directory deleted.</string>
+    <string name="directories_delete_title">Delete the directory?</string>
+    <string name="directories_delete_text">The directory will be deleted together with all its records.</string>
+
+    <string name="directories_csv_title">CSV exchange</string>
+    <string name="directories_csv_description">Export records, download the template or import rows into this directory.</string>
+    <string name="directories_csv_delimiter">CSV delimiter</string>
+    <string name="directories_csv_delimiter_hint">One character, for example ; , | or \\t for tab</string>
+    <string name="directories_csv_export">Export CSV</string>
+    <string name="directories_csv_template">Download template</string>
+    <string name="directories_csv_import">Import CSV</string>
+    <string name="directories_import_success">Rows imported: %1$d.</string>
+    <string name="directories_import_failed">Import failed</string>
 </resources>

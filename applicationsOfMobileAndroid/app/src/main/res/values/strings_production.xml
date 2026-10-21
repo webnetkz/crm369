@@ -1,3 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="production_cards">Что контролирует команда</string>
+    <string name="production_records">Операционный срез</string>
+    <string name="production_focus">Фокус команды</string>
+    <string name="production_next_steps">Следующие шаги</string>
 </resources>

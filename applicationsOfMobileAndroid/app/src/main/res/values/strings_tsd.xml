@@ -1,3 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="tsd_title">ТСД</string>
+    <string name="tsd_open_qr_lookup">Поиск по QR</string>
+    <string name="tsd_scan_camera">Сканировать камерой</string>
+    <string name="tsd_qr_code">QR-код</string>
+    <string name="tsd_settings_title">Параметры сканирования</string>
+    <string name="tsd_device_name">Устройство</string>
+    <string name="tsd_device_name_placeholder">Например, TSD-01</string>
+    <string name="tsd_location">Локация</string>
+    <string name="tsd_location_placeholder">Например, Основной склад</string>
+    <string name="tsd_context">Контекст операции</string>
+    <string name="tsd_context_placeholder">Например, приёмка, отбор, инвентаризация</string>
+    <string name="tsd_result_title">Последний скан</string>
+    <string name="tsd_scanned_at">Время сканирования</string>
+    <string name="tsd_normalized_qr_code">Нормализованное значение</string>
+    <string name="tsd_not_resolved">QR-код сохранён в журнал, складской объект по нему не найден.</string>
+    <string name="tsd_recent_title">Последние сканы</string>
+    <string name="tsd_empty_title">Сканов пока нет</string>
+    <string name="tsd_empty_description">Отсканируйте первый QR-код камерой или ручным сканером.</string>
+    <string name="tsd_actor_value">Оператор: %1$s</string>
+    <string name="tsd_device_value">Устройство: %1$s</string>
+    <string name="tsd_location_value">Локация: %1$s</string>
+    <string name="tsd_context_value">Контекст: %1$s</string>
+    <string name="tsd_webhook_value">Веб-хук: %1$s</string>
+    <string name="tsd_qr_title">QR</string>
+    <string name="tsd_qr_description">Отсканируйте или введите код, чтобы узнать, что это: складской адрес, товарная позиция или оборудование.</string>
+    <string name="tsd_qr_result_title">Результат поиска</string>
+    <string name="tsd_qr_not_found">По этому QR-коду ничего не найдено.</string>
+    <string name="tsd_qr_saved_to_log">Скан сохранён в журнал ТСД.</string>
+    <string name="tsd_qr_saved_at">Скан сохранён в журнал ТСД: %1$s</string>
+    <string name="tsd_qr_equipment_found">Оборудование</string>
+    <string name="tsd_qr_equipment_issued_to">Выдано: %1$s</string>
+    <string name="tsd_qr_equipment_responsible">Ответственный: %1$s</string>
+    <string name="tsd_qr_open_equipment">Открыть оборудование</string>
 </resources>

@@ -1,3 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="edo_total">Документов: %1$d</string>
+    <string name="edo_new">Новый документ</string>
+    <string name="edo_edit">Редактирование документа</string>
+    <string name="edo_create">Создать документ</string>
+    <string name="edo_search">Поиск по документам</string>
+    <string name="edo_filter_all">Все</string>
+    <string name="edo_empty">Документы ЕДО ещё не созданы</string>
+    <string name="edo_empty_message">Создайте документ и выпустите публичную ссылку на подписание.</string>
+    <string name="edo_empty_filtered">Ничего не найдено</string>
+
+    <string name="edo_status_draft">Черновик</string>
+    <string name="edo_status_pending_signature">Ожидает подписи</string>
+    <string name="edo_status_signed">Подписан</string>
+    <string name="edo_status_cancelled">Отменён</string>
+
+    <string name="edo_source_text">Текст вручную</string>
+    <string name="edo_source_upload">Загрузить файл</string>
+    <string name="edo_source_file_entry">Выбрать из файлов</string>
+
+    <string name="edo_section_document">Документ</string>
+    <string name="edo_title_label">Название документа</string>
+    <string name="edo_external_reference">Внешний номер</string>
+    <string name="edo_counterparty">Контрагент</string>
+    <string name="edo_counterparty_identifier">БИН/ИИН контрагента</string>
+    <string name="edo_identifier_hint">12 цифр</string>
+    <string name="edo_counterparty_email">Email контрагента</string>
+    <string name="edo_email_edit_hint">Сервер не возвращает сохранённый email: если оставить поле пустым, email контрагента будет удалён.</string>
+    <string name="edo_document_source">Источник документа</string>
+    <string name="edo_content">Текст документа</string>
+    <string name="edo_upload_label">Файл документа</string>
+    <string name="edo_upload_hint">Поддерживается любой файл до 20 МБ. Без нового файла сохранится текущий.</string>
+    <string name="edo_choose_file">Выбрать файл</string>
+    <string name="edo_file_entry_label">Файл из модуля «Файлы»</string>
+    <string name="edo_file_entry_hint">Копия выбранного файла будет прикреплена к документу.</string>
+    <string name="edo_choose_from_files">Выбрать из файлов</string>
+    <string name="edo_no_file">Файл не выбран</string>
+    <string name="edo_file_picker_title">Файлы</string>
+    <string name="edo_file_picker_up">Назад</string>
+    <string name="edo_file_picker_empty">Папка пуста</string>
+    <string name="edo_file_picker_folder_files">Файлов: %1$d</string>
+
+    <string name="edo_attached_file">Прикреплённый документ</string>
+    <string name="edo_open_file">Открыть</string>
+    <string name="edo_share_file">Поделиться</string>
+
+    <string name="edo_public_link">Публичная ссылка на подписание</string>
+    <string name="edo_link_hint">Создайте публичную ссылку и отправьте её контрагенту для подписи через ЭЦП.</string>
+    <string name="edo_link_not_needed">Документ подписан, ссылка на подписание больше не нужна.</string>
+    <string name="edo_link_create">Создать ссылку для подписи</string>
+    <string name="edo_link_recreate">Создать новую ссылку</string>
+    <string name="edo_link_created">Публичная ссылка на подписание создана на 12 часов.</string>
+    <string name="edo_link_expires">Ссылка действует до</string>
+    <string name="edo_link_copied">Ссылка скопирована</string>
+    <string name="edo_copy_link">Скопировать</string>
+    <string name="edo_share_link">Поделиться</string>
+    <string name="edo_open_link">Открыть</string>
+
+    <string name="edo_signature">Подпись</string>
+    <string name="edo_signed_at">Подписан</string>
+    <string name="edo_signature_subject">Субъект сертификата</string>
+    <string name="edo_signature_serial">Серийный номер сертификата</string>
+    <string name="edo_signature_algorithm">Алгоритм подписи</string>
+    <string name="edo_signature_hash">Хеш подписанных данных</string>
+
+    <string name="edo_created">Создан</string>
+    <string name="edo_updated">Обновлён</string>
+    <string name="edo_created_message">Документ ЕДО создан.</string>
+    <string name="edo_saved_message">Документ ЕДО обновлён.</string>
+    <string name="edo_deleted">Документ ЕДО удалён.</string>
+    <string name="edo_delete_title">Удалить документ?</string>
+    <string name="edo_delete_text">Документ и прикреплённый файл будут удалены без возможности восстановления.</string>
 </resources>

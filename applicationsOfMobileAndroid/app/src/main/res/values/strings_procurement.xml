@@ -1,3 +1,180 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="procurement_tab_requests">Заявки</string>
+    <string name="procurement_tab_orders">Заказы</string>
+    <string name="procurement_tab_receipts">Поступления</string>
+    <string name="procurement_tab_returns">Возвраты</string>
+    <string name="procurement_tab_suppliers">Поставщики</string>
+    <string name="procurement_tab_count">%1$s · %2$d</string>
+
+    <string name="procurement_pending_approvals">На согласовании</string>
+    <string name="procurement_active_orders">Активные заказы</string>
+    <string name="procurement_month_receipts">Поступило за месяц</string>
+    <string name="procurement_potential_savings">Потенциал экономии</string>
+
+    <string name="procurement_empty_requests">Заявок пока нет.</string>
+    <string name="procurement_empty_orders">Заказов пока нет.</string>
+    <string name="procurement_empty_receipts">Поступлений пока нет.</string>
+    <string name="procurement_empty_returns">Возвратов пока нет.</string>
+    <string name="procurement_empty_suppliers">Поставщиков пока нет.</string>
+    <string name="procurement_empty_quotes">Добавьте цены поставщиков для сравнения.</string>
+    <string name="procurement_not_found">Запись не найдена</string>
+
+    <string name="procurement_status_draft">Черновик</string>
+    <string name="procurement_status_pending_approval">На согласовании</string>
+    <string name="procurement_status_approved">Согласована</string>
+    <string name="procurement_status_rejected">Отклонена</string>
+    <string name="procurement_status_ordered">Заказана</string>
+    <string name="procurement_status_sent">Отправлен</string>
+    <string name="procurement_status_partially_received">Частично получен</string>
+    <string name="procurement_status_received">Получен</string>
+    <string name="procurement_status_cancelled">Отменён</string>
+    <string name="procurement_status_posted">Проведён</string>
+
+    <string name="procurement_request">Заявка</string>
+    <string name="procurement_order">Заказ</string>
+    <string name="procurement_receipt">Поступление</string>
+    <string name="procurement_return">Возврат</string>
+    <string name="procurement_supplier">Поставщик</string>
+    <string name="procurement_estimate_of_budget">%1$s из %2$s</string>
+    <string name="procurement_needed_short">к %1$s</string>
+    <string name="procurement_rating_short">★ %1$s</string>
+    <string name="procurement_bin_short">БИН %1$s</string>
+    <string name="procurement_supplier_active">Активен</string>
+    <string name="procurement_supplier_inactive">Неактивен</string>
+
+    <string name="procurement_section_budget">Бюджет и сроки</string>
+    <string name="procurement_section_order">Заказ</string>
+    <string name="procurement_section_amounts">Суммы</string>
+    <string name="procurement_section_receipt">Поступление</string>
+    <string name="procurement_section_return">Возврат</string>
+    <string name="procurement_section_contacts">Контакты</string>
+    <string name="procurement_section_terms">Условия</string>
+
+    <string name="procurement_budget">Бюджет</string>
+    <string name="procurement_estimated_total">Расчётная стоимость</string>
+    <string name="procurement_estimated_total_value">Расчётная стоимость: %1$s</string>
+    <string name="procurement_budget_usage">Использование бюджета</string>
+    <string name="procurement_budget_hint">Не меньше расчётной стоимости позиций</string>
+    <string name="procurement_budget_below_estimate">Бюджет не может быть меньше расчётной стоимости позиций.</string>
+    <string name="procurement_budget_reserve">Резерв бюджета: %1$s</string>
+    <string name="procurement_use_estimate">Подставить в бюджет</string>
+    <string name="procurement_needed_at">Требуется к дате</string>
+    <string name="procurement_requested_by">Инициатор</string>
+    <string name="procurement_submitted_at">Отправлена</string>
+    <string name="procurement_approved_by">Согласовал</string>
+    <string name="procurement_approved_at">Дата согласования</string>
+    <string name="procurement_justification">Обоснование</string>
+    <string name="procurement_rejection_reason">Причина отклонения</string>
+    <string name="procurement_currency">Валюта</string>
+
+    <string name="procurement_approve">Согласовать</string>
+    <string name="procurement_approve_title">Согласовать заявку?</string>
+    <string name="procurement_approve_text">Бюджет заявки: %1$s. После согласования по заявке можно создать заказ поставщику.</string>
+    <string name="procurement_reject">Отклонить</string>
+    <string name="procurement_reject_title">Отклонить заявку</string>
+    <string name="procurement_reason_required">Укажите причину отклонения.</string>
+    <string name="procurement_decision_saved">Решение по бюджету сохранено.</string>
+
+    <string name="procurement_items_count">Позиции: %1$d</string>
+    <string name="procurement_item_number">Позиция %1$d</string>
+    <string name="procurement_item_name">Наименование</string>
+    <string name="procurement_sku">Артикул</string>
+    <string name="procurement_unit">Ед. изм.</string>
+    <string name="procurement_quantity">Количество</string>
+    <string name="procurement_target_unit_price">Целевая цена</string>
+    <string name="procurement_target_total">Целевая сумма</string>
+    <string name="procurement_warehouse_place">Место хранения</string>
+    <string name="procurement_warehouse_item">Складская позиция</string>
+    <string name="procurement_warehouse_stock">Остаток на складе</string>
+    <string name="procurement_production_reference">Производственная потребность</string>
+    <string name="procurement_notes">Примечание</string>
+    <string name="procurement_add_item">Добавить позицию</string>
+    <string name="procurement_remove_item">Удалить позицию</string>
+
+    <string name="procurement_quotations">Цены поставщиков</string>
+    <string name="procurement_best_quote">Лучшая цена</string>
+    <string name="procurement_quote_prices">Цена %1$s · налог %2$s · доставка %3$s</string>
+    <string name="procurement_quote_terms">Итог за ед. %1$s · срок %2$d дн.</string>
+    <string name="procurement_valid_until_short">действует до %1$s</string>
+    <string name="procurement_add_quote">Добавить цену</string>
+    <string name="procurement_quote_hint">Сравнение учитывает цену, налог и доставку. Новая цена того же поставщика заменит предыдущую.</string>
+    <string name="procurement_quote_saved">Цена поставщика сохранена.</string>
+    <string name="procurement_no_active_suppliers">Нет активных поставщиков. Сначала добавьте поставщика.</string>
+    <string name="procurement_unit_price">Цена за единицу</string>
+    <string name="procurement_tax_percent">Ставка налога</string>
+    <string name="procurement_delivery_cost">Доставка</string>
+    <string name="procurement_quoted_at">Дата предложения</string>
+    <string name="procurement_valid_until">Действует до</string>
+    <string name="procurement_lead_time_days">Срок поставки, дней</string>
+
+    <string name="procurement_new_request">Новая заявка</string>
+    <string name="procurement_request_title">Название заявки</string>
+    <string name="procurement_submit_request">Отправить на согласование</string>
+    <string name="procurement_request_created">Заявка отправлена на согласование.</string>
+
+    <string name="procurement_create_order">Создать заказ</string>
+    <string name="procurement_selected_quotes">Цены выбранного поставщика</string>
+    <string name="procurement_order_line">%1$s × %2$s = %3$s</string>
+    <string name="procurement_no_quote_for_item">Нет цены выбранного поставщика</string>
+    <string name="procurement_order_total">Итого с налогом и доставкой: %1$s</string>
+    <string name="procurement_order_over_budget">Сумма заказа превышает согласованный бюджет.</string>
+    <string name="procurement_order_quotes_missing">Выберите поставщика, у которого есть цены по всем позициям заявки.</string>
+    <string name="procurement_no_eligible_suppliers">Нет активного поставщика с ценами по всем позициям заявки.</string>
+    <string name="procurement_order_created">Заказ поставщику создан.</string>
+    <string name="procurement_ordered_at">Дата заказа</string>
+    <string name="procurement_expected_at">Ожидаемая поставка</string>
+    <string name="procurement_sent_at">Отправлен</string>
+    <string name="procurement_subtotal">Сумма без налога</string>
+    <string name="procurement_tax_amount">Налог</string>
+    <string name="procurement_total">Итого</string>
+    <string name="procurement_line_total">Сумма строки</string>
+    <string name="procurement_received_quantity">Получено</string>
+    <string name="procurement_remaining_quantity">Осталось получить</string>
+    <string name="procurement_returned_quantity">Возвращено</string>
+    <string name="procurement_returnable_quantity">Можно вернуть</string>
+    <string name="procurement_send_order">Отправить поставщику</string>
+    <string name="procurement_send_title">Отправить заказ?</string>
+    <string name="procurement_send_text">Заказ будет отмечен как отправленный, после этого по нему можно проводить поступления.</string>
+    <string name="procurement_order_sent">Заказ отмечен как отправленный.</string>
+    <string name="procurement_no_places">Нет мест хранения: создайте склад, чтобы проводить поступления.</string>
+
+    <string name="procurement_record_receipt">Провести поступление</string>
+    <string name="procurement_received_at">Дата поступления</string>
+    <string name="procurement_received_by">Принял</string>
+    <string name="procurement_external_reference">Номер накладной</string>
+    <string name="procurement_receipt_hint">Позиции с нулевым количеством не попадут в поступление.</string>
+    <string name="procurement_receipt_item_hint">Заказано %1$s · осталось получить %2$s</string>
+    <string name="procurement_receipt_created">Поступление проведено, остатки обновлены.</string>
+    <string name="procurement_quantity_invalid">Введите целое число</string>
+    <string name="procurement_quantity_exceeds">Не больше %1$s</string>
+    <string name="procurement_nothing_selected">Укажите количество хотя бы для одной позиции.</string>
+
+    <string name="procurement_record_return">Оформить возврат</string>
+    <string name="procurement_returned_at">Дата возврата</string>
+    <string name="procurement_created_by">Оформил</string>
+    <string name="procurement_reason">Причина</string>
+    <string name="procurement_return_quantity">Количество к возврату</string>
+    <string name="procurement_return_hint">Позиции с нулевым количеством не попадут в возврат.</string>
+    <string name="procurement_return_item_hint">Поступило %1$s · можно вернуть %2$s</string>
+    <string name="procurement_return_created">Возврат проведён, остатки обновлены.</string>
+
+    <string name="procurement_new_supplier">Добавить поставщика</string>
+    <string name="procurement_edit_supplier">Изменить поставщика</string>
+    <string name="procurement_supplier_name">Название поставщика</string>
+    <string name="procurement_bin">БИН</string>
+    <string name="procurement_bin_hint">12 цифр</string>
+    <string name="procurement_contact">Контакт компании</string>
+    <string name="procurement_contact_person">Контактное лицо</string>
+    <string name="procurement_phone">Телефон</string>
+    <string name="procurement_email">Email</string>
+    <string name="procurement_payment_terms_days">Отсрочка оплаты, дней</string>
+    <string name="procurement_days">%1$d дн.</string>
+    <string name="procurement_rating">Рейтинг</string>
+    <string name="procurement_rating_hint">От 0 до 5</string>
+    <string name="procurement_is_active">Активный поставщик</string>
+    <string name="procurement_quotation_count">Предложений</string>
+    <string name="procurement_order_count">Заказов</string>
+    <string name="procurement_supplier_created">Поставщик добавлен.</string>
+    <string name="procurement_supplier_saved">Поставщик обновлён.</string>
 </resources>

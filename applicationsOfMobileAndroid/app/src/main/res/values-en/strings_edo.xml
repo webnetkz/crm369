@@ -1,3 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="edo_total">Documents: %1$d</string>
+    <string name="edo_new">New document</string>
+    <string name="edo_edit">Edit document</string>
+    <string name="edo_create">Create document</string>
+    <string name="edo_search">Search documents</string>
+    <string name="edo_filter_all">All</string>
+    <string name="edo_empty">No EDO documents yet</string>
+    <string name="edo_empty_message">Create a document and issue a public signing link.</string>
+    <string name="edo_empty_filtered">Nothing found</string>
+
+    <string name="edo_status_draft">Draft</string>
+    <string name="edo_status_pending_signature">Awaiting signature</string>
+    <string name="edo_status_signed">Signed</string>
+    <string name="edo_status_cancelled">Cancelled</string>
+
+    <string name="edo_source_text">Manual text</string>
+    <string name="edo_source_upload">Upload a file</string>
+    <string name="edo_source_file_entry">Choose from Files</string>
+
+    <string name="edo_section_document">Document</string>
+    <string name="edo_title_label">Document title</string>
+    <string name="edo_external_reference">External reference</string>
+    <string name="edo_counterparty">Counterparty</string>
+    <string name="edo_counterparty_identifier">Counterparty BIN/IIN</string>
+    <string name="edo_identifier_hint">12 digits</string>
+    <string name="edo_counterparty_email">Counterparty email</string>
+    <string name="edo_email_edit_hint">The server does not return the saved email: leaving this field empty removes the counterparty email.</string>
+    <string name="edo_document_source">Document source</string>
+    <string name="edo_content">Document text</string>
+    <string name="edo_upload_label">Document file</string>
+    <string name="edo_upload_hint">Any file up to 20 MB. Without a new file the current one is kept.</string>
+    <string name="edo_choose_file">Choose file</string>
+    <string name="edo_file_entry_label">File from the Files module</string>
+    <string name="edo_file_entry_hint">A copy of the selected file is attached to the document.</string>
+    <string name="edo_choose_from_files">Choose from Files</string>
+    <string name="edo_no_file">No file selected</string>
+    <string name="edo_file_picker_title">Files</string>
+    <string name="edo_file_picker_up">Back</string>
+    <string name="edo_file_picker_empty">The folder is empty</string>
+    <string name="edo_file_picker_folder_files">Files: %1$d</string>
+
+    <string name="edo_attached_file">Attached document</string>
+    <string name="edo_open_file">Open</string>
+    <string name="edo_share_file">Share</string>
+
+    <string name="edo_public_link">Public signing link</string>
+    <string name="edo_link_hint">Create a public link and send it to the counterparty to sign with a digital signature.</string>
+    <string name="edo_link_not_needed">The document is signed, a signing link is no longer needed.</string>
+    <string name="edo_link_create">Create signing link</string>
+    <string name="edo_link_recreate">Create a new link</string>
+    <string name="edo_link_created">Public signing link created for 12 hours.</string>
+    <string name="edo_link_expires">Link valid until</string>
+    <string name="edo_link_copied">Link copied</string>
+    <string name="edo_copy_link">Copy</string>
+    <string name="edo_share_link">Share</string>
+    <string name="edo_open_link">Open</string>
+
+    <string name="edo_signature">Signature</string>
+    <string name="edo_signed_at">Signed at</string>
+    <string name="edo_signature_subject">Certificate subject</string>
+    <string name="edo_signature_serial">Certificate serial number</string>
+    <string name="edo_signature_algorithm">Signature algorithm</string>
+    <string name="edo_signature_hash">Signed payload hash</string>
+
+    <string name="edo_created">Created</string>
+    <string name="edo_updated">Updated</string>
+    <string name="edo_created_message">EDO document created.</string>
+    <string name="edo_saved_message">EDO document updated.</string>
+    <string name="edo_deleted">EDO document deleted.</string>
+    <string name="edo_delete_title">Delete the document?</string>
+    <string name="edo_delete_text">The document and its attached file will be deleted permanently.</string>
 </resources>

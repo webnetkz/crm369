@@ -1,3 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="news_create">Create news</string>
+    <string name="news_new">New news item</string>
+    <string name="news_edit">Edit news item</string>
+    <string name="news_created">News item created.</string>
+    <string name="news_updated">News item updated.</string>
+    <string name="news_deleted">News item deleted.</string>
+    <string name="news_delete_title">Delete this news item?</string>
+    <string name="news_delete_text">The news item will be deleted permanently.</string>
+    <string name="news_draft">Draft</string>
+    <string name="news_empty_title">No news yet</string>
+    <string name="news_empty_message">Published team news will appear here.</string>
+    <string name="news_empty_manage">Create the first news item and it will appear in the feed.</string>
+    <string name="news_not_found">News item not found</string>
+    <string name="news_author">Author: %1$s</string>
+    <string name="news_form_title">Title</string>
+    <string name="news_form_slug">Link (slug)</string>
+    <string name="news_form_slug_hint">Optional: generated from the title when empty</string>
+    <string name="news_form_slug_edit_hint">Changing the link changes the address of the news item</string>
+    <string name="news_form_excerpt">Short description</string>
+    <string name="news_form_content">Full text</string>
+    <string name="news_form_content_hint">An empty line starts a new paragraph</string>
+    <string name="news_form_publish">Publish</string>
+    <string name="news_form_image">Preview image</string>
+    <string name="news_form_choose_image">Choose image</string>
+    <string name="news_form_replace_image">Replace image</string>
+    <string name="news_form_remove_image">Remove image</string>
 </resources>

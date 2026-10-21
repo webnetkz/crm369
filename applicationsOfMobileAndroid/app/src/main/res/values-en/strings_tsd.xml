@@ -1,3 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="tsd_title">TSD</string>
+    <string name="tsd_open_qr_lookup">QR lookup</string>
+    <string name="tsd_scan_camera">Scan with camera</string>
+    <string name="tsd_qr_code">QR code</string>
+    <string name="tsd_settings_title">Scan settings</string>
+    <string name="tsd_device_name">Device</string>
+    <string name="tsd_device_name_placeholder">For example, TSD-01</string>
+    <string name="tsd_location">Location</string>
+    <string name="tsd_location_placeholder">For example, Main warehouse</string>
+    <string name="tsd_context">Operation context</string>
+    <string name="tsd_context_placeholder">For example, receiving, picking, stocktaking</string>
+    <string name="tsd_result_title">Last scan</string>
+    <string name="tsd_scanned_at">Scanned at</string>
+    <string name="tsd_normalized_qr_code">Normalized value</string>
+    <string name="tsd_not_resolved">The QR code was logged; no warehouse object matches it.</string>
+    <string name="tsd_recent_title">Recent scans</string>
+    <string name="tsd_empty_title">No scans yet</string>
+    <string name="tsd_empty_description">Scan the first QR code with the camera or a handheld scanner.</string>
+    <string name="tsd_actor_value">Operator: %1$s</string>
+    <string name="tsd_device_value">Device: %1$s</string>
+    <string name="tsd_location_value">Location: %1$s</string>
+    <string name="tsd_context_value">Context: %1$s</string>
+    <string name="tsd_webhook_value">Webhook: %1$s</string>
+    <string name="tsd_qr_title">QR</string>
+    <string name="tsd_qr_description">Scan or enter a code to find out what it is: a warehouse address, an item or equipment.</string>
+    <string name="tsd_qr_result_title">Lookup result</string>
+    <string name="tsd_qr_not_found">Nothing was found for this QR code.</string>
+    <string name="tsd_qr_saved_to_log">The scan was saved to the TSD log.</string>
+    <string name="tsd_qr_saved_at">Saved to the TSD log: %1$s</string>
+    <string name="tsd_qr_equipment_found">Equipment</string>
+    <string name="tsd_qr_equipment_issued_to">Issued to: %1$s</string>
+    <string name="tsd_qr_equipment_responsible">Responsible: %1$s</string>
+    <string name="tsd_qr_open_equipment">Open equipment</string>
 </resources>

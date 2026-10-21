@@ -1,23 +1,22 @@
 package com.appswebnetkz.crm369.feature.files
 
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.appswebnetkz.crm369.R
-import com.appswebnetkz.crm369.ui.web.WebPortalScreen
+import com.appswebnetkz.crm369.ui.navigation.longArg
+import com.appswebnetkz.crm369.ui.navigation.optionalLongArg
 
-/*
- * STUB: temporary web fallback. The native implementation replaces this file and keeps
- * the public API: [FilesRoutes], the route constants and `fun NavGraphBuilder.filesGraph()`.
+/**
+ * Routes of the file storage. `directoryId` is an optional String query argument: without it the
+ * screen lists the root folders.
  */
-
 object FilesRoutes {
     const val ROOT = "files?directoryId={directoryId}"
+    const val ACCESS = "files/{directoryId}/access"
 
     fun directory(directoryId: Long? = null): String = if (directoryId == null) "files" else "files?directoryId=$directoryId"
+    fun access(directoryId: Long): String = "files/$directoryId/access"
 }
 
 fun NavGraphBuilder.filesGraph() {
@@ -30,7 +29,13 @@ fun NavGraphBuilder.filesGraph() {
                 defaultValue = null
             },
         ),
-    ) {
-        WebPortalScreen(path = "/files", title = stringResource(R.string.module_files))
+    ) { entry ->
+        FilesScreen(directoryId = entry.optionalLongArg("directoryId"))
+    }
+    composable(
+        route = FilesRoutes.ACCESS,
+        arguments = listOf(navArgument("directoryId") { type = NavType.LongType }),
+    ) { entry ->
+        FilesAccessScreen(directoryId = entry.longArg("directoryId"))
     }
 }

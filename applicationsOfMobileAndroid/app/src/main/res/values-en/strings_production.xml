@@ -1,3 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="production_cards">What the team controls</string>
+    <string name="production_records">Operational snapshot</string>
+    <string name="production_focus">Team focus</string>
+    <string name="production_next_steps">Next actions</string>
 </resources>

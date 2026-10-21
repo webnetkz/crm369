@@ -1,3 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="directories_total">Справочников: %1$d</string>
+    <string name="directories_new">Новый справочник</string>
+    <string name="directories_create">Создать справочник</string>
+    <string name="directories_edit">Редактировать справочник</string>
+    <string name="directories_delete">Удалить справочник</string>
+    <string name="directories_actions">Действия</string>
+    <string name="directories_empty">Справочники ещё не созданы</string>
+    <string name="directories_empty_message">Создайте справочник с нужными колонками, а затем добавьте записи по этой схеме.</string>
+    <string name="directories_records_count">Записей: %1$d</string>
+    <string name="directories_columns_count">Колонок: %1$d</string>
+    <string name="directories_csv_badge">CSV</string>
+
+    <string name="directories_search_records">Поиск по записям</string>
+    <string name="directories_records_empty">В этом справочнике пока нет записей.</string>
+    <string name="directories_records_not_found">Записи не найдены.</string>
+    <string name="directories_record_number">Запись №%1$d</string>
+    <string name="directories_updated_at">Обновлено: %1$s</string>
+    <string name="directories_boolean_true">✓ Да</string>
+    <string name="directories_boolean_false">✗ Нет</string>
+
+    <string name="directories_add_record">Добавить запись</string>
+    <string name="directories_edit_record">Редактировать запись</string>
+    <string name="directories_record_form_hint">Заполните значения для каждой колонки справочника.</string>
+    <string name="directories_record_missing">Запись не найдена</string>
+    <string name="directories_record_created">Запись создана.</string>
+    <string name="directories_record_saved">Запись обновлена.</string>
+    <string name="directories_record_deleted">Запись удалена.</string>
+    <string name="directories_record_delete_title">Удалить запись?</string>
+
+    <string name="directories_name">Название</string>
+    <string name="directories_slug">Системный ключ</string>
+    <string name="directories_slug_hint">Необязательно, например suppliers</string>
+    <string name="directories_description">Описание</string>
+    <string name="directories_csv_enabled">Разрешить CSV-импорт и экспорт</string>
+    <string name="directories_csv_enabled_hint">Отключите, если справочник должен редактироваться только вручную.</string>
+    <string name="directories_columns_title">Колонки</string>
+    <string name="directories_columns_hint">Изменение ключа колонки отвязывает уже сохранённые значения этой колонки.</string>
+    <string name="directories_column_number">Колонка %1$d</string>
+    <string name="directories_column_label">Название колонки</string>
+    <string name="directories_column_key">Ключ колонки</string>
+    <string name="directories_column_key_hint">Например, company_name. Если оставить пустым, ключ создастся из названия.</string>
+    <string name="directories_column_type">Тип поля</string>
+    <string name="directories_column_required">Обязательное поле</string>
+    <string name="directories_add_column">Добавить колонку</string>
+    <string name="directories_remove_column">Удалить колонку</string>
+    <string name="directories_type_text">Текст</string>
+    <string name="directories_type_textarea">Многострочный текст</string>
+    <string name="directories_type_number">Число</string>
+    <string name="directories_type_date">Дата</string>
+    <string name="directories_type_boolean">Логическое значение</string>
+    <string name="directories_created_message">Справочник создан.</string>
+    <string name="directories_saved_message">Справочник обновлён.</string>
+    <string name="directories_deleted">Справочник удалён.</string>
+    <string name="directories_delete_title">Удалить справочник?</string>
+    <string name="directories_delete_text">Справочник будет удалён вместе со всеми записями.</string>
+
+    <string name="directories_csv_title">CSV-операции</string>
+    <string name="directories_csv_description">Экспортируйте записи, скачайте шаблон или импортируйте строки в текущий справочник.</string>
+    <string name="directories_csv_delimiter">Разделитель CSV</string>
+    <string name="directories_csv_delimiter_hint">Один символ, например ; , | или \\t для табуляции</string>
+    <string name="directories_csv_export">Экспорт CSV</string>
+    <string name="directories_csv_template">Скачать шаблон</string>
+    <string name="directories_csv_import">Импорт CSV</string>
+    <string name="directories_import_success">Импортировано строк: %1$d.</string>
+    <string name="directories_import_failed">Импорт не выполнен</string>
 </resources>

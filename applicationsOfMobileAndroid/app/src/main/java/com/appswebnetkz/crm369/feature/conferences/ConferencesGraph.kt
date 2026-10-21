@@ -1,37 +1,30 @@
 package com.appswebnetkz.crm369.feature.conferences
 
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.appswebnetkz.crm369.R
 import com.appswebnetkz.crm369.ui.navigation.longArg
-import com.appswebnetkz.crm369.ui.web.WebPortalScreen
 
-/*
- * STUB: temporary web fallback. The native implementation replaces this file and keeps
- * the public API: [ConferencesRoutes], the route constants and `fun NavGraphBuilder.conferencesGraph()`.
+/**
+ * Routes of the conferences module. The list, details and creation are native; the meeting room
+ * itself (WebRTC) opens in the authenticated web view via `navigator.openWeb(web_path)`.
  */
-
 object ConferencesRoutes {
     const val LIST = "conferences"
+    const val NEW = "conferences/new"
     const val DETAIL = "conferences/{conferenceId}"
 
     fun detail(conferenceId: Long): String = "conferences/$conferenceId"
 }
 
 fun NavGraphBuilder.conferencesGraph() {
-    composable(ConferencesRoutes.LIST) {
-        WebPortalScreen(path = "/conferences", title = stringResource(R.string.module_conferences))
-    }
+    composable(ConferencesRoutes.LIST) { ConferencesListScreen() }
+    composable(ConferencesRoutes.NEW) { ConferenceFormScreen() }
     composable(
         route = ConferencesRoutes.DETAIL,
-        arguments = listOf(
-            navArgument("conferenceId") { type = NavType.LongType },
-        ),
+        arguments = listOf(navArgument("conferenceId") { type = NavType.LongType }),
     ) { entry ->
-        WebPortalScreen(path = "/conferences/" + entry.longArg("conferenceId"), title = stringResource(R.string.module_conferences))
+        ConferenceDetailScreen(conferenceId = entry.longArg("conferenceId"))
     }
 }

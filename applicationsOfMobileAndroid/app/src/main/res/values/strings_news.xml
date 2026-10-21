@@ -1,3 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="news_create">Создать новость</string>
+    <string name="news_new">Новая новость</string>
+    <string name="news_edit">Редактирование новости</string>
+    <string name="news_created">Новость создана.</string>
+    <string name="news_updated">Новость обновлена.</string>
+    <string name="news_deleted">Новость удалена.</string>
+    <string name="news_delete_title">Удалить эту новость?</string>
+    <string name="news_delete_text">Новость будет удалена без возможности восстановления.</string>
+    <string name="news_draft">Черновик</string>
+    <string name="news_empty_title">Новостей пока нет</string>
+    <string name="news_empty_message">Здесь появятся опубликованные новости команды.</string>
+    <string name="news_empty_manage">Создайте первую новость, и она появится в ленте.</string>
+    <string name="news_not_found">Новость не найдена</string>
+    <string name="news_author">Автор: %1$s</string>
+    <string name="news_form_title">Заголовок</string>
+    <string name="news_form_slug">Ссылка (slug)</string>
+    <string name="news_form_slug_hint">Необязательно: если не заполнить, ссылка сформируется из заголовка</string>
+    <string name="news_form_slug_edit_hint">Изменение ссылки меняет адрес новости</string>
+    <string name="news_form_excerpt">Краткое описание</string>
+    <string name="news_form_content">Полный текст</string>
+    <string name="news_form_content_hint">Пустая строка начинает новый абзац</string>
+    <string name="news_form_publish">Опубликовать</string>
+    <string name="news_form_image">Превью изображение</string>
+    <string name="news_form_choose_image">Выбрать изображение</string>
+    <string name="news_form_replace_image">Заменить изображение</string>
+    <string name="news_form_remove_image">Удалить изображение</string>
 </resources>

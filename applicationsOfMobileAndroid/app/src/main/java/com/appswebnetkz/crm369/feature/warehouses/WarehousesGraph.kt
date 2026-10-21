@@ -1,37 +1,43 @@
 package com.appswebnetkz.crm369.feature.warehouses
 
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.appswebnetkz.crm369.R
 import com.appswebnetkz.crm369.ui.navigation.longArg
-import com.appswebnetkz.crm369.ui.web.WebPortalScreen
 
-/*
- * STUB: temporary web fallback. The native implementation replaces this file and keeps
- * the public API: [WarehousesRoutes], the route constants and `fun NavGraphBuilder.warehousesGraph()`.
- */
-
+/** Routes of the warehouses module (address storage, hierarchy, items and QR lookup). */
 object WarehousesRoutes {
     const val LIST = "warehouses"
     const val DETAIL = "warehouses/{warehouseId}"
+    const val NEW = "warehouses/new"
+    const val SCAN = "warehouses/scan"
+    const val FLOOR = "warehouses/{warehouseId}/floors/{floorId}"
 
     fun detail(warehouseId: Long): String = "warehouses/$warehouseId"
+    fun floor(warehouseId: Long, floorId: Long): String = "warehouses/$warehouseId/floors/$floorId"
 }
 
 fun NavGraphBuilder.warehousesGraph() {
-    composable(WarehousesRoutes.LIST) {
-        WebPortalScreen(path = "/warehouses", title = stringResource(R.string.module_warehouses))
-    }
+    composable(WarehousesRoutes.LIST) { WarehousesListScreen() }
+    composable(WarehousesRoutes.NEW) { WarehouseCreateScreen() }
+    composable(WarehousesRoutes.SCAN) { WarehouseScanScreen() }
     composable(
         route = WarehousesRoutes.DETAIL,
+        arguments = listOf(navArgument("warehouseId") { type = NavType.LongType }),
+    ) { entry ->
+        WarehouseDetailScreen(warehouseId = entry.longArg("warehouseId"))
+    }
+    composable(
+        route = WarehousesRoutes.FLOOR,
         arguments = listOf(
             navArgument("warehouseId") { type = NavType.LongType },
+            navArgument("floorId") { type = NavType.LongType },
         ),
     ) { entry ->
-        WebPortalScreen(path = "/warehouses/" + entry.longArg("warehouseId"), title = stringResource(R.string.module_warehouses))
+        WarehouseFloorScreen(
+            warehouseId = entry.longArg("warehouseId"),
+            floorId = entry.longArg("floorId"),
+        )
     }
 }

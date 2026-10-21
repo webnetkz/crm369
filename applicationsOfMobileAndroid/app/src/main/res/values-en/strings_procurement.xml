@@ -1,3 +1,180 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="procurement_tab_requests">Requests</string>
+    <string name="procurement_tab_orders">Orders</string>
+    <string name="procurement_tab_receipts">Receipts</string>
+    <string name="procurement_tab_returns">Returns</string>
+    <string name="procurement_tab_suppliers">Suppliers</string>
+    <string name="procurement_tab_count">%1$s · %2$d</string>
+
+    <string name="procurement_pending_approvals">Pending approval</string>
+    <string name="procurement_active_orders">Active orders</string>
+    <string name="procurement_month_receipts">Received this month</string>
+    <string name="procurement_potential_savings">Potential savings</string>
+
+    <string name="procurement_empty_requests">No requests yet.</string>
+    <string name="procurement_empty_orders">No orders yet.</string>
+    <string name="procurement_empty_receipts">No receipts yet.</string>
+    <string name="procurement_empty_returns">No returns yet.</string>
+    <string name="procurement_empty_suppliers">No suppliers yet.</string>
+    <string name="procurement_empty_quotes">Add supplier prices to compare them.</string>
+    <string name="procurement_not_found">Record not found</string>
+
+    <string name="procurement_status_draft">Draft</string>
+    <string name="procurement_status_pending_approval">Pending approval</string>
+    <string name="procurement_status_approved">Approved</string>
+    <string name="procurement_status_rejected">Rejected</string>
+    <string name="procurement_status_ordered">Ordered</string>
+    <string name="procurement_status_sent">Sent</string>
+    <string name="procurement_status_partially_received">Partially received</string>
+    <string name="procurement_status_received">Received</string>
+    <string name="procurement_status_cancelled">Cancelled</string>
+    <string name="procurement_status_posted">Posted</string>
+
+    <string name="procurement_request">Request</string>
+    <string name="procurement_order">Order</string>
+    <string name="procurement_receipt">Receipt</string>
+    <string name="procurement_return">Return</string>
+    <string name="procurement_supplier">Supplier</string>
+    <string name="procurement_estimate_of_budget">%1$s of %2$s</string>
+    <string name="procurement_needed_short">by %1$s</string>
+    <string name="procurement_rating_short">★ %1$s</string>
+    <string name="procurement_bin_short">BIN %1$s</string>
+    <string name="procurement_supplier_active">Active</string>
+    <string name="procurement_supplier_inactive">Inactive</string>
+
+    <string name="procurement_section_budget">Budget and dates</string>
+    <string name="procurement_section_order">Order</string>
+    <string name="procurement_section_amounts">Amounts</string>
+    <string name="procurement_section_receipt">Receipt</string>
+    <string name="procurement_section_return">Return</string>
+    <string name="procurement_section_contacts">Contacts</string>
+    <string name="procurement_section_terms">Terms</string>
+
+    <string name="procurement_budget">Budget</string>
+    <string name="procurement_estimated_total">Estimated cost</string>
+    <string name="procurement_estimated_total_value">Estimated cost: %1$s</string>
+    <string name="procurement_budget_usage">Budget usage</string>
+    <string name="procurement_budget_hint">Not less than the estimated cost of the items</string>
+    <string name="procurement_budget_below_estimate">The budget cannot be lower than the estimated cost of the items.</string>
+    <string name="procurement_budget_reserve">Budget reserve: %1$s</string>
+    <string name="procurement_use_estimate">Use as budget</string>
+    <string name="procurement_needed_at">Needed by</string>
+    <string name="procurement_requested_by">Requested by</string>
+    <string name="procurement_submitted_at">Submitted at</string>
+    <string name="procurement_approved_by">Approved by</string>
+    <string name="procurement_approved_at">Approved at</string>
+    <string name="procurement_justification">Justification</string>
+    <string name="procurement_rejection_reason">Rejection reason</string>
+    <string name="procurement_currency">Currency</string>
+
+    <string name="procurement_approve">Approve</string>
+    <string name="procurement_approve_title">Approve the request?</string>
+    <string name="procurement_approve_text">Request budget: %1$s. Once approved, a purchase order can be created from the request.</string>
+    <string name="procurement_reject">Reject</string>
+    <string name="procurement_reject_title">Reject the request</string>
+    <string name="procurement_reason_required">Enter the rejection reason.</string>
+    <string name="procurement_decision_saved">Budget decision saved.</string>
+
+    <string name="procurement_items_count">Items: %1$d</string>
+    <string name="procurement_item_number">Item %1$d</string>
+    <string name="procurement_item_name">Item name</string>
+    <string name="procurement_sku">SKU</string>
+    <string name="procurement_unit">Unit</string>
+    <string name="procurement_quantity">Quantity</string>
+    <string name="procurement_target_unit_price">Target unit price</string>
+    <string name="procurement_target_total">Target total</string>
+    <string name="procurement_warehouse_place">Storage place</string>
+    <string name="procurement_warehouse_item">Stock item</string>
+    <string name="procurement_warehouse_stock">Warehouse stock</string>
+    <string name="procurement_production_reference">Production reference</string>
+    <string name="procurement_notes">Notes</string>
+    <string name="procurement_add_item">Add item</string>
+    <string name="procurement_remove_item">Remove item</string>
+
+    <string name="procurement_quotations">Supplier prices</string>
+    <string name="procurement_best_quote">Best price</string>
+    <string name="procurement_quote_prices">Price %1$s · tax %2$s · delivery %3$s</string>
+    <string name="procurement_quote_terms">Landed unit %1$s · lead time %2$d days</string>
+    <string name="procurement_valid_until_short">valid until %1$s</string>
+    <string name="procurement_add_quote">Add price</string>
+    <string name="procurement_quote_hint">The comparison includes price, tax and delivery. A new price from the same supplier replaces the previous one.</string>
+    <string name="procurement_quote_saved">Supplier price saved.</string>
+    <string name="procurement_no_active_suppliers">There are no active suppliers. Add a supplier first.</string>
+    <string name="procurement_unit_price">Unit price</string>
+    <string name="procurement_tax_percent">Tax rate</string>
+    <string name="procurement_delivery_cost">Delivery</string>
+    <string name="procurement_quoted_at">Quote date</string>
+    <string name="procurement_valid_until">Valid until</string>
+    <string name="procurement_lead_time_days">Lead time, days</string>
+
+    <string name="procurement_new_request">New request</string>
+    <string name="procurement_request_title">Request title</string>
+    <string name="procurement_submit_request">Submit for approval</string>
+    <string name="procurement_request_created">The request was submitted for approval.</string>
+
+    <string name="procurement_create_order">Create order</string>
+    <string name="procurement_selected_quotes">Prices of the selected supplier</string>
+    <string name="procurement_order_line">%1$s × %2$s = %3$s</string>
+    <string name="procurement_no_quote_for_item">No price from the selected supplier</string>
+    <string name="procurement_order_total">Total incl. tax and delivery: %1$s</string>
+    <string name="procurement_order_over_budget">The order total exceeds the approved budget.</string>
+    <string name="procurement_order_quotes_missing">Choose a supplier that has prices for every item of the request.</string>
+    <string name="procurement_no_eligible_suppliers">No active supplier has prices for every item of the request.</string>
+    <string name="procurement_order_created">Purchase order created.</string>
+    <string name="procurement_ordered_at">Order date</string>
+    <string name="procurement_expected_at">Expected delivery</string>
+    <string name="procurement_sent_at">Sent at</string>
+    <string name="procurement_subtotal">Subtotal</string>
+    <string name="procurement_tax_amount">Tax</string>
+    <string name="procurement_total">Total</string>
+    <string name="procurement_line_total">Line total</string>
+    <string name="procurement_received_quantity">Received</string>
+    <string name="procurement_remaining_quantity">Remaining</string>
+    <string name="procurement_returned_quantity">Returned</string>
+    <string name="procurement_returnable_quantity">Returnable</string>
+    <string name="procurement_send_order">Send to supplier</string>
+    <string name="procurement_send_title">Send the order?</string>
+    <string name="procurement_send_text">The order will be marked as sent; receipts can be recorded afterwards.</string>
+    <string name="procurement_order_sent">The order is marked as sent.</string>
+    <string name="procurement_no_places">There are no storage places: create a warehouse to record receipts.</string>
+
+    <string name="procurement_record_receipt">Record receipt</string>
+    <string name="procurement_received_at">Received at</string>
+    <string name="procurement_received_by">Received by</string>
+    <string name="procurement_external_reference">Invoice number</string>
+    <string name="procurement_receipt_hint">Items with zero quantity are not included in the receipt.</string>
+    <string name="procurement_receipt_item_hint">Ordered %1$s · remaining %2$s</string>
+    <string name="procurement_receipt_created">Receipt posted, stock updated.</string>
+    <string name="procurement_quantity_invalid">Enter a whole number</string>
+    <string name="procurement_quantity_exceeds">At most %1$s</string>
+    <string name="procurement_nothing_selected">Enter a quantity for at least one item.</string>
+
+    <string name="procurement_record_return">Record return</string>
+    <string name="procurement_returned_at">Returned at</string>
+    <string name="procurement_created_by">Created by</string>
+    <string name="procurement_reason">Reason</string>
+    <string name="procurement_return_quantity">Quantity to return</string>
+    <string name="procurement_return_hint">Items with zero quantity are not included in the return.</string>
+    <string name="procurement_return_item_hint">Received %1$s · returnable %2$s</string>
+    <string name="procurement_return_created">Return posted, stock updated.</string>
+
+    <string name="procurement_new_supplier">Add supplier</string>
+    <string name="procurement_edit_supplier">Edit supplier</string>
+    <string name="procurement_supplier_name">Supplier name</string>
+    <string name="procurement_bin">BIN</string>
+    <string name="procurement_bin_hint">12 digits</string>
+    <string name="procurement_contact">Company contact</string>
+    <string name="procurement_contact_person">Contact person</string>
+    <string name="procurement_phone">Phone</string>
+    <string name="procurement_email">Email</string>
+    <string name="procurement_payment_terms_days">Payment terms, days</string>
+    <string name="procurement_days">%1$d days</string>
+    <string name="procurement_rating">Rating</string>
+    <string name="procurement_rating_hint">From 0 to 5</string>
+    <string name="procurement_is_active">Active supplier</string>
+    <string name="procurement_quotation_count">Quotations</string>
+    <string name="procurement_order_count">Orders</string>
+    <string name="procurement_supplier_created">Supplier added.</string>
+    <string name="procurement_supplier_saved">Supplier updated.</string>
 </resources>

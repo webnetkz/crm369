@@ -1,3 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="equipment_title">Equipment</string>
+    <string name="equipment_total">Total: %1$d</string>
+    <string name="equipment_scan">Scan QR</string>
+    <string name="equipment_new">Add equipment</string>
+    <string name="equipment_edit">Edit equipment</string>
+    <string name="equipment_search">Name, QR code, employee or email</string>
+    <string name="equipment_all_stages">All stages (%1$d)</string>
+    <string name="equipment_status_count">%1$s (%2$d)</string>
+    <string name="equipment_empty_title">No equipment yet</string>
+    <string name="equipment_empty_description">Add the first item to track equipment, issuing and maintenance.</string>
+    <string name="equipment_search_empty_title">Nothing found</string>
+    <string name="equipment_search_empty_description">Try another query or stage.</string>
+    <string name="equipment_issued_to_value">Issued to: %1$s</string>
+    <string name="equipment_responsible_value">Responsible: %1$s</string>
+    <string name="equipment_scan_not_found">No equipment with the QR code “%1$s”</string>
+    <string name="equipment_details_title">Equipment details</string>
+    <string name="equipment_status">Stage</string>
+    <string name="equipment_issued_to">Issued to</string>
+    <string name="equipment_responsible">Responsible employee</string>
+    <string name="equipment_not_issued">Not issued</string>
+    <string name="equipment_not_assigned">Not assigned</string>
+    <string name="equipment_qr_code">QR code</string>
+    <string name="equipment_copy_qr">Copy QR</string>
+    <string name="equipment_qr_copied">QR code copied.</string>
+    <string name="equipment_created">Created</string>
+    <string name="equipment_last_updated">Last updated</string>
+    <string name="equipment_name">Equipment name</string>
+    <string name="equipment_name_placeholder">For example, Lenovo ThinkPad laptop</string>
+    <string name="equipment_qr_code_placeholder">Leave empty to generate the code automatically</string>
+    <string name="equipment_qr_code_edit_hint">The current code is kept. If you change it, printed labels will no longer match</string>
+    <string name="equipment_status_on_balance">On balance</string>
+    <string name="equipment_status_issued">Issued to employee</string>
+    <string name="equipment_status_maintenance">Maintenance</string>
+    <string name="equipment_status_repair">Repair</string>
+    <string name="equipment_status_written_off">Written off</string>
+    <string name="equipment_created_success">Equipment added.</string>
+    <string name="equipment_updated_success">Equipment updated.</string>
 </resources>
