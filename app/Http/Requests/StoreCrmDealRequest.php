@@ -33,7 +33,7 @@ class StoreCrmDealRequest extends FormRequest
             'contact_name' => $this->normalizeNullableString($this->input('contact_name')),
             'contact_phone' => $this->normalizeNullableString($this->input('contact_phone')),
             'contact_email' => $this->normalizeNullableString($this->input('contact_email')),
-            'amount' => $this->normalizeNullableString($this->input('amount')),
+            'amount' => $this->normalizeNullableAmount($this->input('amount')),
             'currency' => $this->normalizeCurrency($this->input('currency')),
             'expected_close_at' => $this->normalizeNullableString($this->input('expected_close_at')),
             'description' => $this->normalizeNullableString($this->input('description')),
@@ -181,6 +181,19 @@ class StoreCrmDealRequest extends FormRequest
     private function normalizeNullableString(mixed $value): ?string
     {
         return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
+    /**
+     * JSON clients (the native mobile application) send amounts as numbers,
+     * the web form sends them as strings.
+     */
+    private function normalizeNullableAmount(mixed $value): ?string
+    {
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        return $this->normalizeNullableString($value);
     }
 
     private function normalizeCurrency(mixed $value): ?string

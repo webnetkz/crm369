@@ -466,6 +466,16 @@ test('funnel members can create show update move and delete deals through the mo
     expect($response->json('data.created_at'))->toBeString()
         ->and($response->json('data.updated_at'))->toBeString();
 
+    $this->postJson(route('mobile.v1.funnels.deals.store', $funnel), [
+        'crm_funnel_stage_id' => $lead->id,
+        'title' => 'Numeric amount deal',
+        'amount' => 4200.75,
+        'currency' => 'KZT',
+        'custom_fields' => ['source' => 'Phone'],
+    ])
+        ->assertCreated()
+        ->assertJsonPath('data.amount', 4200.75);
+
     $this->getJson(route('mobile.v1.funnels.deals.show', [$funnel, $deal]))
         ->assertSuccessful()
         ->assertJsonPath('data.deal.id', $deal->id)
