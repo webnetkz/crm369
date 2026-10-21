@@ -1,20 +1,12 @@
 package com.appswebnetkz.crm369.feature.chats
 
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.appswebnetkz.crm369.R
 import com.appswebnetkz.crm369.ui.navigation.longArg
-import com.appswebnetkz.crm369.ui.web.WebPortalScreen
 
-/*
- * STUB: temporary web fallback. The native implementation replaces this file and keeps
- * the public API: [ChatsRoutes], [ChatsListScreen] and `fun NavGraphBuilder.chatsGraph()`.
- */
-
+/** Routes of the chats module. `ChatsListScreen()` (ChatsListScreen.kt) is the main "Chats" tab. */
 object ChatsRoutes {
     const val LIST = "chats"
     const val NEW = "chats/new"
@@ -25,31 +17,19 @@ object ChatsRoutes {
     fun user(userId: Long): String = "chats/users/$userId"
 }
 
-/** Content of the main screen tab. */
-@Composable
-fun ChatsListScreen() {
-    WebPortalScreen(path = "/chats", title = stringResource(R.string.module_chats))
-}
-
 fun NavGraphBuilder.chatsGraph() {
     composable(ChatsRoutes.LIST) { ChatsListScreen() }
-    composable(ChatsRoutes.NEW) {
-        WebPortalScreen(path = "/chats", title = stringResource(R.string.module_chats))
-    }
+    composable(ChatsRoutes.NEW) { ChatNewScreen() }
     composable(
         route = ChatsRoutes.CONVERSATION,
-        arguments = listOf(
-            navArgument("conversationId") { type = NavType.LongType },
-        ),
+        arguments = listOf(navArgument("conversationId") { type = NavType.LongType }),
     ) { entry ->
-        WebPortalScreen(path = "/chats?conversation=" + entry.longArg("conversationId"), title = stringResource(R.string.module_chats))
+        ChatConversationScreen(conversationId = entry.longArg("conversationId"))
     }
     composable(
         route = ChatsRoutes.USER,
-        arguments = listOf(
-            navArgument("userId") { type = NavType.LongType },
-        ),
-    ) {
-        WebPortalScreen(path = "/chats", title = stringResource(R.string.module_chats))
+        arguments = listOf(navArgument("userId") { type = NavType.LongType }),
+    ) { entry ->
+        ChatUserProfileScreen(userId = entry.longArg("userId"))
     }
 }

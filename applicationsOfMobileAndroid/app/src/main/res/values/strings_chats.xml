@@ -1,3 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- List and search -->
+    <string name="chats_search_placeholder">Поиск по имени или email</string>
+    <string name="chats_recent">Открытые чаты</string>
+    <string name="chats_people">Пользователи</string>
+    <string name="chats_empty">Чатов пока нет</string>
+    <string name="chats_empty_message">Начните диалог с коллегой — нажмите «Начать чат».</string>
+    <string name="chats_nothing_found">Ничего не найдено</string>
+    <string name="chats_no_contacts">Пользователи не найдены</string>
+    <string name="chats_new">Новый чат</string>
+    <string name="chats_start_chat">Начать чат</string>
+    <string name="chats_unread_total">Непрочитанных: %1$d</string>
+    <string name="chats_untitled">Чат без названия</string>
+    <string name="chats_no_messages_yet">Сообщений пока нет</string>
+    <string name="chats_first_message_hint">Напишите первое сообщение.</string>
+
+    <!-- Composer -->
+    <string name="chats_message_placeholder">Введите сообщение…</string>
+    <string name="chats_attach_files">Прикрепить файлы</string>
+    <string name="chats_remove_attachment">Убрать вложение</string>
+    <string name="chats_attachments_limit">Можно прикрепить не более %1$d файлов.</string>
+    <string name="chats_attachment_too_large">Файл «%1$s» больше 20 МБ.</string>
+    <string name="chats_message_required">Введите сообщение или прикрепите хотя бы один файл.</string>
+
+    <!-- Messages -->
+    <string name="chats_edited">изменено</string>
+    <string name="chats_deleted_message">Сообщение удалено</string>
+    <string name="chats_message_deleted">Сообщение удалено.</string>
+    <string name="chats_editing_message">Редактирование сообщения</string>
+    <string name="chats_copy">Копировать</string>
+    <string name="chats_copied">Текст скопирован</string>
+    <string name="chats_pin">Закрепить</string>
+    <string name="chats_unpin">Открепить</string>
+    <string name="chats_pinned_done">Сообщение закреплено.</string>
+    <string name="chats_unpinned_done">Сообщение откреплено.</string>
+    <string name="chats_delete_confirm">Удалить сообщение из чата?</string>
+    <string name="chats_pinned_message">Закреплённое сообщение</string>
+    <string name="chats_pinned_messages">Закреплённые сообщения</string>
+    <string name="chats_pinned_count">Закреплено: %1$d</string>
+    <string name="chats_message_viewers">Кто просмотрел сообщение</string>
+    <string name="chats_seen_by_count">Просмотрели: %1$d</string>
+    <string name="chats_not_read_yet">Сообщение ещё никто не прочитал</string>
+    <string name="chats_read">Прочитано</string>
+    <string name="chats_sent">Отправлено</string>
+    <string name="chats_today">Сегодня</string>
+    <string name="chats_yesterday">Вчера</string>
+    <string name="chats_scroll_to_latest">Прокрутить к последнему сообщению</string>
+    <string name="chats_attachment">Вложение</string>
+    <string name="chats_audio">Аудио</string>
+    <string name="chats_participants">Участники</string>
+    <string name="chats_participants_count">Участников: %1$d</string>
+    <string name="chats_unknown_user">Неизвестный пользователь</string>
+
+    <!-- User profile -->
+    <string name="chats_write">Написать</string>
+    <string name="chats_profile_title">Профиль сотрудника</string>
+    <string name="chats_inactive">Деактивирован</string>
+    <string name="chats_call">Позвонить</string>
+    <string name="chats_send_email">Написать письмо</string>
+    <string name="chats_section_contacts">Контакты</string>
+    <string name="chats_email">Email</string>
+    <string name="chats_phone">Телефон</string>
+    <string name="chats_position">Должность</string>
+    <string name="chats_group">Группа</string>
+    <string name="chats_manager">Руководитель</string>
+    <string name="chats_no_manager">Руководитель не назначен</string>
+    <string name="chats_subordinates_count">Подчинённые (%1$d)</string>
+    <string name="chats_no_subordinates">Прямых подчинённых пока нет</string>
+    <string name="chats_issued_equipment">Выданное оборудование</string>
+    <string name="chats_qr_code_value">QR-код: %1$s</string>
+    <string name="chats_responsible_value">Ответственный: %1$s</string>
 </resources>

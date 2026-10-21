@@ -1,3 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="company_total_value">Employees: %1$d</string>
+    <string name="company_search_placeholder">Search by name, position or email</string>
+    <string name="company_empty_structure">The company structure is empty</string>
+    <string name="company_results_count">Found: %1$d</string>
+    <string name="company_empty">No employees found</string>
+    <string name="company_tree_title">Org chart</string>
+    <string name="company_total_users">Employees</string>
+    <string name="company_root_users">Top-level managers</string>
+    <string name="company_managers">Managers</string>
+    <string name="company_collapse">Collapse</string>
+    <string name="company_expand">Expand</string>
+    <string name="company_no_position">No position specified</string>
+    <string name="company_reports_count">Reports: %1$d</string>
+    <string name="company_employee_card">Employee card</string>
+    <string name="company_inactive">Deactivated</string>
+    <string name="company_chain">Reporting line</string>
+    <string name="company_write">Message</string>
+    <string name="company_send_email">Send email</string>
+    <string name="company_call">Call</string>
+    <string name="company_contacts">Contacts</string>
+    <string name="company_email">Email</string>
+    <string name="company_phone">Phone</string>
+    <string name="company_position">Position</string>
+    <string name="company_manager">Manager</string>
+    <string name="company_no_manager">No manager assigned</string>
+    <string name="company_subordinates_count">Direct reports (%1$d)</string>
+    <string name="company_no_subordinates">No direct reports yet</string>
 </resources>

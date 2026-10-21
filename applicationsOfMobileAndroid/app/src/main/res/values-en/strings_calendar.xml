@@ -1,3 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="calendar_today">Today</string>
+    <string name="calendar_previous">Previous month</string>
+    <string name="calendar_next">Next month</string>
+    <string name="calendar_filter_tasks">Tasks</string>
+    <string name="calendar_filter_conferences">Conferences</string>
+    <string name="calendar_task">Task</string>
+    <string name="calendar_conference">Conference</string>
+    <string name="calendar_events_count">Events: %1$d</string>
+    <string name="calendar_empty_day">There are no events on this day.</string>
+    <string name="calendar_no_filters">Select at least one event type.</string>
+    <string name="calendar_all_day">All day</string>
+    <string name="calendar_time_range">%1$s – %2$s</string>
+    <string name="calendar_project_value">Project: %1$s</string>
+    <string name="calendar_assignee_value">Assignee: %1$s</string>
+    <string name="calendar_organizer_value">Organizer: %1$s</string>
+    <string name="calendar_status_todo">To do</string>
+    <string name="calendar_status_in_progress">In progress</string>
+    <string name="calendar_status_review">Review</string>
+    <string name="calendar_status_done">Done</string>
+    <string name="calendar_status_scheduled">Scheduled</string>
+    <string name="calendar_status_live">Live</string>
+    <string name="calendar_status_ended">Ended</string>
 </resources>

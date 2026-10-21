@@ -1,3 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- List and search -->
+    <string name="chats_search_placeholder">Search by name or email</string>
+    <string name="chats_recent">Open chats</string>
+    <string name="chats_people">Users</string>
+    <string name="chats_empty">There are no chats yet</string>
+    <string name="chats_empty_message">Start a conversation with a colleague — tap “Start chat”.</string>
+    <string name="chats_nothing_found">Nothing found</string>
+    <string name="chats_no_contacts">No users found</string>
+    <string name="chats_new">New chat</string>
+    <string name="chats_start_chat">Start chat</string>
+    <string name="chats_unread_total">Unread: %1$d</string>
+    <string name="chats_untitled">Untitled chat</string>
+    <string name="chats_no_messages_yet">No messages yet</string>
+    <string name="chats_first_message_hint">Write the first message.</string>
+
+    <!-- Composer -->
+    <string name="chats_message_placeholder">Write a message…</string>
+    <string name="chats_attach_files">Attach files</string>
+    <string name="chats_remove_attachment">Remove attachment</string>
+    <string name="chats_attachments_limit">You can attach up to %1$d files.</string>
+    <string name="chats_attachment_too_large">File “%1$s” is larger than 20 MB.</string>
+    <string name="chats_message_required">Write a message or attach at least one file.</string>
+
+    <!-- Messages -->
+    <string name="chats_edited">edited</string>
+    <string name="chats_deleted_message">Message deleted</string>
+    <string name="chats_message_deleted">Message deleted.</string>
+    <string name="chats_editing_message">Edit message</string>
+    <string name="chats_copy">Copy</string>
+    <string name="chats_copied">Text copied</string>
+    <string name="chats_pin">Pin</string>
+    <string name="chats_unpin">Unpin</string>
+    <string name="chats_pinned_done">Message pinned.</string>
+    <string name="chats_unpinned_done">Message unpinned.</string>
+    <string name="chats_delete_confirm">Delete this message from the chat?</string>
+    <string name="chats_pinned_message">Pinned message</string>
+    <string name="chats_pinned_messages">Pinned messages</string>
+    <string name="chats_pinned_count">Pinned: %1$d</string>
+    <string name="chats_message_viewers">Message viewers</string>
+    <string name="chats_seen_by_count">Seen by: %1$d</string>
+    <string name="chats_not_read_yet">Nobody has read this message yet</string>
+    <string name="chats_read">Read</string>
+    <string name="chats_sent">Sent</string>
+    <string name="chats_today">Today</string>
+    <string name="chats_yesterday">Yesterday</string>
+    <string name="chats_scroll_to_latest">Scroll to latest message</string>
+    <string name="chats_attachment">Attachment</string>
+    <string name="chats_audio">Audio</string>
+    <string name="chats_participants">Participants</string>
+    <string name="chats_participants_count">Participants: %1$d</string>
+    <string name="chats_unknown_user">Unknown user</string>
+
+    <!-- User profile -->
+    <string name="chats_write">Message</string>
+    <string name="chats_profile_title">Employee profile</string>
+    <string name="chats_inactive">Deactivated</string>
+    <string name="chats_call">Call</string>
+    <string name="chats_send_email">Send email</string>
+    <string name="chats_section_contacts">Contacts</string>
+    <string name="chats_email">Email</string>
+    <string name="chats_phone">Phone</string>
+    <string name="chats_position">Position</string>
+    <string name="chats_group">Group</string>
+    <string name="chats_manager">Manager</string>
+    <string name="chats_no_manager">No manager assigned</string>
+    <string name="chats_subordinates_count">Direct reports (%1$d)</string>
+    <string name="chats_no_subordinates">No direct reports yet</string>
+    <string name="chats_issued_equipment">Issued equipment</string>
+    <string name="chats_qr_code_value">QR code: %1$s</string>
+    <string name="chats_responsible_value">Responsible: %1$s</string>
 </resources>

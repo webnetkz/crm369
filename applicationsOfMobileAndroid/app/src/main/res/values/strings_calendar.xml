@@ -1,3 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="calendar_today">Сегодня</string>
+    <string name="calendar_previous">Предыдущий месяц</string>
+    <string name="calendar_next">Следующий месяц</string>
+    <string name="calendar_filter_tasks">Задачи</string>
+    <string name="calendar_filter_conferences">Конференции</string>
+    <string name="calendar_task">Задача</string>
+    <string name="calendar_conference">Конференция</string>
+    <string name="calendar_events_count">Событий: %1$d</string>
+    <string name="calendar_empty_day">На этот день событий нет.</string>
+    <string name="calendar_no_filters">Выберите хотя бы один тип событий.</string>
+    <string name="calendar_all_day">Весь день</string>
+    <string name="calendar_time_range">%1$s – %2$s</string>
+    <string name="calendar_project_value">Проект: %1$s</string>
+    <string name="calendar_assignee_value">Исполнитель: %1$s</string>
+    <string name="calendar_organizer_value">Организатор: %1$s</string>
+    <string name="calendar_status_todo">Новая</string>
+    <string name="calendar_status_in_progress">В работе</string>
+    <string name="calendar_status_review">На проверке</string>
+    <string name="calendar_status_done">Завершена</string>
+    <string name="calendar_status_scheduled">Запланирована</string>
+    <string name="calendar_status_live">В эфире</string>
+    <string name="calendar_status_ended">Завершена</string>
 </resources>

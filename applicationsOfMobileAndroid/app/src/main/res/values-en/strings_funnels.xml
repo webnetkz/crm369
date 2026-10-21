@@ -1,3 +1,106 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Board -->
+    <string name="funnels_choose_funnel">Choose funnel</string>
+    <string name="funnels_settings">Funnel settings</string>
+    <string name="funnels_inactive">Inactive</string>
+    <string name="funnels_active_status">Active</string>
+    <string name="funnels_deals_summary">Deals: %1$d · %2$s</string>
+    <string name="funnels_no_funnels_title">No funnels yet</string>
+    <string name="funnels_no_funnels_manage">Create your first funnel, configure stages, deal fields, and group access.</string>
+    <string name="funnels_no_funnels_ask">Ask your administrator to give you access to a funnel.</string>
+    <string name="funnels_no_stages">The funnel has no stages yet.</string>
+    <string name="funnels_no_stage_deals">There are no deals in this stage yet.</string>
+    <string name="funnels_stats_deals">Total deals</string>
+    <string name="funnels_stats_active">Active</string>
+    <string name="funnels_stats_won">Won</string>
+    <string name="funnels_stats_lost">Lost</string>
+    <string name="funnels_stats_amount">Funnel amount</string>
+    <string name="funnels_deal_menu">Deal actions</string>
+    <string name="funnels_open_deal">Open</string>
+    <string name="funnels_move_to_stage">Move to stage…</string>
+    <string name="funnels_move_title">Move deal</string>
+    <string name="funnels_deal_moved">Deal moved.</string>
+
+    <!-- Deal -->
+    <string name="funnels_deal">Deal</string>
+    <string name="funnels_new_deal">New deal</string>
+    <string name="funnels_edit_deal">Edit deal</string>
+    <string name="funnels_delete_deal">Delete deal</string>
+    <string name="funnels_delete_deal_text">Deal “%1$s” will be deleted permanently.</string>
+    <string name="funnels_deal_created">Deal created.</string>
+    <string name="funnels_deal_updated">Deal updated.</string>
+    <string name="funnels_deal_deleted">Deal deleted.</string>
+    <string name="funnels_stage">Stage</string>
+    <string name="funnels_deal_title">Deal title</string>
+    <string name="funnels_company_name">Company</string>
+    <string name="funnels_contact_name">Contact</string>
+    <string name="funnels_contact_phone">Phone</string>
+    <string name="funnels_contact_email">Email</string>
+    <string name="funnels_amount">Amount</string>
+    <string name="funnels_currency">Currency</string>
+    <string name="funnels_expected_close_at">Expected close date</string>
+    <string name="funnels_responsible_user">Responsible user</string>
+    <string name="funnels_responsible_hint">Leave empty if nobody is responsible yet.</string>
+    <string name="funnels_no_responsible_user">Unassigned</string>
+    <string name="funnels_deal_description">Deal description</string>
+    <string name="funnels_custom_fields">Additional fields</string>
+    <string name="funnels_section_main">Main</string>
+    <string name="funnels_section_contact">Contact person</string>
+    <string name="funnels_created">Created</string>
+    <string name="funnels_updated">Updated</string>
+    <string name="funnels_call">Call</string>
+    <string name="funnels_whatsapp">WhatsApp</string>
+    <string name="funnels_write_email">Email</string>
+
+    <!-- Funnel management -->
+    <string name="funnels_section_funnel">Funnel</string>
+    <string name="funnels_create_funnel">Create funnel</string>
+    <string name="funnels_edit_funnel">Edit funnel</string>
+    <string name="funnels_delete_funnel">Delete funnel</string>
+    <string name="funnels_delete_funnel_text">Funnel “%1$s” will be deleted together with its stages. This cannot be undone.</string>
+    <string name="funnels_funnel_created">Funnel created.</string>
+    <string name="funnels_funnel_updated">Funnel updated.</string>
+    <string name="funnels_funnel_deleted">Funnel deleted.</string>
+    <string name="funnels_name">Funnel name</string>
+    <string name="funnels_description">Description</string>
+    <string name="funnels_color">Color</string>
+    <string name="funnels_active">Funnel is active</string>
+    <string name="funnels_access_groups">Access groups</string>
+    <string name="funnels_access_groups_hint">The super admin always has access to every funnel. Other users get access through the selected groups.</string>
+    <string name="funnels_groups_none">No groups selected</string>
+    <string name="funnels_deal_fields">Deal fields</string>
+    <string name="funnels_deal_fields_hint">Extra fields that will be available in deals of this funnel.</string>
+    <string name="funnels_no_custom_fields">No additional fields have been added yet.</string>
+    <string name="funnels_add_field">Add field</string>
+    <string name="funnels_remove_field">Remove field</string>
+    <string name="funnels_field_number">Field %1$d</string>
+    <string name="funnels_field_label">Field label</string>
+    <string name="funnels_field_key">Field key</string>
+    <string name="funnels_field_key_hint">Latin letters, digits and _</string>
+    <string name="funnels_field_type">Field type</string>
+    <string name="funnels_field_required">Required field</string>
+    <string name="funnels_field_type_text">Text</string>
+    <string name="funnels_field_type_textarea">Long text</string>
+    <string name="funnels_field_type_number">Number</string>
+    <string name="funnels_field_type_date">Date</string>
+
+    <!-- Stages -->
+    <string name="funnels_stages">Funnel stages</string>
+    <string name="funnels_create_stage">Add stage</string>
+    <string name="funnels_edit_stage">Edit stage</string>
+    <string name="funnels_delete_stage">Delete stage</string>
+    <string name="funnels_delete_stage_text">Stage “%1$s” will be deleted. A stage that has deals cannot be deleted.</string>
+    <string name="funnels_stage_created">Stage created.</string>
+    <string name="funnels_stage_updated">Stage updated.</string>
+    <string name="funnels_stage_deleted">Stage deleted.</string>
+    <string name="funnels_stage_name">Stage name</string>
+    <string name="funnels_stage_color">Stage color</string>
+    <string name="funnels_stage_type">Stage type</string>
+    <string name="funnels_stage_sort_order">Sort order</string>
+    <string name="funnels_sort_order_hint">Stages with lower numbers come first.</string>
+    <string name="funnels_stage_type_open">In progress</string>
+    <string name="funnels_stage_type_won">Won</string>
+    <string name="funnels_stage_type_lost">Lost</string>
+    <string name="funnels_stage_summary">%1$s · Order: %2$d · Deals: %3$d</string>
 </resources>

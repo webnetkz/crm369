@@ -1,3 +1,106 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Board -->
+    <string name="funnels_choose_funnel">Выбрать воронку</string>
+    <string name="funnels_settings">Настройки воронки</string>
+    <string name="funnels_inactive">Неактивна</string>
+    <string name="funnels_active_status">Активна</string>
+    <string name="funnels_deals_summary">Сделок: %1$d · %2$s</string>
+    <string name="funnels_no_funnels_title">Воронок пока нет</string>
+    <string name="funnels_no_funnels_manage">Создайте первую воронку, настройте этапы, поля сделок и доступ для групп.</string>
+    <string name="funnels_no_funnels_ask">Обратитесь к администратору, чтобы получить доступ к воронке.</string>
+    <string name="funnels_no_stages">В воронке пока нет этапов.</string>
+    <string name="funnels_no_stage_deals">На этом этапе пока нет сделок.</string>
+    <string name="funnels_stats_deals">Всего сделок</string>
+    <string name="funnels_stats_active">Активные</string>
+    <string name="funnels_stats_won">Успешные</string>
+    <string name="funnels_stats_lost">Потерянные</string>
+    <string name="funnels_stats_amount">Сумма по воронке</string>
+    <string name="funnels_deal_menu">Действия со сделкой</string>
+    <string name="funnels_open_deal">Открыть</string>
+    <string name="funnels_move_to_stage">Переместить в этап…</string>
+    <string name="funnels_move_title">Переместить сделку</string>
+    <string name="funnels_deal_moved">Сделка перемещена.</string>
+
+    <!-- Deal -->
+    <string name="funnels_deal">Сделка</string>
+    <string name="funnels_new_deal">Новая сделка</string>
+    <string name="funnels_edit_deal">Редактировать сделку</string>
+    <string name="funnels_delete_deal">Удалить сделку</string>
+    <string name="funnels_delete_deal_text">Сделка «%1$s» будет удалена без возможности восстановления.</string>
+    <string name="funnels_deal_created">Сделка создана.</string>
+    <string name="funnels_deal_updated">Сделка обновлена.</string>
+    <string name="funnels_deal_deleted">Сделка удалена.</string>
+    <string name="funnels_stage">Этап</string>
+    <string name="funnels_deal_title">Название сделки</string>
+    <string name="funnels_company_name">Компания</string>
+    <string name="funnels_contact_name">Контакт</string>
+    <string name="funnels_contact_phone">Телефон</string>
+    <string name="funnels_contact_email">Email</string>
+    <string name="funnels_amount">Сумма</string>
+    <string name="funnels_currency">Валюта</string>
+    <string name="funnels_expected_close_at">Плановая дата закрытия</string>
+    <string name="funnels_responsible_user">Ответственный</string>
+    <string name="funnels_responsible_hint">Оставьте пустым, если ответственный не назначен.</string>
+    <string name="funnels_no_responsible_user">Не назначен</string>
+    <string name="funnels_deal_description">Описание сделки</string>
+    <string name="funnels_custom_fields">Дополнительные поля</string>
+    <string name="funnels_section_main">Основное</string>
+    <string name="funnels_section_contact">Контактное лицо</string>
+    <string name="funnels_created">Создано</string>
+    <string name="funnels_updated">Обновлено</string>
+    <string name="funnels_call">Позвонить</string>
+    <string name="funnels_whatsapp">WhatsApp</string>
+    <string name="funnels_write_email">Написать</string>
+
+    <!-- Funnel management -->
+    <string name="funnels_section_funnel">Воронка</string>
+    <string name="funnels_create_funnel">Создать воронку</string>
+    <string name="funnels_edit_funnel">Редактировать воронку</string>
+    <string name="funnels_delete_funnel">Удалить воронку</string>
+    <string name="funnels_delete_funnel_text">Воронка «%1$s» будет удалена вместе с этапами. Это действие нельзя отменить.</string>
+    <string name="funnels_funnel_created">Воронка создана.</string>
+    <string name="funnels_funnel_updated">Воронка обновлена.</string>
+    <string name="funnels_funnel_deleted">Воронка удалена.</string>
+    <string name="funnels_name">Название воронки</string>
+    <string name="funnels_description">Описание</string>
+    <string name="funnels_color">Цвет</string>
+    <string name="funnels_active">Воронка активна</string>
+    <string name="funnels_access_groups">Доступ по группам</string>
+    <string name="funnels_access_groups_hint">Супер администратор имеет доступ ко всем воронкам. Остальным пользователям доступ открывается через выбранные группы.</string>
+    <string name="funnels_groups_none">Группы не выбраны</string>
+    <string name="funnels_deal_fields">Поля сделок</string>
+    <string name="funnels_deal_fields_hint">Дополнительные поля, которые будут доступны в карточке сделки этой воронки.</string>
+    <string name="funnels_no_custom_fields">Дополнительные поля пока не добавлены.</string>
+    <string name="funnels_add_field">Добавить поле</string>
+    <string name="funnels_remove_field">Удалить поле</string>
+    <string name="funnels_field_number">Поле %1$d</string>
+    <string name="funnels_field_label">Название поля</string>
+    <string name="funnels_field_key">Ключ поля</string>
+    <string name="funnels_field_key_hint">Латинские буквы, цифры и _</string>
+    <string name="funnels_field_type">Тип поля</string>
+    <string name="funnels_field_required">Обязательное поле</string>
+    <string name="funnels_field_type_text">Текст</string>
+    <string name="funnels_field_type_textarea">Большой текст</string>
+    <string name="funnels_field_type_number">Число</string>
+    <string name="funnels_field_type_date">Дата</string>
+
+    <!-- Stages -->
+    <string name="funnels_stages">Этапы воронки</string>
+    <string name="funnels_create_stage">Добавить этап</string>
+    <string name="funnels_edit_stage">Редактировать этап</string>
+    <string name="funnels_delete_stage">Удалить этап</string>
+    <string name="funnels_delete_stage_text">Этап «%1$s» будет удалён. Этап, в котором есть сделки, удалить нельзя.</string>
+    <string name="funnels_stage_created">Этап добавлен.</string>
+    <string name="funnels_stage_updated">Этап обновлён.</string>
+    <string name="funnels_stage_deleted">Этап удалён.</string>
+    <string name="funnels_stage_name">Название этапа</string>
+    <string name="funnels_stage_color">Цвет этапа</string>
+    <string name="funnels_stage_type">Тип этапа</string>
+    <string name="funnels_stage_sort_order">Порядок</string>
+    <string name="funnels_sort_order_hint">Этапы с меньшим числом идут первыми.</string>
+    <string name="funnels_stage_type_open">В работе</string>
+    <string name="funnels_stage_type_won">Успешный</string>
+    <string name="funnels_stage_type_lost">Потерянный</string>
+    <string name="funnels_stage_summary">%1$s · Порядок: %2$d · Сделок: %3$d</string>
 </resources>

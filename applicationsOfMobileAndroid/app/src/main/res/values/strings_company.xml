@@ -1,3 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="company_total_value">Сотрудников: %1$d</string>
+    <string name="company_search_placeholder">Поиск по имени, должности или email</string>
+    <string name="company_empty_structure">Структура компании пока пуста</string>
+    <string name="company_results_count">Найдено: %1$d</string>
+    <string name="company_empty">Сотрудники не найдены</string>
+    <string name="company_tree_title">Оргструктура</string>
+    <string name="company_total_users">Сотрудники</string>
+    <string name="company_root_users">Руководители верхнего уровня</string>
+    <string name="company_managers">Руководители</string>
+    <string name="company_collapse">Свернуть</string>
+    <string name="company_expand">Развернуть</string>
+    <string name="company_no_position">Должность не указана</string>
+    <string name="company_reports_count">Подчинённых: %1$d</string>
+    <string name="company_employee_card">Карточка сотрудника</string>
+    <string name="company_inactive">Деактивирован</string>
+    <string name="company_chain">Цепочка руководителей</string>
+    <string name="company_write">Написать</string>
+    <string name="company_send_email">Написать письмо</string>
+    <string name="company_call">Позвонить</string>
+    <string name="company_contacts">Контакты</string>
+    <string name="company_email">Email</string>
+    <string name="company_phone">Телефон</string>
+    <string name="company_position">Должность</string>
+    <string name="company_manager">Руководитель</string>
+    <string name="company_no_manager">Руководитель не назначен</string>
+    <string name="company_subordinates_count">Подчинённые (%1$d)</string>
+    <string name="company_no_subordinates">Прямых подчинённых пока нет</string>
 </resources>
